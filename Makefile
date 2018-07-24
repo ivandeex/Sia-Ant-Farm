@@ -1,8 +1,8 @@
 all: install
 
 dependencies:
-	go get -u github.com/NebulousLabs/Sia/...
-	go install -tags='dev' github.com/NebulousLabs/Sia/cmd/siad
+	go get -u gitlab.com/NebulousLabs/Sia/...
+	go install -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
 	go install -race std
 	go get -u github.com/golang/lint/golint
 
@@ -31,7 +31,7 @@ lint:
 clean:
 	rm -rf cover
 
-cover: clean 
+cover: clean
 	mkdir -p cover/
 	@for package in $(pkgs); do \
 		go test -covermode=atomic -coverprofile=cover/$$package.out ./$$package \

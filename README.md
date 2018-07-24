@@ -2,15 +2,15 @@
 [![Build Status](https://travis-ci.org/NebulousLabs/Sia-Ant-Farm.svg?branch=travis)](https://travis-ci.org/NebulousLabs/Sia)
 
 sia-antfarm is a collection of utilities for performing complex, end-to-end
-tests of the [Sia](https://github.com/NebulousLabs/Sia) platform.  These test
+tests of the [Sia](https://gitlab.com/NebulousLabs/Sia) platform.  These test
 are long-running and offer superior insight into high-level
 network behaviour than Sia's existing automated testing suite.
 
 # Install
 
 ```shell
-go get -u github.com/NebulousLabs/Sia-Ant-Farm/...
-cd $GOPATH/src/github.com/NebulousLabs/Sia-Ant-Farm
+go get -u gitlab.com/NebulousLabs/Sia-Ant-Farm/...
+cd $GOPATH/src/gitlab.com/NebulousLabs/Sia-Ant-Farm
 make dependencies && make
 ```
 

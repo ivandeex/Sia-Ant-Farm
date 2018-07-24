@@ -7,10 +7,10 @@ import (
 	"net"
 	"os"
 
-	"github.com/NebulousLabs/Sia-Ant-Farm/ant"
-	"github.com/NebulousLabs/Sia/modules"
-	"github.com/NebulousLabs/Sia/node/api/client"
-	"github.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // getAddrs returns n free listening ports by leveraging the
