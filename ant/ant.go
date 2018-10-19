@@ -6,8 +6,8 @@ import (
 	"net"
 	"os/exec"
 
-	"github.com/NebulousLabs/Sia/types"
-	"github.com/NebulousLabs/go-upnp"
+	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/go-upnp"
 )
 
 // AntConfig represents a configuration object passed to New(), used to

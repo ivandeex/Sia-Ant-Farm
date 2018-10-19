@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
 
 // TestNewSiad tests that NewSiad creates a reachable Sia API

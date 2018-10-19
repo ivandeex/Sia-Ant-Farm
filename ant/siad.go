@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
 
 // newSiad spawns a new siad process using os/exec and waits for the api to

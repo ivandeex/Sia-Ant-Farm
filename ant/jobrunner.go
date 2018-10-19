@@ -1,8 +1,8 @@
 package ant
 
 import (
-	"github.com/NebulousLabs/Sia/node/api/client"
-	"github.com/NebulousLabs/Sia/sync"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/sync"
 )
 
 // A jobRunner is used to start up jobs on the running Sia node.
