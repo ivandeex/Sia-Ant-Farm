@@ -18,6 +18,7 @@ type AntConfig struct {
 	HostAddr        string `json:",omitempty"`
 	SiaDirectory    string `json:",omitempty"`
 	Name            string `json:",omitempty"`
+	APIPassword		string `json:",omitempty"`
 	SiadPath        string
 	Jobs            []string
 	DesiredCurrency uint64
@@ -81,7 +82,7 @@ func New(config AntConfig) (*Ant, error) {
 	}
 
 	// Construct the ant's Siad instance
-	siad, err := newSiad(config.SiadPath, config.SiaDirectory, config.APIAddr, config.RPCAddr, config.HostAddr)
+	siad, err := newSiad(config.SiadPath, config.SiaDirectory, config.APIAddr, config.RPCAddr, config.HostAddr, config.APIPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +94,7 @@ func New(config AntConfig) (*Ant, error) {
 		}
 	}()
 
-	j, err := newJobRunner(config.APIAddr, "", config.SiaDirectory)
+	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiaDirectory)
 	if err != nil {
 		return nil, err
 	}

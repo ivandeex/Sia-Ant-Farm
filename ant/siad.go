@@ -22,7 +22,7 @@ import (
 // exec.Command.  An error is returned if starting siad fails, otherwise a
 // pointer to siad's os.Cmd object is returned.  The data directory `datadir`
 // is passed as siad's `--sia-directory`.
-func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, hostAddr string) (*exec.Cmd, error) {
+func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, hostAddr string, apiPassword string) (*exec.Cmd, error) {
 	if err := checkSiadConstants(siadPath); err != nil {
 		return nil, err
 	}
@@ -31,9 +31,16 @@ func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, ho
 	if err != nil {
 		return nil, err
 	}
-	cmd := exec.Command(siadPath, "--modules=cgthmrw", "--no-bootstrap", "--sia-directory="+datadir, "--api-addr="+apiAddr, "--rpc-addr="+rpcAddr, "--host-addr="+hostAddr)
+	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory="+datadir, "--api-addr="+apiAddr, "--rpc-addr="+rpcAddr, "--host-addr="+hostAddr}
+	if apiPassword == "" {
+		args = append(args, "--authenticate-api=false")
+	}
+	cmd := exec.Command(siadPath, args...)
 	cmd.Stderr = logfile
 	cmd.Stdout = logfile
+	if apiPassword != "" {
+		cmd.Env = append(os.Environ(), "SIA_API_PASSWORD="+apiPassword)
+	}
 
 	if err := cmd.Start(); err != nil {
 		return nil, err

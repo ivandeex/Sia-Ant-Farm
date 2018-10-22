@@ -38,6 +38,7 @@ func connectAnts(ants ...*ant.Ant) error {
 	}
 	targetAnt := ants[0]
 	c := client.New(targetAnt.APIAddr)
+	c.Password = targetAnt.Config.APIPassword
 	for _, ant := range ants[1:] {
 		connectQuery := ant.RPCAddr
 		addr := modules.NetAddress(ant.RPCAddr)
