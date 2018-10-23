@@ -80,6 +80,7 @@ Note that the ants connect to each other over the public Internet, so you must e
 ```
 {
 	'APIAddr': the api address for the ant to listen on, by default an unused localhost: bind address will be used.
+	'APIPassword': the password to be used for authenticating certain calls to the ant.
 	'RPCAddr': the RPC address for the ant to listen on, by default an unused bind address will be used.
 	'HostAddr': the Host address for the ant to listen on, by default an unused bind address will be used.
 	'SiaDirectory': the data directory to use for this ant, by default a unique directory in `./antfarm-data` will be generated and used.

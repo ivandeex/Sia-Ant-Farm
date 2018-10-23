@@ -12,7 +12,7 @@ func TestNewJobRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(datadir)
-	siad, err := newSiad("siad", datadir, "localhost:31337", "localhost:31338", "localhost:31339")
+	siad, err := newSiad("siad", datadir, "localhost:31337", "localhost:31338", "localhost:31339", "")
 	if err != nil {
 		t.Fatal(err)
 	}
