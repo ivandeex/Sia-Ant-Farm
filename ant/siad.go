@@ -31,7 +31,7 @@ func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, ho
 	if err != nil {
 		return nil, err
 	}
-	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory="+datadir, "--api-addr="+apiAddr, "--rpc-addr="+rpcAddr, "--host-addr="+hostAddr}
+	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory=" + datadir, "--api-addr=" + apiAddr, "--rpc-addr=" + rpcAddr, "--host-addr=" + hostAddr}
 	if apiPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}

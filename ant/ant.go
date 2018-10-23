@@ -18,7 +18,7 @@ type AntConfig struct {
 	HostAddr        string `json:",omitempty"`
 	SiaDirectory    string `json:",omitempty"`
 	Name            string `json:",omitempty"`
-	APIPassword		string `json:",omitempty"`
+	APIPassword     string `json:",omitempty"`
 	SiadPath        string
 	Jobs            []string
 	DesiredCurrency uint64
