@@ -162,7 +162,11 @@ func (r *renterJob) deleteRandom() error {
 
 	randindex := fastrand.Intn(len(r.files))
 
-	if err := r.jr.client.RenterDeletePost(r.files[randindex].sourceFile); err != nil {
+	path, err := modules.NewSiaPath(r.files[randindex].sourceFile);
+	if err != nil {
+		return err
+	}
+	if err := r.jr.client.RenterDeletePost(path); err != nil {
 		return err
 	}
 
@@ -200,7 +204,7 @@ func (r *renterJob) download() error {
 	defer r.jr.tg.Done()
 
 	// Download a random file from the renter's file list
-	renterFiles, err := r.jr.client.RenterFilesGet()
+	renterFiles, err := r.jr.client.RenterFilesGet(false)  // cached=false
 	if err != nil {
 		return fmt.Errorf("error calling /renter/files: %v", err)
 	}
@@ -232,7 +236,7 @@ func (r *renterJob) download() error {
 
 	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.jr.siaDirectory, fileToDownload.SiaPath, destPath)
 
-	err = r.jr.client.RenterDownloadGet(fileToDownload.SiaPath, destPath, 0, fileToDownload.Filesize, true)
+	_, err = r.jr.client.RenterDownloadGet(fileToDownload.SiaPath, destPath, 0, fileToDownload.Filesize, true)
 	if err != nil {
 		return fmt.Errorf("failed in call to /renter/download: %v", err)
 	}
@@ -319,11 +323,9 @@ func (r *renterJob) upload() error {
 		return err
 	}
 
-	// use the sourcePath with its leading slash stripped for the sia path
-	siapath := sourcePath[1:]
-	if string(sourcePath[1]) == ":" {
-		// looks like a Windows path - Cut Differently!
-		siapath = sourcePath[3:]
+	siapath, err := modules.NewSiaPath(sourcePath);
+	if err != nil {
+		return err
 	}
 
 	// Add the file to the renter.
@@ -351,7 +353,7 @@ func (r *renterJob) upload() error {
 		case <-time.After(time.Second * 20):
 		}
 
-		rfg, err := r.jr.client.RenterFilesGet()
+		rfg, err := r.jr.client.RenterFilesGet(false)  // cached=false
 		if err != nil {
 			return fmt.Errorf("error calling /renter/files: %v", err)
 		}
