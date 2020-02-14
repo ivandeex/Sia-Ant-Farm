@@ -162,11 +162,11 @@ func (r *renterJob) deleteRandom() error {
 
 	randindex := fastrand.Intn(len(r.files))
 
-	path, err := modules.NewSiaPath(r.files[randindex].sourceFile);
+	path, err := modules.NewSiaPath(r.files[randindex].sourceFile)
 	if err != nil {
 		return err
 	}
-	if err := r.jr.client.RenterDeletePost(path); err != nil {
+	if err := r.jr.client.RenterFileDeletePost(path); err != nil {
 		return err
 	}
 
@@ -204,7 +204,7 @@ func (r *renterJob) download() error {
 	defer r.jr.tg.Done()
 
 	// Download a random file from the renter's file list
-	renterFiles, err := r.jr.client.RenterFilesGet(false)  // cached=false
+	renterFiles, err := r.jr.client.RenterFilesGet(false) // cached=false
 	if err != nil {
 		return fmt.Errorf("error calling /renter/files: %v", err)
 	}
@@ -236,7 +236,7 @@ func (r *renterJob) download() error {
 
 	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.jr.siaDirectory, fileToDownload.SiaPath, destPath)
 
-	_, err = r.jr.client.RenterDownloadGet(fileToDownload.SiaPath, destPath, 0, fileToDownload.Filesize, true)
+	_, err = r.jr.client.RenterDownloadGet(fileToDownload.SiaPath, destPath, 0, fileToDownload.Filesize, true, false)
 	if err != nil {
 		return fmt.Errorf("failed in call to /renter/download: %v", err)
 	}
@@ -323,7 +323,7 @@ func (r *renterJob) upload() error {
 		return err
 	}
 
-	siapath, err := modules.NewSiaPath(sourcePath);
+	siapath, err := modules.NewSiaPath(sourcePath)
 	if err != nil {
 		return err
 	}
@@ -353,7 +353,7 @@ func (r *renterJob) upload() error {
 		case <-time.After(time.Second * 20):
 		}
 
-		rfg, err := r.jr.client.RenterFilesGet(false)  // cached=false
+		rfg, err := r.jr.client.RenterFilesGet(false) // cached=false
 		if err != nil {
 			return fmt.Errorf("error calling /renter/files: %v", err)
 		}
