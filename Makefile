@@ -1,7 +1,6 @@
 all: install
 
 dependencies:
-	go get -u gitlab.com/NebulousLabs/Sia/...
 	go install -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
 	go install -race std
 	go get -u golang.org/x/lint/golint
