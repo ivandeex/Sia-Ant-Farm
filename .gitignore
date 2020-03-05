@@ -22,3 +22,7 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# Ignore any files created by the user
+antfarm-data
+config.json
