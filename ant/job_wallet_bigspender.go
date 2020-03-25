@@ -36,7 +36,7 @@ func (j *jobRunner) bigSpender() {
 		log.Printf("[%v jobSpender INFO]: sending a large transaction\n", j.siaDirectory)
 
 		voidaddress := types.UnlockHash{}
-		_, err = j.client.WalletSiacoinsPost(spendThreshold, voidaddress)
+		_, err = j.client.WalletSiacoinsPost(spendThreshold, voidaddress, false)
 		if err != nil {
 			log.Printf("[%v jobSpender ERROR]: %v\n", j.siaDirectory, err)
 			continue

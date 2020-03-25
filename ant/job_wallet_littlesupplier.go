@@ -33,7 +33,7 @@ func (j *jobRunner) littleSupplier(sendAddress types.UnlockHash) {
 			continue
 		}
 
-		_, err = j.client.WalletSiacoinsPost(sendAmount, sendAddress)
+		_, err = j.client.WalletSiacoinsPost(sendAmount, sendAddress, false)
 		if err != nil {
 			log.Printf("[%v jobSupplier ERROR]: %v\n", j.siaDirectory, err)
 		}
