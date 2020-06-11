@@ -22,12 +22,16 @@ func TestNewSiad(t *testing.T) {
 
 	siad, err := newSiad("siad", datadir, "localhost:9990", "localhost:0", "localhost:0", "")
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	defer siad.Process.Kill()
 
-	c := client.New("localhost:9990")
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Address = "localhost:9990"
+	c := client.New(opts)
 	if _, err := c.ConsensusGet(); err != nil {
 		t.Error(err)
 	}

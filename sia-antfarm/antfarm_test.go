@@ -111,7 +111,12 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	time.Sleep(time.Second * 3)
 
 	// verify that farm2 has farm1 as its peer
-	c := client.New(farm1.ants[0].APIAddr)
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Address = farm1.ants[0].APIAddr
+	c := client.New(opts)
 	gatewayInfo, err := c.GatewayGet()
 	if err != nil {
 		t.Fatal(err)

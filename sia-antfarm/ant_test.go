@@ -39,7 +39,12 @@ func TestStartAnts(t *testing.T) {
 
 	// verify each ant has a reachable api
 	for _, ant := range ants {
-		c := client.New(ant.APIAddr)
+		opts, err := client.DefaultOptions()
+		if err != nil {
+			t.Fatal(err)
+		}
+		opts.Address = ant.APIAddr
+		c := client.New(opts)
 		if _, err := c.ConsensusGet(); err != nil {
 			t.Fatal(err)
 		}
@@ -82,7 +87,12 @@ func TestConnectAnts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	c := client.New(ants[0].APIAddr)
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Address = ants[0].APIAddr
+	c := client.New(opts)
 	gatewayInfo, err := c.GatewayGet()
 	if err != nil {
 		t.Fatal(err)

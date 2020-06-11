@@ -6,7 +6,6 @@ their behavior and report their successfullness at each user store.
 package ant
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // newSiad spawns a new siad process using os/exec and waits for the api to
@@ -73,7 +73,12 @@ func checkSiadConstants(siadPath string) error {
 // stopSiad tries to stop the siad running at `apiAddr`, issuing a kill to its
 // `process` after a timeout.
 func stopSiad(apiAddr string, process *os.Process) {
-	if err := client.New(apiAddr).DaemonStopGet(); err != nil {
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		panic(err)
+	}
+	opts.Address = apiAddr
+	if err := client.New(opts).DaemonStopGet(); err != nil {
 		process.Kill()
 	}
 
@@ -93,7 +98,12 @@ func stopSiad(apiAddr string, process *os.Process) {
 // waitForAPI blocks until the Sia API at apiAddr becomes available.
 // if siad returns while waiting for the api, return an error.
 func waitForAPI(apiAddr string, siad *exec.Cmd) error {
-	c := client.New(apiAddr)
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		return errors.AddContext(err, "unable to get client options")
+	}
+	opts.Address = apiAddr
+	c := client.New(opts)
 
 	exitchan := make(chan error)
 	go func() {
