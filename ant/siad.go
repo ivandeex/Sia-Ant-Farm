@@ -6,7 +6,6 @@ their behavior and report their successfullness at each user store.
 package ant
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // newSiad spawns a new siad process using os/exec and waits for the api to
@@ -31,7 +31,7 @@ func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, ho
 	if err != nil {
 		return nil, err
 	}
-	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory=" + datadir, "--api-addr=" + apiAddr, "--rpc-addr=" + rpcAddr, "--host-addr=" + hostAddr, "--siamux-addr="+siamuxAddr, "--siamux-addr-ws="+siamuxWsAddr}
+	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory=" + datadir, "--api-addr=" + apiAddr, "--rpc-addr=" + rpcAddr, "--host-addr=" + hostAddr, "--siamux-addr=" + siamuxAddr, "--siamux-addr-ws=" + siamuxWsAddr}
 	if apiPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}
@@ -73,12 +73,12 @@ func checkSiadConstants(siadPath string) error {
 // stopSiad tries to stop the siad running at `apiAddr`, issuing a kill to its
 // `process` after a timeout.
 func stopSiad(apiAddr string, process *os.Process) {
-	opts := client.Options{
-		Address:   apiAddr,
-		UserAgent: UserAgent,
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		panic(err)
 	}
-	c := client.New(opts)
-	if err := c.DaemonStopGet(); err != nil {
+	opts.Address = apiAddr
+	if err := client.New(opts).DaemonStopGet(); err != nil {
 		process.Kill()
 	}
 
@@ -98,10 +98,11 @@ func stopSiad(apiAddr string, process *os.Process) {
 // waitForAPI blocks until the Sia API at apiAddr becomes available.
 // if siad returns while waiting for the api, return an error.
 func waitForAPI(apiAddr string, siad *exec.Cmd) error {
-	opts := client.Options{
-		Address:   apiAddr,
-		UserAgent: UserAgent,
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		return errors.AddContext(err, "unable to get client options")
 	}
+	opts.Address = apiAddr
 	c := client.New(opts)
 
 	exitchan := make(chan error)

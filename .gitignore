@@ -23,7 +23,6 @@ _testmain.go
 *.test
 *.prof
 
-# Data created during executiong
-antfarm-data/
+# Ignore any files created by the user
+antfarm-data
 config.json
-

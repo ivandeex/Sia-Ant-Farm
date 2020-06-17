@@ -2,12 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/julienschmidt/httprouter"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/julienschmidt/httprouter"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 )
