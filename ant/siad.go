@@ -22,7 +22,7 @@ import (
 // exec.Command.  An error is returned if starting siad fails, otherwise a
 // pointer to siad's os.Cmd object is returned.  The data directory `datadir`
 // is passed as siad's `--sia-directory`.
-func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, hostAddr string, apiPassword string) (*exec.Cmd, error) {
+func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, hostAddr string, siamuxAddr string, siamuxWsAddr string, apiPassword string) (*exec.Cmd, error) {
 	if err := checkSiadConstants(siadPath); err != nil {
 		return nil, err
 	}
@@ -31,7 +31,7 @@ func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, ho
 	if err != nil {
 		return nil, err
 	}
-	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory=" + datadir, "--api-addr=" + apiAddr, "--rpc-addr=" + rpcAddr, "--host-addr=" + hostAddr}
+	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory=" + datadir, "--api-addr=" + apiAddr, "--rpc-addr=" + rpcAddr, "--host-addr=" + hostAddr, "--siamux-addr="+siamuxAddr, "--siamux-addr-ws="+siamuxWsAddr}
 	if apiPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}

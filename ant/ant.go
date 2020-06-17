@@ -20,6 +20,8 @@ type AntConfig struct {
 	APIAddr         string `json:",omitempty"`
 	RPCAddr         string `json:",omitempty"`
 	HostAddr        string `json:",omitempty"`
+	SiamuxAddr      string `json:",omitempty"`
+	SiamuxWsAddr    string `json:",omitempty"`
 	SiaDirectory    string `json:",omitempty"`
 	Name            string `json:",omitempty"`
 	APIPassword     string `json:",omitempty"`
@@ -86,7 +88,7 @@ func New(config AntConfig) (*Ant, error) {
 	}
 
 	// Construct the ant's Siad instance
-	siad, err := newSiad(config.SiadPath, config.SiaDirectory, config.APIAddr, config.RPCAddr, config.HostAddr, config.APIPassword)
+	siad, err := newSiad(config.SiadPath, config.SiaDirectory, config.APIAddr, config.RPCAddr, config.HostAddr, config.SiamuxAddr, config.SiamuxWsAddr, config.APIPassword)
 	if err != nil {
 		return nil, err
 	}
