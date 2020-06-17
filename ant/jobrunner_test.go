@@ -12,7 +12,17 @@ func TestNewJobRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(datadir)
-	siad, err := newSiad("siad", datadir, "localhost:31337", "localhost:31338", "localhost:31339", "localhost:31340", "localhost:31341", "")
+	config := SiadConfig{
+		APIAddr:      "localhost:31337",
+		APIPassword:  "",
+		DataDir:      datadir,
+		HostAddr:     "localhost:31339",
+		RPCAddr:      "localhost:31338",
+		SiadPath:     "siadDir",
+		SiaMuxAddr:   "localhost:31340",
+		SiaMuxWsAddr: "localhost:31341",
+	}
+	siad, err := newSiad(config)
 	if err != nil {
 		t.Fatal(err)
 	}

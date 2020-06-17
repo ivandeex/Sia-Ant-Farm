@@ -21,7 +21,9 @@ func TestNewAntfarm(t *testing.T) {
 		ListenAddress: "localhost:31337",
 		AntConfigs: []ant.AntConfig{
 			{
-				RPCAddr: "localhost:3337",
+				SiadConfig: ant.SiadConfig{
+					RPCAddr: "localhost:3337",
+				},
 				Jobs: []string{
 					"gateway",
 				},
@@ -62,30 +64,25 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		t.SkipNow()
 	}
 
+	antConfig := ant.AntConfig{
+		SiadConfig: ant.SiadConfig{
+			RPCAddr: "127.0.0.1:3338",
+		},
+		Jobs: []string{
+			"gateway",
+		},
+	}
+
 	config1 := AntfarmConfig{
 		ListenAddress: "127.0.0.1:31337",
 		DataDirPrefix: "antfarm-data1",
-		AntConfigs: []ant.AntConfig{
-			{
-				RPCAddr: "127.0.0.1:3337",
-				Jobs: []string{
-					"gateway",
-				},
-			},
-		},
+		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
 	config2 := AntfarmConfig{
 		ListenAddress: "127.0.0.1:31338",
 		DataDirPrefix: "antfarm-data2",
-		AntConfigs: []ant.AntConfig{
-			{
-				RPCAddr: "127.0.0.1:3338",
-				Jobs: []string{
-					"gateway",
-				},
-			},
-		},
+		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
 	farm1, err := createAntfarm(config1)

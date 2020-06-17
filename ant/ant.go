@@ -13,15 +13,10 @@ import (
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
 type AntConfig struct {
-	APIAddr         string `json:",omitempty"`
-	RPCAddr         string `json:",omitempty"`
-	HostAddr        string `json:",omitempty"`
-	SiamuxAddr      string `json:",omitempty"`
-	SiamuxWsAddr    string `json:",omitempty"`
+	SiadConfig
+
 	SiaDirectory    string `json:",omitempty"`
 	Name            string `json:",omitempty"`
-	APIPassword     string `json:",omitempty"`
-	SiadPath        string
 	Jobs            []string
 	DesiredCurrency uint64
 }
@@ -84,7 +79,7 @@ func New(config AntConfig) (*Ant, error) {
 	}
 
 	// Construct the ant's Siad instance
-	siad, err := newSiad(config.SiadPath, config.SiaDirectory, config.APIAddr, config.RPCAddr, config.HostAddr, config.SiamuxAddr, config.SiamuxWsAddr, config.APIPassword)
+	siad, err := newSiad(config.SiadConfig)
 	if err != nil {
 		return nil, err
 	}

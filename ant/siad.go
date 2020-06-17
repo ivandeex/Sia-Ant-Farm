@@ -17,36 +17,59 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
+// SiadConfig contains the necessary config information to create a new siad
+// instance
+type SiadConfig struct {
+	APIAddr      string
+	APIPassword  string
+	DataDir      string
+	HostAddr     string
+	RPCAddr      string
+	SiadPath     string
+	SiaMuxAddr   string
+	SiaMuxWsAddr string
+}
+
 // newSiad spawns a new siad process using os/exec and waits for the api to
 // become available.  siadPath is the path to Siad, passed directly to
 // exec.Command.  An error is returned if starting siad fails, otherwise a
 // pointer to siad's os.Cmd object is returned.  The data directory `datadir`
 // is passed as siad's `--sia-directory`.
-func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, hostAddr string, siamuxAddr string, siamuxWsAddr string, apiPassword string) (*exec.Cmd, error) {
-	if err := checkSiadConstants(siadPath); err != nil {
+func newSiad(config SiadConfig) (*exec.Cmd, error) {
+	if err := checkSiadConstants(config.SiadPath); err != nil {
 		return nil, err
 	}
 	// create a logfile for Sia's stderr and stdout.
-	logfile, err := os.Create(filepath.Join(datadir, "sia-output.log"))
+	logfile, err := os.Create(filepath.Join(config.DataDir, "sia-output.log"))
 	if err != nil {
 		return nil, err
 	}
-	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory=" + datadir, "--api-addr=" + apiAddr, "--rpc-addr=" + rpcAddr, "--host-addr=" + hostAddr, "--siamux-addr=" + siamuxAddr, "--siamux-addr-ws=" + siamuxWsAddr}
-	if apiPassword == "" {
+	args := []string{
+		"--modules=cgthmrw",
+		"--no-bootstrap",
+		"--sia-directory=" + config.DataDir,
+		"--api-addr=" + config.APIAddr,
+		"--rpc-addr=" + config.RPCAddr,
+		"--host-addr=" + config.HostAddr,
+		"--siamux-addr=" + config.SiaMuxAddr,
+		"--siamux-addr-ws=" + config.SiaMuxWsAddr,
+	}
+
+	if config.APIPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}
-	cmd := exec.Command(siadPath, args...)
+	cmd := exec.Command(config.SiadPath, args...)
 	cmd.Stderr = logfile
 	cmd.Stdout = logfile
-	if apiPassword != "" {
-		cmd.Env = append(os.Environ(), "SIA_API_PASSWORD="+apiPassword)
+	if config.APIPassword != "" {
+		cmd.Env = append(os.Environ(), "SIA_API_PASSWORD="+config.APIPassword)
 	}
 
 	if err := cmd.Start(); err != nil {
 		return nil, err
 	}
 
-	if err := waitForAPI(apiAddr, cmd); err != nil {
+	if err := waitForAPI(config.APIAddr, cmd); err != nil {
 		return nil, err
 	}
 

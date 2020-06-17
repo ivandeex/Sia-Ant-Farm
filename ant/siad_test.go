@@ -20,7 +20,18 @@ func TestNewSiad(t *testing.T) {
 	}
 	defer os.RemoveAll(datadir)
 
-	siad, err := newSiad("siad", datadir, "localhost:9990", "localhost:0", "localhost:0", "localhost:0", "localhost:0", "")
+	config := SiadConfig{
+		APIAddr:      "localhost:9990",
+		APIPassword:  "",
+		DataDir:      datadir,
+		HostAddr:     "localhost:0",
+		RPCAddr:      "localhost:0",
+		SiadPath:     "siad",
+		SiaMuxAddr:   "localhost:0",
+		SiaMuxWsAddr: "localhost:0",
+	}
+
+	siad, err := newSiad(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,7 +49,8 @@ func TestNewSiad(t *testing.T) {
 	siad.Process.Kill()
 
 	// verify that NewSiad returns an error given invalid args
-	_, err = newSiad("siad", datadir, "this_is_an_invalid_addres:1000000", "localhost:0", "localhost:0", "localhost:0", "localhost:0", "")
+	config.APIAddr = "this_is_an_invalid_addres:1000000"
+	_, err = newSiad(config)
 	if err == nil {
 		t.Fatal("expected newsiad to return an error with invalid args")
 	}

@@ -25,7 +25,7 @@ func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jo
 	}
 	opt.Address = apiaddr
 	opt.Password = authpassword
-	client := client.New(opt)
+	c := client.New(opt)
 	jr := &jobRunner{
 		client:       c,
 		siaDirectory: siadirectory,

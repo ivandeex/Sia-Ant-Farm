@@ -16,11 +16,13 @@ func TestNewAnt(t *testing.T) {
 	}
 	defer os.RemoveAll(datadir)
 	config := AntConfig{
-		APIAddr:      "localhost:31337",
-		RPCAddr:      "localhost:31338",
-		HostAddr:     "localhost:31339",
+		SiadConfig: SiadConfig{
+			APIAddr:  "localhost:31337",
+			RPCAddr:  "localhost:31338",
+			HostAddr: "localhost:31339",
+			SiadPath: "siad",
+		},
 		SiaDirectory: datadir,
-		SiadPath:     "siad",
 	}
 
 	ant, err := New(config)
@@ -48,11 +50,13 @@ func TestStartJob(t *testing.T) {
 	defer os.RemoveAll(datadir)
 
 	config := AntConfig{
-		APIAddr:      "localhost:31337",
-		RPCAddr:      "localhost:31338",
-		HostAddr:     "localhost:31339",
+		SiadConfig: SiadConfig{
+			APIAddr:  "localhost:31337",
+			RPCAddr:  "localhost:31338",
+			HostAddr: "localhost:31339",
+			SiadPath: "siad",
+		},
 		SiaDirectory: datadir,
-		SiadPath:     "siad",
 	}
 
 	ant, err := New(config)
@@ -76,11 +80,13 @@ func TestWalletAddress(t *testing.T) {
 	defer os.RemoveAll(datadir)
 
 	config := AntConfig{
-		APIAddr:      "localhost:31337",
-		RPCAddr:      "localhost:31338",
-		HostAddr:     "localhost:31339",
+		SiadConfig: SiadConfig{
+			APIAddr:  "localhost:31337",
+			RPCAddr:  "localhost:31338",
+			HostAddr: "localhost:31339",
+			SiadPath: "siad",
+		},
 		SiaDirectory: datadir,
-		SiadPath:     "siad",
 	}
 
 	ant, err := New(config)
