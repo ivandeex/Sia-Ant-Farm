@@ -22,3 +22,8 @@ _testmain.go
 *.exe
 *.test
 *.prof
+
+# Data created during executiong
+antfarm-data/
+config.json
+
