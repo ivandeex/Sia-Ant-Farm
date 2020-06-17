@@ -58,7 +58,7 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	if config.APIPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}
-	cmd := exec.Command(config.SiadPath, args...)
+	cmd := exec.Command(config.SiadPath, args...) //nolint:gosec
 	cmd.Stderr = logfile
 	cmd.Stdout = logfile
 	if config.APIPassword != "" {
@@ -80,7 +80,7 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 // is running the correct, dev, constants. Returns an error if the correct
 // constants are not running, otherwise returns nil.
 func checkSiadConstants(siadPath string) error {
-	cmd := exec.Command(siadPath, "version")
+	cmd := exec.Command(siadPath, "version") //nolint:gosec
 	output, err := cmd.Output()
 	if err != nil {
 		return err

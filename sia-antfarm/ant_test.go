@@ -17,6 +17,7 @@ func TestStartAnts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	configs := []ant.AntConfig{
 		{},
@@ -55,6 +56,7 @@ func TestConnectAnts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// connectAnts should throw an error if only one ant is provided
 	if err := connectAnts(&ant.Ant{}); err == nil {
@@ -101,7 +103,7 @@ func TestConnectAnts(t *testing.T) {
 	for _, ant := range ants[1:] {
 		hasAddr := false
 		for _, peer := range gatewayInfo.Peers {
-			if fmt.Sprintf("%s", peer.NetAddress) == "127.0.0.1"+ant.RPCAddr {
+			if fmt.Sprintln(peer.NetAddress) == "127.0.0.1"+ant.RPCAddr {
 				hasAddr = true
 			}
 		}
@@ -115,6 +117,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// spin up our testing ants
 	configs := []ant.AntConfig{

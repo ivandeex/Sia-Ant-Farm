@@ -18,14 +18,13 @@ import (
 	"gitlab.com/NebulousLabs/go-upnp"
 )
 
-// getAddrs returns n free listening ports by leveraging the
-// behaviour of net.Listen(":0").  Addresses are returned in the format of
-// ":port"
+// getAddrs returns n free listening ports by leveraging the behaviour of
+// net.Listen(":0").  Addresses are returned in the format of ":port"
 func getAddrs(n int) ([]string, error) {
 	var addrs []string
 
 	for i := 0; i < n; i++ {
-		l, err := net.Listen("tcp", ":0")
+		l, err := net.Listen("tcp", ":0") //nolint:gosec
 		if err != nil {
 			return nil, err
 		}
@@ -223,7 +222,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 	if err != nil {
 		ipAddr, err = myExternalIP()
 		if err != nil {
-			err = errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")
+			return ant.AntConfig{}, errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")
 		}
 	}
 	// Automatically generate 3 free operating system ports for the Ant's api,

@@ -13,6 +13,7 @@ func TestNewSiad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	datadir, err := ioutil.TempDir("", "sia-testing")
 	if err != nil {
@@ -49,7 +50,7 @@ func TestNewSiad(t *testing.T) {
 	siad.Process.Kill()
 
 	// verify that NewSiad returns an error given invalid args
-	config.APIAddr = "this_is_an_invalid_addres:1000000"
+	config.APIAddr = "this_is_an_invalid_address:1000000"
 	_, err = newSiad(config)
 	if err == nil {
 		t.Fatal("expected newsiad to return an error with invalid args")

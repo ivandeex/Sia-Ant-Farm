@@ -8,10 +8,10 @@ import (
 
 // A jobRunner is used to start up jobs on the running Sia node.
 type jobRunner struct {
-	client         *client.Client
-	walletPassword string
-	siaDirectory   string
-	tg             sync.ThreadGroup
+	staticClient         *client.Client
+	staticWalletPassword string
+	staticSiaDirectory   string
+	staticTG             sync.ThreadGroup
 }
 
 // newJobRunner creates a new job runner, using the provided api address,
@@ -27,16 +27,16 @@ func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jo
 	opt.Password = authpassword
 	c := client.New(opt)
 	jr := &jobRunner{
-		client:       c,
-		siaDirectory: siadirectory,
+		staticClient:       c,
+		staticSiaDirectory: siadirectory,
 	}
-	walletParams, err := jr.client.WalletInitPost("", false)
+	walletParams, err := jr.staticClient.WalletInitPost("", false)
 	if err != nil {
 		return nil, err
 	}
-	jr.walletPassword = walletParams.PrimarySeed
+	jr.staticWalletPassword = walletParams.PrimarySeed
 
-	err = jr.client.WalletUnlockPost(jr.walletPassword)
+	err = jr.staticClient.WalletUnlockPost(jr.staticWalletPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -47,5 +47,5 @@ func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jo
 // Stop signals all running jobs to stop and blocks until the jobs have
 // finished stopping.
 func (j *jobRunner) Stop() {
-	j.tg.Stop()
+	j.staticTG.Stop()
 }

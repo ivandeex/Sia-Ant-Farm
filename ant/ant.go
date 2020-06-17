@@ -177,7 +177,7 @@ func (a *Ant) WalletAddress() (*types.UnlockHash, error) {
 		return nil, errors.New("ant is not running")
 	}
 
-	addressGet, err := a.jr.client.WalletAddressGet()
+	addressGet, err := a.jr.staticClient.WalletAddressGet()
 	if err != nil {
 		return nil, err
 	}

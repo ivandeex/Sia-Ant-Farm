@@ -7,6 +7,7 @@ import (
 )
 
 func TestNewJobRunner(t *testing.T) {
+	t.Parallel()
 	datadir, err := ioutil.TempDir("", "testing-data")
 	if err != nil {
 		t.Fatal(err)

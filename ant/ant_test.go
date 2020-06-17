@@ -10,6 +10,7 @@ import (
 )
 
 func TestNewAnt(t *testing.T) {
+	t.Parallel()
 	datadir, err := ioutil.TempDir("", "testing-data")
 	if err != nil {
 		t.Fatal(err)
@@ -43,6 +44,7 @@ func TestNewAnt(t *testing.T) {
 }
 
 func TestStartJob(t *testing.T) {
+	t.Parallel()
 	datadir, err := ioutil.TempDir("", "testing-data")
 	if err != nil {
 		t.Fatal(err)
@@ -73,6 +75,7 @@ func TestStartJob(t *testing.T) {
 }
 
 func TestWalletAddress(t *testing.T) {
+	t.Parallel()
 	datadir, err := ioutil.TempDir("", "testing-data")
 	if err != nil {
 		t.Fatal(err)

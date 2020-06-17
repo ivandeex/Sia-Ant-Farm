@@ -56,6 +56,7 @@ lint:
     - ./bin/golangci-lint run -c .golangci.yml ./...
     - make lint-analyze
     - make markdown-spellcheck
+    - make test
 
 build:
   stage: lint
@@ -66,7 +67,7 @@ build:
     paths:
       - $CI_PROJECT_DIR/artifacts
   script:
-    - ./check-builds.sh
+      - make install
 
 tests:
   <<: *default_test_params
@@ -75,5 +76,5 @@ tests:
     paths:
       - .cache
   script:
-    - make test
+    - make test-long
 

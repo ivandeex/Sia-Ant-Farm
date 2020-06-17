@@ -10,13 +10,13 @@ import (
 // balanceMaintainer mines when the balance is below desiredBalance. The miner
 // is stopped if the balance exceeds the desired balance.
 func (j *jobRunner) balanceMaintainer(desiredBalance types.Currency) {
-	j.tg.Add()
-	defer j.tg.Done()
+	j.staticTG.Add()
+	defer j.staticTG.Done()
 
 	minerRunning := true
-	err := j.client.MinerStartGet()
+	err := j.staticClient.MinerStartGet()
 	if err != nil {
-		log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.siaDirectory, err)
+		log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.staticSiaDirectory, err)
 		return
 	}
 
@@ -26,30 +26,30 @@ func (j *jobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	// started.
 	for {
 		select {
-		case <-j.tg.StopChan():
+		case <-j.staticTG.StopChan():
 			return
 		case <-time.After(time.Second * 20):
 		}
 
-		walletInfo, err := j.client.WalletGet()
+		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.siaDirectory, err)
+			log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.staticSiaDirectory, err)
 			return
 		}
 
 		haveDesiredBalance := walletInfo.ConfirmedSiacoinBalance.Cmp(desiredBalance) > 0
 		if !minerRunning && !haveDesiredBalance {
-			log.Printf("[%v balanceMaintainer INFO]: not enough currency, starting the miner\n", j.siaDirectory)
+			log.Printf("[%v balanceMaintainer INFO]: not enough currency, starting the miner\n", j.staticSiaDirectory)
 			minerRunning = true
-			if err = j.client.MinerStartGet(); err != nil {
-				log.Printf("[%v miner ERROR]: %v\n", j.siaDirectory, err)
+			if err = j.staticClient.MinerStartGet(); err != nil {
+				log.Printf("[%v miner ERROR]: %v\n", j.staticSiaDirectory, err)
 				return
 			}
 		} else if minerRunning && haveDesiredBalance {
-			log.Printf("[%v balanceMaintainer INFO]: mined enough currency, stopping the miner\n", j.siaDirectory)
+			log.Printf("[%v balanceMaintainer INFO]: mined enough currency, stopping the miner\n", j.staticSiaDirectory)
 			minerRunning = false
-			if err = j.client.MinerStopGet(); err != nil {
-				log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.siaDirectory, err)
+			if err = j.staticClient.MinerStopGet(); err != nil {
+				log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.staticSiaDirectory, err)
 				return
 			}
 		}

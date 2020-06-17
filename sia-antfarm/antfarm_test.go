@@ -16,6 +16,7 @@ func TestNewAntfarm(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	config := AntfarmConfig{
 		ListenAddress: "localhost:31337",
@@ -63,6 +64,7 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
@@ -122,7 +124,7 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	for _, ant := range farm2.ants {
 		hasAddr := false
 		for _, peer := range gatewayInfo.Peers {
-			if fmt.Sprintf("%s", peer.NetAddress) == ant.RPCAddr {
+			if fmt.Sprintln(peer.NetAddress) == ant.RPCAddr {
 				hasAddr = true
 			}
 		}
