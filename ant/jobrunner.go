@@ -18,10 +18,14 @@ type jobRunner struct {
 // be newly initialized, and initializes a new wallet, for usage in the jobs.
 // siadirectory is used in logging to identify the job runner.
 func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jobRunner, error) {
-	client := client.New(apiaddr)
-	client.Password = authpassword
+	opts := client.Options{
+		Address:   apiaddr,
+		Password:  authpassword,
+		UserAgent: UserAgent,
+	}
+	c := client.New(opts)
 	jr := &jobRunner{
-		client:       client,
+		client:       c,
 		siaDirectory: siadirectory,
 	}
 	walletParams, err := jr.client.WalletInitPost("", false)

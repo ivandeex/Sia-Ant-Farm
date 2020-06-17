@@ -10,6 +10,10 @@ import (
 	"gitlab.com/NebulousLabs/go-upnp"
 )
 
+var (
+	UserAgent = "Sia-Agent"
+)
+
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
 type AntConfig struct {

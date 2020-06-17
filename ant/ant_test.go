@@ -29,7 +29,11 @@ func TestNewAnt(t *testing.T) {
 	}
 	defer ant.Close()
 
-	c := client.New("localhost:31337")
+	opts := client.Options{
+		Address:   "localhost:31337",
+		UserAgent: UserAgent,
+	}
+	c := client.New(opts)
 	if _, err = c.ConsensusGet(); err != nil {
 		t.Fatal(err)
 	}

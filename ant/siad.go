@@ -73,7 +73,12 @@ func checkSiadConstants(siadPath string) error {
 // stopSiad tries to stop the siad running at `apiAddr`, issuing a kill to its
 // `process` after a timeout.
 func stopSiad(apiAddr string, process *os.Process) {
-	if err := client.New(apiAddr).DaemonStopGet(); err != nil {
+	opts := client.Options{
+		Address:   apiAddr,
+		UserAgent: UserAgent,
+	}
+	c := client.New(opts)
+	if err := c.DaemonStopGet(); err != nil {
 		process.Kill()
 	}
 
@@ -93,7 +98,11 @@ func stopSiad(apiAddr string, process *os.Process) {
 // waitForAPI blocks until the Sia API at apiAddr becomes available.
 // if siad returns while waiting for the api, return an error.
 func waitForAPI(apiAddr string, siad *exec.Cmd) error {
-	c := client.New(apiAddr)
+	opts := client.Options{
+		Address:   apiAddr,
+		UserAgent: UserAgent,
+	}
+	c := client.New(opts)
 
 	exitchan := make(chan error)
 	go func() {

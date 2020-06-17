@@ -27,7 +27,11 @@ func TestNewSiad(t *testing.T) {
 	}
 	defer siad.Process.Kill()
 
-	c := client.New("localhost:9990")
+	opts := client.Options{
+		Address:   "localhost:9990",
+		UserAgent: UserAgent,
+	}
+	c := client.New(opts)
 	if _, err := c.ConsensusGet(); err != nil {
 		t.Error(err)
 	}

@@ -37,7 +37,11 @@ func connectAnts(ants ...*ant.Ant) error {
 		return errors.New("you must call connectAnts with at least two ants")
 	}
 	targetAnt := ants[0]
-	c := client.New(targetAnt.APIAddr)
+	opts := client.Options{
+		Address:   targetAnt.APIAddr,
+		UserAgent: ant.UserAgent,
+	}
+	c := client.New(opts)
 	c.Password = targetAnt.Config.APIPassword
 	for _, ant := range ants[1:] {
 		connectQuery := ant.RPCAddr
@@ -61,7 +65,11 @@ func connectAnts(ants ...*ant.Ant) error {
 // in each group.
 func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 	for _, a := range ants {
-		c := client.New(a.APIAddr)
+		opts := client.Options{
+			Address:   a.APIAddr,
+			UserAgent: ant.UserAgent,
+		}
+		c := client.New(opts)
 		cg, err := c.ConsensusGet()
 		if err != nil {
 			return nil, err
