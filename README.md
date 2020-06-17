@@ -58,12 +58,14 @@ An example `config.json`:
 ```
 
 This `config.json` creates 5 ants, with four running the `gateway` job
-and one running a `gateway` and a `miner` job.  If `HostAddr`, `APIAddr`, or
-`RPCAddr` are not specified, they will be set to a random port.  If
-`autoconnect` is set to `false`, the ants will not automatically be made peers
-of each other.
+and one running a `gateway` and a `miner` job.  If `HostAddr`, `APIAddr`,
+`RPCAddr`, `SiamuxAddr`, or `SiamuxWsAddr` are not specified, they will be set
+to a random port. If `autoconnect` is set to `false`, the ants will not
+automatically be made peers of each other.
 
-Note that the ants connect to each other over the public Internet, so you must either have UPnP enabled on your router or you must configure your system so that the ants' `RPCAddr` and `HostAddr` ports are accessible from the Internet.
+Note that the ants connect to each other over the public Internet, so you must
+either have UPnP enabled on your router or you must configure your system so
+that the ants' `RPCAddr` and `HostAddr` ports are accessible from the Internet.
 
 ## Available configuration options:
 
@@ -83,6 +85,8 @@ Note that the ants connect to each other over the public Internet, so you must e
 	'APIPassword': the password to be used for authenticating certain calls to the ant.
 	'RPCAddr': the RPC address for the ant to listen on, by default an unused bind address will be used.
 	'HostAddr': the Host address for the ant to listen on, by default an unused bind address will be used.
+	'SiamuxAddr': the SiaMux address for the ant to listen on, by default an unused bind address will be used.
+	'SiamuxWsAddr': the SiaMux websocket address for the ant to listen on, by default an unused bind address will be used.
 	'SiaDirectory': the data directory to use for this ant, by default a unique directory in `./antfarm-data` will be generated and used.
 	'SiadPath': the path to the `siad` binary, by default the `siad` in your path will be used.
 	'Jobs': an array of jobs for this ant to run. available jobs include: ['miner', 'host', 'renter', 'gateway']
