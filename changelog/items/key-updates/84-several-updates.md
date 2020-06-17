@@ -1,0 +1,4 @@
+- Add changelog generator
+- update to Sia v1.4.11
+- Create SiadConfig struct
+- Add gitlab yml for CI/CD
