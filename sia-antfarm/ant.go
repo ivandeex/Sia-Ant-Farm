@@ -182,14 +182,14 @@ func startJobs(ants ...*ant.Ant) error {
 // parseConfig takes an input `config` and fills it with default values if
 // required.
 func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
-	// if config.SiaDirectory isn't set, use ioutil.TempDir to create a new
+	// if config.SiadConfig.DataDir isn't set, use ioutil.TempDir to create a new
 	// temporary directory.
-	if config.SiaDirectory == "" && config.Name == "" {
+	if config.SiadConfig.DataDir == "" && config.Name == "" {
 		tempdir, err := ioutil.TempDir("./antfarm-data", "ant")
 		if err != nil {
 			return ant.AntConfig{}, err
 		}
-		config.SiaDirectory = tempdir
+		config.SiadConfig.DataDir = tempdir
 	}
 
 	if config.Name != "" {
@@ -198,7 +198,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 		if err != nil {
 			return ant.AntConfig{}, err
 		}
-		config.SiaDirectory = siadir
+		config.SiadConfig.DataDir = siadir
 	}
 
 	if config.SiadPath == "" {

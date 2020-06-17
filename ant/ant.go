@@ -15,7 +15,6 @@ import (
 type AntConfig struct {
 	SiadConfig
 
-	SiaDirectory    string `json:",omitempty"`
 	Name            string `json:",omitempty"`
 	Jobs            []string
 	DesiredCurrency uint64
@@ -71,9 +70,8 @@ func clearPorts(config AntConfig) error {
 
 // New creates a new Ant using the configuration passed through `config`.
 func New(config AntConfig) (*Ant, error) {
-	var err error
 	// unforward the ports required for this ant
-	err = clearPorts(config)
+	err := clearPorts(config)
 	if err != nil {
 		log.Printf("error clearing upnp ports for ant: %v\n", err)
 	}
@@ -91,7 +89,7 @@ func New(config AntConfig) (*Ant, error) {
 		}
 	}()
 
-	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiaDirectory)
+	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
 	if err != nil {
 		return nil, err
 	}

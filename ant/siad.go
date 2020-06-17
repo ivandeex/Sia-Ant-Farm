@@ -37,12 +37,12 @@ type SiadConfig struct {
 // is passed as siad's `--sia-directory`.
 func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	if err := checkSiadConstants(config.SiadPath); err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "error with siad constants")
 	}
 	// create a logfile for Sia's stderr and stdout.
 	logfile, err := os.Create(filepath.Join(config.DataDir, "sia-output.log"))
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to create log file")
 	}
 	args := []string{
 		"--modules=cgthmrw",
@@ -66,11 +66,11 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to start process")
 	}
 
 	if err := waitForAPI(config.APIAddr, cmd); err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "error with API")
 	}
 
 	return cmd, nil

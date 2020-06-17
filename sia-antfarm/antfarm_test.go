@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
 
@@ -18,12 +19,16 @@ func TestNewAntfarm(t *testing.T) {
 	}
 	t.Parallel()
 
+	addr := test.RandomLocalhostAddress()
+	datadir := test.TestDir(t.Name())
 	config := AntfarmConfig{
-		ListenAddress: "localhost:31337",
+		ListenAddress: addr,
 		AntConfigs: []ant.AntConfig{
 			{
 				SiadConfig: ant.SiadConfig{
-					RPCAddr: "localhost:3337",
+					DataDir:  datadir,
+					RPCAddr:  addr,
+					SiadPath: test.TestSiadPath,
 				},
 				Jobs: []string{
 					"gateway",
@@ -40,7 +45,7 @@ func TestNewAntfarm(t *testing.T) {
 
 	go antfarm.ServeAPI()
 
-	res, err := http.DefaultClient.Get("http://localhost:31337/ants")
+	res, err := http.DefaultClient.Get("http://" + "addr" + "/ants")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,9 +71,12 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	}
 	t.Parallel()
 
+	datadir := test.TestDir(t.Name())
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
-			RPCAddr: "127.0.0.1:3338",
+			DataDir:  datadir,
+			RPCAddr:  "127.0.0.1:3338",
+			SiadPath: test.TestSiadPath,
 		},
 		Jobs: []string{
 			"gateway",

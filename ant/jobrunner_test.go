@@ -1,35 +1,31 @@
 package ant
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
+
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 )
 
+// TeTestNewJobRunner test creating a new Job Runner
 func TestNewJobRunner(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
 	t.Parallel()
-	datadir, err := ioutil.TempDir("", "testing-data")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(datadir)
-	config := SiadConfig{
-		APIAddr:      "localhost:31337",
-		APIPassword:  "",
-		DataDir:      datadir,
-		HostAddr:     "localhost:31339",
-		RPCAddr:      "localhost:31338",
-		SiadPath:     "siadDir",
-		SiaMuxAddr:   "localhost:31340",
-		SiaMuxWsAddr: "localhost:31341",
-	}
+
+	// Create testing config
+	datadir := test.TestDir(t.Name())
+	config := newTestingSiadConfig(datadir)
+
+	// Create siad process
 	siad, err := newSiad(config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stopSiad("localhost:31337", siad.Process)
+	defer stopSiad(config.APIAddr, siad.Process)
 
-	j, err := newJobRunner("localhost:31337", "", datadir)
+	// Create jobRunnner on same APIAddr as the siad process
+	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.DataDir)
 	if err != nil {
 		t.Fatal(err)
 	}

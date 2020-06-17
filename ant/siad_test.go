@@ -1,12 +1,26 @@
 package ant
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/persist"
 )
+
+// newTestingSiadConfig creates a generic SiadConfig for the provided datadir.
+func newTestingSiadConfig(datadir string) SiadConfig {
+	return SiadConfig{
+		APIAddr:      test.RandomLocalhostAddress(),
+		APIPassword:  persist.RandomSuffix(),
+		DataDir:      datadir,
+		HostAddr:     test.RandomLocalhostAddress(),
+		RPCAddr:      test.RandomLocalhostAddress(),
+		SiadPath:     test.TestSiadPath,
+		SiaMuxAddr:   test.RandomLocalhostAddress(),
+		SiaMuxWsAddr: test.RandomLocalhostAddress(),
+	}
+}
 
 // TestNewSiad tests that NewSiad creates a reachable Sia API
 func TestNewSiad(t *testing.T) {
@@ -15,39 +29,37 @@ func TestNewSiad(t *testing.T) {
 	}
 	t.Parallel()
 
-	datadir, err := ioutil.TempDir("", "sia-testing")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.RemoveAll(datadir)
+	// Create testing config
+	datadir := test.TestDir(t.Name())
+	config := newTestingSiadConfig(datadir)
 
-	config := SiadConfig{
-		APIAddr:      "localhost:9990",
-		APIPassword:  "",
-		DataDir:      datadir,
-		HostAddr:     "localhost:0",
-		RPCAddr:      "localhost:0",
-		SiadPath:     "siad",
-		SiaMuxAddr:   "localhost:0",
-		SiaMuxWsAddr: "localhost:0",
-	}
-
+	// Create the siad process
 	siad, err := newSiad(config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer siad.Process.Kill()
 
+	// Create Sia Client
 	opts, err := client.DefaultOptions()
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts.Address = "localhost:9990"
+	opts.Address = config.APIAddr
 	c := client.New(opts)
+
+	// Test Client by pinging the ConsensusGet endpoint
 	if _, err := c.ConsensusGet(); err != nil {
 		t.Error(err)
 	}
+
+	// Kill siad process
 	siad.Process.Kill()
+
+	// Test Creating siad with a blank config
+	_, err = newSiad(SiadConfig{})
+	if err == nil {
+		t.Fatal("Shouldn't be able to create siad process with empty config")
+	}
 
 	// verify that NewSiad returns an error given invalid args
 	config.APIAddr = "this_is_an_invalid_address:1000000"

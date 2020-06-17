@@ -34,15 +34,18 @@ fmt:
 install:
 	go install $(pkgs)
 
+install-siad-dev:
+	go build -o $(GOPATH)/bin/siad-dev -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
+
 # markdown-spellcheck runs codespell on all markdown files that are not
 # vendored.
 markdown-spellcheck:
 	git ls-files "*.md" :\!:"vendor/**" | xargs codespell --check-filenames
 
-test: fmt vet install
+test: fmt vet install install-siad-dev
 	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=$(run) -count=$(count)
 
-test-long: clean fmt vet lint-ci
+test-long: clean fmt vet lint-ci install-siad-dev
 	@mkdir -p cover
 	go test --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=3600s $(pkgs) -run=$(run) -count=$(count)
 
