@@ -1,12 +1,14 @@
 package ant
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
 	"os/exec"
 
 	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/go-upnp"
 )
 
@@ -35,6 +37,16 @@ type Ant struct {
 	// for this ant. The map will just keep growing, but it shouldn't take up a
 	// prohibitive amount of space.
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
+}
+
+// PrintJSON is a wrapper for json.MarshalIndent
+func PrintJSON(v interface{}) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -79,7 +91,7 @@ func New(config AntConfig) (*Ant, error) {
 	// Construct the ant's Siad instance
 	siad, err := newSiad(config.SiadConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to create new siad process")
 	}
 
 	// Ensure siad is always stopped if an error is returned.
@@ -91,7 +103,7 @@ func New(config AntConfig) (*Ant, error) {
 
 	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
 
 	for _, job := range config.Jobs {

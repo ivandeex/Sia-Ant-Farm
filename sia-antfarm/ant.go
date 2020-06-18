@@ -125,12 +125,19 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 	for i, config := range configs {
 		cfg, err := parseConfig(config)
 		if err != nil {
-			return nil, err
+			return nil, errors.AddContext(err, "unable to parse config")
 		}
-		fmt.Printf("[INFO] starting ant %v with config %v\n", i, cfg)
-		ant, err := ant.New(cfg)
+		// Log config information about the Ant
+		fmt.Printf("[INFO] starting ant %v with config: \n", i)
+		err = ant.PrintJSON(cfg)
 		if err != nil {
 			return nil, err
+		}
+
+		// Create Ant
+		ant, err := ant.New(cfg)
+		if err != nil {
+			return nil, errors.AddContext(err, "unable to create ant")
 		}
 		defer func() {
 			if err != nil {

@@ -69,7 +69,7 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 		return nil, errors.AddContext(err, "unable to start process")
 	}
 
-	if err := waitForAPI(config.APIAddr, cmd); err != nil {
+	if err := waitForAPI(config, cmd); err != nil {
 		return nil, errors.AddContext(err, "error with API")
 	}
 
@@ -120,12 +120,13 @@ func stopSiad(apiAddr string, process *os.Process) {
 
 // waitForAPI blocks until the Sia API at apiAddr becomes available.
 // if siad returns while waiting for the api, return an error.
-func waitForAPI(apiAddr string, siad *exec.Cmd) error {
+func waitForAPI(config SiadConfig, siad *exec.Cmd) error {
 	opts, err := client.DefaultOptions()
 	if err != nil {
 		return errors.AddContext(err, "unable to get client options")
 	}
-	opts.Address = apiAddr
+	opts.Address = config.APIAddr
+	opts.Password = config.APIPassword
 	c := client.New(opts)
 
 	exitchan := make(chan error)
@@ -142,7 +143,10 @@ func waitForAPI(apiAddr string, siad *exec.Cmd) error {
 		}
 		select {
 		case err := <-exitchan:
-			return fmt.Errorf("siad exited unexpectedly while waiting for api, exited with error: %v", err)
+			if err != nil {
+				return fmt.Errorf("siad exited unexpectedly while waiting for api, exited with error: %v", err)
+			}
+			return nil
 		default:
 			if _, err := c.ConsensusGet(); err == nil {
 				success = true
@@ -150,7 +154,7 @@ func waitForAPI(apiAddr string, siad *exec.Cmd) error {
 		}
 	}
 	if !success {
-		stopSiad(apiAddr, siad.Process)
+		stopSiad(config.APIAddr, siad.Process)
 		return errors.New("timeout: couldnt reach api after 5 minutes")
 	}
 	return nil

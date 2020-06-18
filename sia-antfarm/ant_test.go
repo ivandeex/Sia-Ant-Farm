@@ -2,10 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
 
@@ -24,7 +21,7 @@ func TestStartAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := initAntDirs(dataDir, 3)
+	antDirs := test.AntDirs(dataDir, 3)
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -85,7 +82,7 @@ func TestConnectAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := initAntDirs(dataDir, 5)
+	antDirs := test.AntDirs(dataDir, 5)
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -147,13 +144,13 @@ func TestConnectAnts(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
 	// Verify the ants are peers
 	for _, ant := range ants[1:] {
 		hasAddr := false
 		for _, peer := range gatewayInfo.Peers {
-			if fmt.Sprintf("%s", peer.NetAddress) == ant.RPCAddr {
+			if fmt.Sprint(peer.NetAddress) == ant.RPCAddr {
 				hasAddr = true
+				break
 			}
 		}
 		if !hasAddr {
@@ -171,7 +168,7 @@ func TestAntConsensusGroups(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := initAntDirs(dataDir, 3)
+	antDirs := test.AntDirs(dataDir, 4)
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -217,7 +214,14 @@ func TestAntConsensusGroups(t *testing.T) {
 	}
 
 	// Start an ant that is desynced from the rest of the network
-	cfg, err := parseConfig(ant.AntConfig{Jobs: []string{"miner"}})
+	cfg, err := parseConfig(ant.AntConfig{
+		Jobs: []string{"miner"},
+		SiadConfig: ant.SiadConfig{
+			DataDir:  antDirs[3],
+			SiadPath: test.TestSiadPath,
+		},
+	},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -247,18 +251,4 @@ func TestAntConsensusGroups(t *testing.T) {
 	if !reflect.DeepEqual(groups[1][0], otherAnt) {
 		t.Fatal("expected the miner ant to be in the second consensus group")
 	}
-}
-
-// initAntDirs creates a slice of ant directories and cleans the directories
-func initAntDirs(dataDir string, nDirs int) []string {
-	antDirs := []string{}
-	for i := 0; i < nDirs; i++ {
-		path := filepath.Join(dataDir, strconv.Itoa(i))
-		antDirs = append(antDirs, path)
-
-		// Clean ant dirs
-		os.RemoveAll(path)
-		os.MkdirAll(path, 0700)
-	}
-	return antDirs
 }

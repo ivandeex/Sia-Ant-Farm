@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -19,10 +20,10 @@ func TestNewAntfarm(t *testing.T) {
 	}
 	t.Parallel()
 
-	antFarmAddr := test.RandomLocalhostAddress()
-	antAddr := test.RandomLocalhostAddress()
+	antFarmAddr := test.RandomLocalAddress()
+	antAddr := test.RandomLocalAddress()
 	dataDir := test.TestDir(t.Name())
-	antDirs := initAntDirs(dataDir, 1)
+	antDirs := test.AntDirs(dataDir, 1)
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,
 		AntConfigs: []ant.AntConfig{
@@ -74,10 +75,10 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	t.Parallel()
 
 	datadir := test.TestDir(t.Name())
+	antDirs := test.AntDirs(datadir, 2)
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
-			DataDir:  datadir,
-			RPCAddr:  "127.0.0.1:3338",
+			RPCAddr:  test.RandomLocalAddress(),
 			SiadPath: test.TestSiadPath,
 		},
 		Jobs: []string{
@@ -85,15 +86,18 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		},
 	}
 
+	antConfig.SiadConfig.DataDir = antDirs[0]
 	config1 := AntfarmConfig{
-		ListenAddress: "127.0.0.1:31337",
-		DataDirPrefix: "antfarm-data1",
+		ListenAddress: test.RandomLocalAddress(),
+		DataDir:       filepath.Join(datadir, "antfarm-data1"),
 		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
+	antConfig.SiadConfig.DataDir = antDirs[1]
+	antConfig.RPCAddr = test.RandomLocalAddress()
 	config2 := AntfarmConfig{
-		ListenAddress: "127.0.0.1:31338",
-		DataDirPrefix: "antfarm-data2",
+		ListenAddress: test.RandomLocalAddress(),
+		DataDir:       filepath.Join(datadir, "antfarm-data2"),
 		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
@@ -134,8 +138,9 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	for _, ant := range farm2.ants {
 		hasAddr := false
 		for _, peer := range gatewayInfo.Peers {
-			if fmt.Sprintln(peer.NetAddress) == ant.RPCAddr {
+			if fmt.Sprint(peer.NetAddress) == ant.RPCAddr {
 				hasAddr = true
+				break
 			}
 		}
 		if !hasAddr {
