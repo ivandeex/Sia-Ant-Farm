@@ -225,9 +225,9 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 			return ant.AntConfig{}, errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")
 		}
 	}
-	// Automatically generate 3 free operating system ports for the Ant's api,
-	// rpc, and host addresses
-	addrs, err := getAddrs(3)
+	// Automatically generate 5 free operating system ports for the Ant's api,
+	// rpc, host, siamux, and siamux websocket addresses
+	addrs, err := getAddrs(5)
 	if err != nil {
 		return ant.AntConfig{}, err
 	}
@@ -235,10 +235,16 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 		config.APIAddr = ipAddr + addrs[0]
 	}
 	if config.RPCAddr == "" {
-		config.RPCAddr = addrs[1]
+		config.RPCAddr = ipAddr + addrs[1]
 	}
 	if config.HostAddr == "" {
-		config.HostAddr = addrs[2]
+		config.HostAddr = ipAddr + addrs[2]
+	}
+	if config.SiaMuxAddr == "" {
+		config.SiaMuxAddr = ipAddr + addrs[3]
+	}
+	if config.SiaMuxWsAddr == "" {
+		config.SiaMuxWsAddr = ipAddr + addrs[4]
 	}
 
 	return config, nil
