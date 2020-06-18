@@ -67,7 +67,7 @@ build:
     paths:
       - $CI_PROJECT_DIR/artifacts
   script:
-      - make install
+      - make dependencies && make install
 
 tests:
   <<: *default_test_params
