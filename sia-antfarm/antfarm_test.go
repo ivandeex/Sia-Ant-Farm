@@ -19,15 +19,17 @@ func TestNewAntfarm(t *testing.T) {
 	}
 	t.Parallel()
 
-	addr := test.RandomLocalhostAddress()
-	datadir := test.TestDir(t.Name())
+	antFarmAddr := test.RandomLocalhostAddress()
+	antAddr := test.RandomLocalhostAddress()
+	dataDir := test.TestDir(t.Name())
+	antDirs := initAntDirs(dataDir, 1)
 	config := AntfarmConfig{
-		ListenAddress: addr,
+		ListenAddress: antFarmAddr,
 		AntConfigs: []ant.AntConfig{
 			{
 				SiadConfig: ant.SiadConfig{
-					DataDir:  datadir,
-					RPCAddr:  addr,
+					DataDir:  antDirs[0],
+					RPCAddr:  antAddr,
 					SiadPath: test.TestSiadPath,
 				},
 				Jobs: []string{
@@ -45,7 +47,7 @@ func TestNewAntfarm(t *testing.T) {
 
 	go antfarm.ServeAPI()
 
-	res, err := http.DefaultClient.Get("http://" + "addr" + "/ants")
+	res, err := http.DefaultClient.Get("http://" + antFarmAddr + "/ants")
 	if err != nil {
 		t.Fatal(err)
 	}

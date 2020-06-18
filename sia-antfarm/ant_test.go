@@ -24,15 +24,7 @@ func TestStartAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := []string{}
-	for i := 0; i < 3; i++ {
-		path := filepath.Join(dataDir, strconv.Itoa(i))
-		antDirs = append(antDirs, path)
-
-		// Clean ant dirs
-		os.RemoveAll(path)
-		os.MkdirAll(path, 0700)
-	}
+	antDirs := initAntDirs(dataDir, 3)
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -93,15 +85,7 @@ func TestConnectAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := []string{}
-	for i := 0; i < 5; i++ {
-		path := filepath.Join(dataDir, strconv.Itoa(i))
-		antDirs = append(antDirs, path)
-
-		// Clean ant dirs
-		os.RemoveAll(path)
-		os.MkdirAll(path, 0700)
-	}
+	antDirs := initAntDirs(dataDir, 5)
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -187,22 +171,23 @@ func TestAntConsensusGroups(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
+	antDirs := initAntDirs(dataDir, 3)
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[0],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[1],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[2],
 				SiadPath: test.TestSiadPath,
 			},
 		},
@@ -262,4 +247,18 @@ func TestAntConsensusGroups(t *testing.T) {
 	if !reflect.DeepEqual(groups[1][0], otherAnt) {
 		t.Fatal("expected the miner ant to be in the second consensus group")
 	}
+}
+
+// initAntDirs creates a slice of ant directories and cleans the directories
+func initAntDirs(dataDir string, nDirs int) []string {
+	antDirs := []string{}
+	for i := 0; i < nDirs; i++ {
+		path := filepath.Join(dataDir, strconv.Itoa(i))
+		antDirs = append(antDirs, path)
+
+		// Clean ant dirs
+		os.RemoveAll(path)
+		os.MkdirAll(path, 0700)
+	}
+	return antDirs
 }
