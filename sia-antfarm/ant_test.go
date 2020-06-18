@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strconv"
 	"testing"
 	"time"
 
@@ -21,22 +24,31 @@ func TestStartAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
+	antDirs := []string{}
+	for i := 0; i < 3; i++ {
+		path := filepath.Join(dataDir, strconv.Itoa(i))
+		antDirs = append(antDirs, path)
+
+		// Clean ant dirs
+		os.RemoveAll(path)
+		os.MkdirAll(path, 0700)
+	}
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[0],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[1],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[2],
 				SiadPath: test.TestSiadPath,
 			},
 		},
