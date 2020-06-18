@@ -93,34 +93,43 @@ func TestConnectAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
+	antDirs := []string{}
+	for i := 0; i < 5; i++ {
+		path := filepath.Join(dataDir, strconv.Itoa(i))
+		antDirs = append(antDirs, path)
+
+		// Clean ant dirs
+		os.RemoveAll(path)
+		os.MkdirAll(path, 0700)
+	}
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[0],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[1],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[2],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[3],
 				SiadPath: test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
-				DataDir:  dataDir,
+				DataDir:  antDirs[4],
 				SiadPath: test.TestSiadPath,
 			},
 		},
@@ -159,12 +168,12 @@ func TestConnectAnts(t *testing.T) {
 	for _, ant := range ants[1:] {
 		hasAddr := false
 		for _, peer := range gatewayInfo.Peers {
-			if fmt.Sprintln(peer.NetAddress) == "127.0.0.1"+ant.RPCAddr {
+			if fmt.Sprintf("%s", peer.NetAddress) == ant.RPCAddr {
 				hasAddr = true
 			}
 		}
 		if !hasAddr {
-			t.Fatalf("the central ant is missing %v", "127.0.0.1"+ant.RPCAddr)
+			t.Fatalf("the central ant is missing %v", ant.RPCAddr)
 		}
 	}
 }

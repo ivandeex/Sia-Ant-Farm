@@ -217,7 +217,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 	}
 
 	// Check if UPnP is enabled
-	ipAddr := "localhost"
+	ipAddr := "127.0.0.1"
 	_, err := upnp.Discover()
 	if err != nil {
 		ipAddr, err = myExternalIP()
