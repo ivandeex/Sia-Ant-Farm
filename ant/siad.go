@@ -20,14 +20,15 @@ import (
 // SiadConfig contains the necessary config information to create a new siad
 // instance
 type SiadConfig struct {
-	APIAddr      string
-	APIPassword  string
-	DataDir      string
-	HostAddr     string
-	RPCAddr      string
-	SiadPath     string
-	SiaMuxAddr   string
-	SiaMuxWsAddr string
+	APIAddr                  string
+	APIPassword              string
+	DataDir                  string
+	HostAddr                 string
+	RPCAddr                  string
+	SiadPath                 string
+	SiaMuxAddr               string
+	SiaMuxWsAddr             string
+	UseExternalIPWithoutUPnP bool
 }
 
 // newSiad spawns a new siad process using os/exec and waits for the api to
