@@ -23,9 +23,11 @@ func TestNewAntfarm(t *testing.T) {
 	antFarmAddr := test.RandomLocalAddress()
 	antAddr := test.RandomLocalAddress()
 	dataDir := test.TestDir(t.Name())
+	antFarmDir := filepath.Join(dataDir, "antfarm-data")
 	antDirs := test.AntDirs(dataDir, 1)
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,
+		DataDir:       antFarmDir,
 		AntConfigs: []ant.AntConfig{
 			{
 				SiadConfig: ant.SiadConfig{
@@ -75,7 +77,7 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	t.Parallel()
 
 	datadir := test.TestDir(t.Name())
-	antDirs := test.AntDirs(datadir, 2)
+	antFarmDataDirs := []string{filepath.Join(datadir, "antfarm-data1"), filepath.Join(datadir, "antfarm-data2")}
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
 			RPCAddr:  test.RandomLocalAddress(),
@@ -86,18 +88,18 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		},
 	}
 
-	antConfig.SiadConfig.DataDir = antDirs[0]
+	antConfig.SiadConfig.DataDir = test.AntDirs(antFarmDataDirs[0], 1)[0]
 	config1 := AntfarmConfig{
 		ListenAddress: test.RandomLocalAddress(),
-		DataDir:       filepath.Join(datadir, "antfarm-data1"),
+		DataDir:       antFarmDataDirs[0],
 		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
-	antConfig.SiadConfig.DataDir = antDirs[1]
+	antConfig.SiadConfig.DataDir = test.AntDirs(antFarmDataDirs[1], 1)[0]
 	antConfig.RPCAddr = test.RandomLocalAddress()
 	config2 := AntfarmConfig{
 		ListenAddress: test.RandomLocalAddress(),
-		DataDir:       filepath.Join(datadir, "antfarm-data2"),
+		DataDir:       antFarmDataDirs[1],
 		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 

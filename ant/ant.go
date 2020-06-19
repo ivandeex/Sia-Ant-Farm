@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -82,7 +83,13 @@ func clearPorts(config AntConfig) error {
 
 // New creates a new Ant using the configuration passed through `config`.
 func New(config AntConfig) (*Ant, error) {
-	// unforward the ports required for this ant
+	// Create ant working dir if it doesn't exist
+	// (e.g. ant farm deleted the whole farm dir)
+	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
+		os.MkdirAll(config.DataDir, 0700)
+	}
+
+	// Unforward the ports required for this ant
 	err := clearPorts(config)
 	if err != nil {
 		log.Printf("error clearing upnp ports for ant: %v\n", err)
