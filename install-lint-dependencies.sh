@@ -24,3 +24,8 @@ if ! [ -x "$(command -v analyze)" ]; then
   echo "Installing analyze..."
   go get gitlab.com/NebulousLabs/analyze
 fi
+
+if ! [ -x "$(command -v staticcheck)" ]; then
+  echo "Installing staticcheck..."
+  go get honnef.co/go/tools/cmd/staticcheck
+fi
