@@ -53,12 +53,15 @@ test-long: clean fmt vet lint-ci install-siad-dev
 
 # lint runs golangci-lint (which includes golint, a spellcheck of the codebase,
 # and other linters), the custom analyzers, and also a markdown spellchecker.
-lint: lint-dependencies markdown-spellcheck lint-analyze staticcheck
-	golangci-lint run -c .golangci.yml
+lint: lint-dependencies markdown-spellcheck lint-golangci lint-analyze staticcheck
 
 # lint-analyze runs the custom analyzers.
 lint-analyze:
 	analyze -lockcheck -- $(pkgs)
+
+# lint-golangci runs golangci-lint analyzer.
+lint-golangci:
+	golangci-lint run -c .golangci.yml
 
 # lint-ci runs golint.
 lint-ci:
