@@ -1,11 +1,13 @@
 all: install
 
 dependencies:
+	go get -d ./...
 	go install -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
 	go install -race std
+
+lint-dependencies:
 	go get -u golang.org/x/lint/golint
-	go get -d ./...
-	./install-dependencies.sh
+	./install-lint-dependencies.sh
 
 count = 1
 
@@ -51,12 +53,15 @@ test-long: clean fmt vet lint-ci install-siad-dev
 
 # lint runs golangci-lint (which includes golint, a spellcheck of the codebase,
 # and other linters), the custom analyzers, and also a markdown spellchecker.
-lint: markdown-spellcheck lint-analyze staticcheck
-	golangci-lint run -c .golangci.yml
+lint: lint-dependencies markdown-spellcheck lint-golangci lint-analyze staticcheck
 
 # lint-analyze runs the custom analyzers.
 lint-analyze:
 	analyze -lockcheck -- $(pkgs)
+
+# lint-golangci runs golangci-lint analyzer.
+lint-golangci:
+	golangci-lint run -c .golangci.yml
 
 # lint-ci runs golint.
 lint-ci:
@@ -72,7 +77,6 @@ spellcheck: markdown-spellcheck
 	golangci-lint run -c .golangci.yml -E misspell
 
 # staticcheck runs the staticcheck tool
-# NOTE: this is not yet enabled in the CI system.
 staticcheck:
 	staticcheck $(pkgs)
 

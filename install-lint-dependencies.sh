@@ -9,7 +9,13 @@ fi
 if ! [ -x "$(command -v codespell)" ]; then
   echo "Installing codespell..."
   if ! [ -x "$(command -v pip3)" ]; then
-    sudo apt install python3-pip
+    if ! [ -x "$(command -v sudo)" ]; then
+      apt-get update
+      apt install -y python3-pip
+    else
+      sudo apt-get update
+      sudo apt install -y python3-pip
+    fi
   fi
   pip3 install codespell
 fi
@@ -17,4 +23,9 @@ fi
 if ! [ -x "$(command -v analyze)" ]; then
   echo "Installing analyze..."
   go get gitlab.com/NebulousLabs/analyze
+fi
+
+if ! [ -x "$(command -v staticcheck)" ]; then
+  echo "Installing staticcheck..."
+  go get honnef.co/go/tools/cmd/staticcheck
 fi
