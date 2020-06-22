@@ -11,10 +11,10 @@ if ! [ -x "$(command -v codespell)" ]; then
   if ! [ -x "$(command -v pip3)" ]; then
     if ! [ -x "$(command -v sudo)" ]; then
       apt-get update
-      apt install python3-pip
+      apt install -y python3-pip
     else
       sudo apt-get update
-      sudo apt install python3-pip
+      sudo apt install -y python3-pip
     fi
   fi
   pip3 install codespell
