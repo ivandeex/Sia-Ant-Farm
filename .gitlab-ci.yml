@@ -61,7 +61,9 @@ build:
       - $CI_PROJECT_DIR/artifacts
   script:
       - make dependencies && make install
-      - ls -al "$GOPATH/bin"
+      ## Publish artifacts
+      - cp "$GOPATH/bin/siad" "$CI_PROJECT_DIR/artifacts/."
+      - cp "$GOPATH/bin/sia-antfarm" "$CI_PROJECT_DIR/artifacts/."
 
 tests:
   <<: *default_test_params
