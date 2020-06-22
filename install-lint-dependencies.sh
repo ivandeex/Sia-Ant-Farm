@@ -3,9 +3,6 @@ set -e
 
 if ! [ -x "$(command -v golangci-lint)" ]; then
   echo "Installing golangci-lint..."
-  echo "xxx: $GOPATH"
-  go env GOPATH
-  echo "xxx: $PATH"
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b "$(go env GOPATH)"/bin v1.24.0
 fi
 
