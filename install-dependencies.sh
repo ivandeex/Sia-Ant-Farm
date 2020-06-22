@@ -11,7 +11,7 @@ if ! [ -x "$(command -v codespell)" ]; then
   if ! [ -x "$(command -v pip3)" ]; then
     if ! [ -x "$(command -v sudo)" ]; then
       apt install python3-pip
-    elif
+    else
       sudo apt install python3-pip
     fi
   fi
