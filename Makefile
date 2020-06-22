@@ -77,7 +77,6 @@ spellcheck: markdown-spellcheck
 	golangci-lint run -c .golangci.yml -E misspell
 
 # staticcheck runs the staticcheck tool
-# NOTE: this is not yet enabled in the CI system.
 staticcheck:
 	staticcheck $(pkgs)
 
