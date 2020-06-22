@@ -1,10 +1,10 @@
 all: install
 
 dependencies:
+	go get -d ./...
 	go install -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
 	go install -race std
 	go get -u golang.org/x/lint/golint
-	go get -d ./...
 	./install-dependencies.sh
 
 count = 1

@@ -2,8 +2,6 @@ module gitlab.com/NebulousLabs/Sia-Ant-Farm
 
 go 1.13
 
-replace github.com/xtaci/smux => ../Sia/vendor/github.com/xtaci/smux
-
 require (
 	github.com/julienschmidt/httprouter v1.3.0
 	gitlab.com/NebulousLabs/Sia v1.4.11
