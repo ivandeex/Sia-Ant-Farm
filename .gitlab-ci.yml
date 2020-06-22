@@ -61,6 +61,7 @@ build:
       - $CI_PROJECT_DIR/artifacts
   script:
       - make dependencies && make install
+      - ls -al "$GOPATH/bin"
 
 tests:
   <<: *default_test_params
