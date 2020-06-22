@@ -9,7 +9,11 @@ fi
 if ! [ -x "$(command -v codespell)" ]; then
   echo "Installing codespell..."
   if ! [ -x "$(command -v pip3)" ]; then
-    sudo apt install python3-pip
+    if ! [ -x "$(command -v sudo)" ]; then
+      apt install python3-pip
+    elif
+      sudo apt install python3-pip
+    fi
   fi
   pip3 install codespell
 fi
