@@ -48,8 +48,7 @@ lint:
   script:
     ## This is the recommended way to install golang-ci lint.
     - export GOCACHE=$CI_PROJECT_DIR/.cache/gocache
-    - ./install-lint-dependencies.sh
-    - golangci-lint run -c .golangci.yml ./...
+    - make lint
     - make lint-analyze
     - make markdown-spellcheck
     - make test
