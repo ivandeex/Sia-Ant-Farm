@@ -1,26 +1,30 @@
 package main
 
 import (
-	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
+	"strings"
+	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/go-upnp"
 )
 
-// getAddrs returns n free listening ports by leveraging the
-// behaviour of net.Listen(":0").  Addresses are returned in the format of
-// ":port"
+// getAddrs returns n free listening ports by leveraging the behaviour of
+// net.Listen(":0").  Addresses are returned in the format of ":port"
 func getAddrs(n int) ([]string, error) {
 	var addrs []string
 
 	for i := 0; i < n; i++ {
-		l, err := net.Listen("tcp", ":0")
+		l, err := net.Listen("tcp", ":0") //nolint:gosec
 		if err != nil {
 			return nil, err
 		}
@@ -37,8 +41,13 @@ func connectAnts(ants ...*ant.Ant) error {
 		return errors.New("you must call connectAnts with at least two ants")
 	}
 	targetAnt := ants[0]
-	c := client.New(targetAnt.APIAddr)
-	c.Password = targetAnt.Config.APIPassword
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		return errors.AddContext(err, "unable to get default client options")
+	}
+	opts.Address = targetAnt.APIAddr
+	opts.Password = targetAnt.Config.APIPassword
+	c := client.New(opts)
 	for _, ant := range ants[1:] {
 		connectQuery := ant.RPCAddr
 		addr := modules.NetAddress(ant.RPCAddr)
@@ -60,8 +69,13 @@ func connectAnts(ants ...*ant.Ant) error {
 // The outer slice is the list of gorups, and the inner slice is a list of ants
 // in each group.
 func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		return nil, errors.AddContext(err, "unable to get default client options")
+	}
 	for _, a := range ants {
-		c := client.New(a.APIAddr)
+		opts.Address = a.APIAddr
+		c := client.New(opts)
 		cg, err := c.ConsensusGet()
 		if err != nil {
 			return nil, err
@@ -111,12 +125,19 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 	for i, config := range configs {
 		cfg, err := parseConfig(config)
 		if err != nil {
-			return nil, err
+			return nil, errors.AddContext(err, "unable to parse config")
 		}
-		fmt.Printf("[INFO] starting ant %v with config %v\n", i, cfg)
-		ant, err := ant.New(cfg)
+		// Log config information about the Ant
+		fmt.Printf("[INFO] starting ant %v with config: \n", i)
+		err = ant.PrintJSON(cfg)
 		if err != nil {
 			return nil, err
+		}
+
+		// Create Ant
+		ant, err := ant.New(cfg)
+		if err != nil {
+			return nil, errors.AddContext(err, "unable to create ant")
 		}
 		defer func() {
 			if err != nil {
@@ -168,14 +189,14 @@ func startJobs(ants ...*ant.Ant) error {
 // parseConfig takes an input `config` and fills it with default values if
 // required.
 func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
-	// if config.SiaDirectory isn't set, use ioutil.TempDir to create a new
+	// if config.SiadConfig.DataDir isn't set, use ioutil.TempDir to create a new
 	// temporary directory.
-	if config.SiaDirectory == "" && config.Name == "" {
+	if config.SiadConfig.DataDir == "" && config.Name == "" {
 		tempdir, err := ioutil.TempDir("./antfarm-data", "ant")
 		if err != nil {
 			return ant.AntConfig{}, err
 		}
-		config.SiaDirectory = tempdir
+		config.SiadConfig.DataDir = tempdir
 	}
 
 	if config.Name != "" {
@@ -184,7 +205,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 		if err != nil {
 			return ant.AntConfig{}, err
 		}
-		config.SiaDirectory = siadir
+		config.SiadConfig.DataDir = siadir
 	}
 
 	if config.SiadPath == "" {
@@ -202,21 +223,61 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 		return ant.AntConfig{}, errors.New("error parsing config: cannot have desired currency with miner job")
 	}
 
-	// Automatically generate 3 free operating system ports for the Ant's api,
-	// rpc, and host addresses
-	addrs, err := getAddrs(3)
+	// Check if UPnP is enabled
+	ipAddr := "127.0.0.1"
+	_, err := upnp.Discover()
+	if err != nil && config.UseExternalIPWithoutUPnP {
+		ipAddr, err = myExternalIP()
+		if err != nil {
+			return ant.AntConfig{}, errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")
+		}
+	}
+	// Automatically generate 5 free operating system ports for the Ant's api,
+	// rpc, host, siamux, and siamux websocket addresses
+	addrs, err := getAddrs(5)
 	if err != nil {
 		return ant.AntConfig{}, err
 	}
 	if config.APIAddr == "" {
-		config.APIAddr = "localhost" + addrs[0]
+		config.APIAddr = ipAddr + addrs[0]
 	}
 	if config.RPCAddr == "" {
-		config.RPCAddr = addrs[1]
+		config.RPCAddr = ipAddr + addrs[1]
 	}
 	if config.HostAddr == "" {
-		config.HostAddr = addrs[2]
+		config.HostAddr = ipAddr + addrs[2]
+	}
+	if config.SiaMuxAddr == "" {
+		config.SiaMuxAddr = ipAddr + addrs[3]
+	}
+	if config.SiaMuxWsAddr == "" {
+		config.SiaMuxWsAddr = ipAddr + addrs[4]
 	}
 
 	return config, nil
+}
+
+// myExternalIP discovers the gateway's external IP by querying a centralized
+// service, http://myexternalip.com.
+func myExternalIP() (string, error) {
+	// timeout after 10 seconds
+	client := http.Client{Timeout: time.Duration(10 * time.Second)}
+	resp, err := client.Get("http://myexternalip.com/raw")
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		errResp, _ := ioutil.ReadAll(resp.Body)
+		return "", errors.New(string(errResp))
+	}
+	buf, err := ioutil.ReadAll(io.LimitReader(resp.Body, 64))
+	if err != nil {
+		return "", err
+	}
+	if len(buf) == 0 {
+		return "", errors.New("myexternalip.com returned a 0 length IP address")
+	}
+	// trim newline
+	return strings.TrimSpace(string(buf)), nil
 }

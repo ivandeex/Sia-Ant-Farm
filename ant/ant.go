@@ -1,25 +1,24 @@
 package ant
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
 	"log"
 	"net"
+	"os"
 	"os/exec"
 
 	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/go-upnp"
 )
 
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
 type AntConfig struct {
-	APIAddr         string `json:",omitempty"`
-	RPCAddr         string `json:",omitempty"`
-	HostAddr        string `json:",omitempty"`
-	SiaDirectory    string `json:",omitempty"`
+	SiadConfig
+
 	Name            string `json:",omitempty"`
-	APIPassword     string `json:",omitempty"`
-	SiadPath        string
 	Jobs            []string
 	DesiredCurrency uint64
 }
@@ -39,6 +38,16 @@ type Ant struct {
 	// for this ant. The map will just keep growing, but it shouldn't take up a
 	// prohibitive amount of space.
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
+}
+
+// PrintJSON is a wrapper for json.MarshalIndent
+func PrintJSON(v interface{}) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -74,17 +83,22 @@ func clearPorts(config AntConfig) error {
 
 // New creates a new Ant using the configuration passed through `config`.
 func New(config AntConfig) (*Ant, error) {
-	var err error
-	// unforward the ports required for this ant
-	err = clearPorts(config)
+	// Create ant working dir if it doesn't exist
+	// (e.g. ant farm deleted the whole farm dir)
+	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
+		os.MkdirAll(config.DataDir, 0700)
+	}
+
+	// Unforward the ports required for this ant
+	err := clearPorts(config)
 	if err != nil {
 		log.Printf("error clearing upnp ports for ant: %v\n", err)
 	}
 
 	// Construct the ant's Siad instance
-	siad, err := newSiad(config.SiadPath, config.SiaDirectory, config.APIAddr, config.RPCAddr, config.HostAddr, config.APIPassword)
+	siad, err := newSiad(config.SiadConfig)
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to create new siad process")
 	}
 
 	// Ensure siad is always stopped if an error is returned.
@@ -94,9 +108,9 @@ func New(config AntConfig) (*Ant, error) {
 		}
 	}()
 
-	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiaDirectory)
+	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
 
 	for _, job := range config.Jobs {
@@ -180,7 +194,7 @@ func (a *Ant) WalletAddress() (*types.UnlockHash, error) {
 		return nil, errors.New("ant is not running")
 	}
 
-	addressGet, err := a.jr.client.WalletAddressGet()
+	addressGet, err := a.jr.staticClient.WalletAddressGet()
 	if err != nil {
 		return nil, err
 	}

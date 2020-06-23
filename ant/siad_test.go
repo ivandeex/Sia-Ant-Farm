@@ -1,40 +1,69 @@
 package ant
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/persist"
 )
+
+// newTestingSiadConfig creates a generic SiadConfig for the provided datadir.
+func newTestingSiadConfig(datadir string) SiadConfig {
+	return SiadConfig{
+		APIAddr:      test.RandomLocalAddress(),
+		APIPassword:  persist.RandomSuffix(),
+		DataDir:      datadir,
+		HostAddr:     test.RandomLocalAddress(),
+		RPCAddr:      test.RandomLocalAddress(),
+		SiadPath:     test.TestSiadPath,
+		SiaMuxAddr:   test.RandomLocalAddress(),
+		SiaMuxWsAddr: test.RandomLocalAddress(),
+	}
+}
 
 // TestNewSiad tests that NewSiad creates a reachable Sia API
 func TestNewSiad(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
-	datadir, err := ioutil.TempDir("", "sia-testing")
+	// Create testing config
+	datadir := test.TestDir(t.Name())
+	config := newTestingSiadConfig(datadir)
+
+	// Create the siad process
+	siad, err := newSiad(config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.RemoveAll(datadir)
 
-	siad, err := newSiad("siad", datadir, "localhost:9990", "localhost:0", "localhost:0", "")
+	// Create Sia Client
+	opts, err := client.DefaultOptions()
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
-	defer siad.Process.Kill()
+	opts.Address = config.APIAddr
+	c := client.New(opts)
 
-	c := client.New("localhost:9990")
+	// Test Client by pinging the ConsensusGet endpoint
 	if _, err := c.ConsensusGet(); err != nil {
 		t.Error(err)
 	}
+
+	// Kill siad process
 	siad.Process.Kill()
 
+	// Test Creating siad with a blank config
+	_, err = newSiad(SiadConfig{})
+	if err == nil {
+		t.Fatal("Shouldn't be able to create siad process with empty config")
+	}
+
 	// verify that NewSiad returns an error given invalid args
-	_, err = newSiad("siad", datadir, "this_is_an_invalid_addres:1000000", "localhost:0", "localhost:0", "")
+	config.APIAddr = "this_is_an_invalid_address:1000000"
+	_, err = newSiad(config)
 	if err == nil {
 		t.Fatal("expected newsiad to return an error with invalid args")
 	}

@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"reflect"
 	"testing"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
 
@@ -17,16 +17,33 @@ func TestStartAnts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
+	// Create minimum configs
+	dataDir := test.TestDir(t.Name())
+	antDirs := test.AntDirs(dataDir, 3)
 	configs := []ant.AntConfig{
-		{},
-		{},
-		{},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[0],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[1],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[2],
+				SiadPath: test.TestSiadPath,
+			},
+		},
 	}
 
-	os.MkdirAll("./antfarm-data", 0700)
-	defer os.RemoveAll("./antfarm-data")
-
+	// Start ants
 	ants, err := startAnts(configs...)
 	if err != nil {
 		t.Fatal(err)
@@ -39,34 +56,67 @@ func TestStartAnts(t *testing.T) {
 
 	// verify each ant has a reachable api
 	for _, ant := range ants {
-		c := client.New(ant.APIAddr)
+		opts, err := client.DefaultOptions()
+		if err != nil {
+			t.Fatal(err)
+		}
+		opts.Address = ant.APIAddr
+		c := client.New(opts)
 		if _, err := c.ConsensusGet(); err != nil {
 			t.Fatal(err)
 		}
 	}
 }
 
+// TestTestConnectAnts verifies that ants will connect
 func TestConnectAnts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// connectAnts should throw an error if only one ant is provided
 	if err := connectAnts(&ant.Ant{}); err == nil {
 		t.Fatal("connectAnts didnt throw an error with only one ant")
 	}
 
+	// Create minimum configs
+	dataDir := test.TestDir(t.Name())
+	antDirs := test.AntDirs(dataDir, 5)
 	configs := []ant.AntConfig{
-		{},
-		{},
-		{},
-		{},
-		{},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[0],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[1],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[2],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[3],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[4],
+				SiadPath: test.TestSiadPath,
+			},
+		},
 	}
 
-	os.MkdirAll("./antfarm-data", 0700)
-	defer os.RemoveAll("./antfarm-data")
-
+	// Start ants
 	ants, err := startAnts(configs...)
 	if err != nil {
 		t.Fatal(err)
@@ -77,45 +127,70 @@ func TestConnectAnts(t *testing.T) {
 		}
 	}()
 
+	// Connect the ants
 	err = connectAnts(ants...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	c := client.New(ants[0].APIAddr)
+	// Get the Gateway info from on of the ants
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Address = ants[0].APIAddr
+	c := client.New(opts)
 	gatewayInfo, err := c.GatewayGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-
+	// Verify the ants are peers
 	for _, ant := range ants[1:] {
 		hasAddr := false
 		for _, peer := range gatewayInfo.Peers {
-			if fmt.Sprintf("%s", peer.NetAddress) == "127.0.0.1"+ant.RPCAddr {
+			if fmt.Sprint(peer.NetAddress) == ant.RPCAddr {
 				hasAddr = true
+				break
 			}
 		}
 		if !hasAddr {
-			t.Fatalf("the central ant is missing %v", "127.0.0.1"+ant.RPCAddr)
+			t.Fatalf("the central ant is missing %v", ant.RPCAddr)
 		}
 	}
 }
 
+// TestTestAntConsensusGroups probes the antConsensusGroup function
 func TestAntConsensusGroups(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
-	// spin up our testing ants
+	// Create minimum configs
+	dataDir := test.TestDir(t.Name())
+	antDirs := test.AntDirs(dataDir, 4)
 	configs := []ant.AntConfig{
-		{},
-		{},
-		{},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[0],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[1],
+				SiadPath: test.TestSiadPath,
+			},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				DataDir:  antDirs[2],
+				SiadPath: test.TestSiadPath,
+			},
+		},
 	}
 
-	os.MkdirAll("./antfarm-data", 0700)
-	defer os.RemoveAll("./antfarm-data")
-
+	// Start Ants
 	ants, err := startAnts(configs...)
 	if err != nil {
 		t.Fatal(err)
@@ -126,6 +201,7 @@ func TestAntConsensusGroups(t *testing.T) {
 		}
 	}()
 
+	// Get the consensus groups
 	groups, err := antConsensusGroups(ants...)
 	if err != nil {
 		t.Fatal(err)
@@ -138,7 +214,14 @@ func TestAntConsensusGroups(t *testing.T) {
 	}
 
 	// Start an ant that is desynced from the rest of the network
-	cfg, err := parseConfig(ant.AntConfig{Jobs: []string{"miner"}})
+	cfg, err := parseConfig(ant.AntConfig{
+		Jobs: []string{"miner"},
+		SiadConfig: ant.SiadConfig{
+			DataDir:  antDirs[3],
+			SiadPath: test.TestSiadPath,
+		},
+	},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,6 +234,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	// Wait for the other ant to mine a few blocks
 	time.Sleep(time.Second * 30)
 
+	// Verify the ants are synced
 	groups, err = antConsensusGroups(ants...)
 	if err != nil {
 		t.Fatal(err)

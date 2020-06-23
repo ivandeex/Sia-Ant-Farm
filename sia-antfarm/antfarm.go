@@ -2,21 +2,24 @@ package main
 
 import (
 	"encoding/json"
-	"github.com/julienschmidt/httprouter"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"time"
 
+	"github.com/julienschmidt/httprouter"
+
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 type (
 	// AntfarmConfig contains the fields to parse and use to create a sia-antfarm.
 	AntfarmConfig struct {
 		ListenAddress string
-		DataDirPrefix string
+		DataDir       string
 		AntConfigs    []ant.AntConfig
 		AutoConnect   bool
 
@@ -44,8 +47,8 @@ type (
 func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	// clear old antfarm data before creating an antfarm
 	datadir := "./antfarm-data"
-	if config.DataDirPrefix != "" {
-		datadir = config.DataDirPrefix
+	if config.DataDir != "" {
+		datadir = config.DataDir
 	}
 
 	os.RemoveAll(datadir)
@@ -56,12 +59,12 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	// start up each ant process with its jobs
 	ants, err := startAnts(config.AntConfigs...)
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to start ants")
 	}
 
 	err = startJobs(ants...)
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to start jobs")
 	}
 
 	farm.ants = ants
@@ -74,19 +77,19 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	// if the AutoConnect flag is set, use connectAnts to bootstrap the network.
 	if config.AutoConnect {
 		if err = connectAnts(ants...); err != nil {
-			return nil, err
+			return nil, errors.AddContext(err, "unable to connect ants")
 		}
 	}
 	// connect the external antFarms
 	for _, address := range config.ExternalFarms {
 		if err = farm.connectExternalAntfarm(address); err != nil {
-			return nil, err
+			return nil, errors.AddContext(err, "unable to connect external ant farm")
 		}
 	}
 	// start up the api server listener
 	farm.apiListener, err = net.Listen("tcp", config.ListenAddress)
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, fmt.Sprintf("unable to create TCP connection on %v", config.ListenAddress))
 	}
 
 	// construct the router and serve the API.

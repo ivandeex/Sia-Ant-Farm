@@ -6,7 +6,6 @@ their behavior and report their successfullness at each user store.
 package ant
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,39 +14,64 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/errors"
 )
+
+// SiadConfig contains the necessary config information to create a new siad
+// instance
+type SiadConfig struct {
+	APIAddr                  string
+	APIPassword              string
+	DataDir                  string
+	HostAddr                 string
+	RPCAddr                  string
+	SiadPath                 string
+	SiaMuxAddr               string
+	SiaMuxWsAddr             string
+	UseExternalIPWithoutUPnP bool
+}
 
 // newSiad spawns a new siad process using os/exec and waits for the api to
 // become available.  siadPath is the path to Siad, passed directly to
 // exec.Command.  An error is returned if starting siad fails, otherwise a
 // pointer to siad's os.Cmd object is returned.  The data directory `datadir`
 // is passed as siad's `--sia-directory`.
-func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, hostAddr string, apiPassword string) (*exec.Cmd, error) {
-	if err := checkSiadConstants(siadPath); err != nil {
-		return nil, err
+func newSiad(config SiadConfig) (*exec.Cmd, error) {
+	if err := checkSiadConstants(config.SiadPath); err != nil {
+		return nil, errors.AddContext(err, "error with siad constants")
 	}
 	// create a logfile for Sia's stderr and stdout.
-	logfile, err := os.Create(filepath.Join(datadir, "sia-output.log"))
+	logfile, err := os.Create(filepath.Join(config.DataDir, "sia-output.log"))
 	if err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to create log file")
 	}
-	args := []string{"--modules=cgthmrw", "--no-bootstrap", "--sia-directory=" + datadir, "--api-addr=" + apiAddr, "--rpc-addr=" + rpcAddr, "--host-addr=" + hostAddr}
-	if apiPassword == "" {
+	args := []string{
+		"--modules=cgthmrw",
+		"--no-bootstrap",
+		"--sia-directory=" + config.DataDir,
+		"--api-addr=" + config.APIAddr,
+		"--rpc-addr=" + config.RPCAddr,
+		"--host-addr=" + config.HostAddr,
+		"--siamux-addr=" + config.SiaMuxAddr,
+		"--siamux-addr-ws=" + config.SiaMuxWsAddr,
+	}
+
+	if config.APIPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}
-	cmd := exec.Command(siadPath, args...)
+	cmd := exec.Command(config.SiadPath, args...) //nolint:gosec
 	cmd.Stderr = logfile
 	cmd.Stdout = logfile
-	if apiPassword != "" {
-		cmd.Env = append(os.Environ(), "SIA_API_PASSWORD="+apiPassword)
+	if config.APIPassword != "" {
+		cmd.Env = append(os.Environ(), "SIA_API_PASSWORD="+config.APIPassword)
 	}
 
 	if err := cmd.Start(); err != nil {
-		return nil, err
+		return nil, errors.AddContext(err, "unable to start process")
 	}
 
-	if err := waitForAPI(apiAddr, cmd); err != nil {
-		return nil, err
+	if err := waitForAPI(config, cmd); err != nil {
+		return nil, errors.AddContext(err, "error with API")
 	}
 
 	return cmd, nil
@@ -57,7 +81,7 @@ func newSiad(siadPath string, datadir string, apiAddr string, rpcAddr string, ho
 // is running the correct, dev, constants. Returns an error if the correct
 // constants are not running, otherwise returns nil.
 func checkSiadConstants(siadPath string) error {
-	cmd := exec.Command(siadPath, "version")
+	cmd := exec.Command(siadPath, "version") //nolint:gosec
 	output, err := cmd.Output()
 	if err != nil {
 		return err
@@ -73,7 +97,12 @@ func checkSiadConstants(siadPath string) error {
 // stopSiad tries to stop the siad running at `apiAddr`, issuing a kill to its
 // `process` after a timeout.
 func stopSiad(apiAddr string, process *os.Process) {
-	if err := client.New(apiAddr).DaemonStopGet(); err != nil {
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		panic(err)
+	}
+	opts.Address = apiAddr
+	if err := client.New(opts).DaemonStopGet(); err != nil {
 		process.Kill()
 	}
 
@@ -92,8 +121,14 @@ func stopSiad(apiAddr string, process *os.Process) {
 
 // waitForAPI blocks until the Sia API at apiAddr becomes available.
 // if siad returns while waiting for the api, return an error.
-func waitForAPI(apiAddr string, siad *exec.Cmd) error {
-	c := client.New(apiAddr)
+func waitForAPI(config SiadConfig, siad *exec.Cmd) error {
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		return errors.AddContext(err, "unable to get client options")
+	}
+	opts.Address = config.APIAddr
+	opts.Password = config.APIPassword
+	c := client.New(opts)
 
 	exitchan := make(chan error)
 	go func() {
@@ -109,7 +144,11 @@ func waitForAPI(apiAddr string, siad *exec.Cmd) error {
 		}
 		select {
 		case err := <-exitchan:
-			return fmt.Errorf("siad exited unexpectedly while waiting for api, exited with error: %v", err)
+			msg := "siad exited unexpectedly while waiting for api"
+			if err != nil {
+				return fmt.Errorf(msg+", exited with error: %v", err)
+			}
+			return fmt.Errorf(msg)
 		default:
 			if _, err := c.ConsensusGet(); err == nil {
 				success = true
@@ -117,7 +156,7 @@ func waitForAPI(apiAddr string, siad *exec.Cmd) error {
 		}
 	}
 	if !success {
-		stopSiad(apiAddr, siad.Process)
+		stopSiad(config.APIAddr, siad.Process)
 		return errors.New("timeout: couldnt reach api after 5 minutes")
 	}
 	return nil

@@ -3,8 +3,8 @@
 
 sia-antfarm is a collection of utilities for performing complex, end-to-end
 tests of the [Sia](https://gitlab.com/NebulousLabs/Sia) platform.  These test
-are long-running and offer superior insight into high-level
-network behaviour than Sia's existing automated testing suite.
+are long-running and offer superior insight into high-level network behaviour
+than Sia's existing automated testing suite.
 
 # Install
 
@@ -16,7 +16,11 @@ make dependencies && make
 
 # Running a sia-antfarm
 
-This repository contains one utility, `sia-antfarm`. `sia-antfarm` starts up a number of `siad` instances, using jobs and configuration options parsed from the input `config.json`. `sia-antfarm` takes a flag, `-config`, which is a path to a JSON file defining the ants and their jobs. See `nebulous-configs/` for some examples that we use to test Sia.
+This repository contains one utility, `sia-antfarm`. `sia-antfarm` starts up
+a number of `siad` instances, using jobs and configuration options parsed from
+the input `config.json`. `sia-antfarm` takes a flag, `-config`, which is a path
+to a JSON file defining the ants and their jobs. See `nebulous-configs/` for
+some examples that we use to test Sia.
 
 An example `config.json`:
 
@@ -57,13 +61,21 @@ An example `config.json`:
 }
 ```
 
-This `config.json` creates 5 ants, with four running the `gateway` job
-and one running a `gateway` and a `miner` job.  If `HostAddr`, `APIAddr`, or
-`RPCAddr` are not specified, they will be set to a random port.  If
-`autoconnect` is set to `false`, the ants will not automatically be made peers
-of each other.
+This `config.json` creates 5 ants, with four running the `gateway` job and one
+running a `gateway` and a `miner` job.  If `HostAddr`, `APIAddr`, `RPCAddr`,
+`SiamuxAddr`, or `SiamuxWsAddr` are not specified, they will be set to a random
+port. If `autoconnect` is set to `false`, the ants will not automatically be
+made peers of each other.
 
-Note that the ants connect to each other over the public Internet, so you must either have UPnP enabled on your router or you must configure your system so that the ants' `RPCAddr` and `HostAddr` ports are accessible from the Internet.
+Note that if you have UPnP enabled on your router, the ants connect to each
+other over the public Internet. If you do not have UPnP enabled on your router
+and want the ants connect to each other over public Internet, you must set
+`UseExternalIPWithoutUPnP` in `AntConfig`-s to `true` and configure your system
+so that the ants' `RPCAddr` and `HostAddr` ports are accessible from the
+Internet, i.e. to forward ports. You can run ant farm without UPnP enabled
+router and without port forwarding if all your ants are on the same machine,
+`UseExternalIPWithoutUPnP` is unset or set to `false` and IPs are unset or set
+to `127.0.0.1`.
 
 ## Available configuration options:
 
@@ -83,6 +95,9 @@ Note that the ants connect to each other over the public Internet, so you must e
 	'APIPassword': the password to be used for authenticating certain calls to the ant.
 	'RPCAddr': the RPC address for the ant to listen on, by default an unused bind address will be used.
 	'HostAddr': the Host address for the ant to listen on, by default an unused bind address will be used.
+	'SiamuxAddr': the SiaMux address for the ant to listen on, by default an unused bind address will be used.
+	'SiamuxWsAddr': the SiaMux websocket address for the ant to listen on, by default an unused bind address will be used.
+	'UseExternalIPWithoutUPnP': if set to true and you do not have router with UPnP enabled, external IPs will be used and you need to set port forwarding. See note above.
 	'SiaDirectory': the data directory to use for this ant, by default a unique directory in `./antfarm-data` will be generated and used.
 	'SiadPath': the path to the `siad` binary, by default the `siad` in your path will be used.
 	'Jobs': an array of jobs for this ant to run. available jobs include: ['miner', 'host', 'renter', 'gateway']

@@ -3,14 +3,15 @@ package ant
 import (
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/sync"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // A jobRunner is used to start up jobs on the running Sia node.
 type jobRunner struct {
-	client         *client.Client
-	walletPassword string
-	siaDirectory   string
-	tg             sync.ThreadGroup
+	staticClient         *client.Client
+	staticWalletPassword string
+	staticSiaDirectory   string
+	staticTG             sync.ThreadGroup
 }
 
 // newJobRunner creates a new job runner, using the provided api address,
@@ -18,19 +19,24 @@ type jobRunner struct {
 // be newly initialized, and initializes a new wallet, for usage in the jobs.
 // siadirectory is used in logging to identify the job runner.
 func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jobRunner, error) {
-	client := client.New(apiaddr)
-	client.Password = authpassword
-	jr := &jobRunner{
-		client:       client,
-		siaDirectory: siadirectory,
+	opt, err := client.DefaultOptions()
+	if err != nil {
+		return nil, errors.AddContext(err, "unable to get client options")
 	}
-	walletParams, err := jr.client.WalletInitPost("", false)
+	opt.Address = apiaddr
+	opt.Password = authpassword
+	c := client.New(opt)
+	jr := &jobRunner{
+		staticClient:       c,
+		staticSiaDirectory: siadirectory,
+	}
+	walletParams, err := jr.staticClient.WalletInitPost("", false)
 	if err != nil {
 		return nil, err
 	}
-	jr.walletPassword = walletParams.PrimarySeed
+	jr.staticWalletPassword = walletParams.PrimarySeed
 
-	err = jr.client.WalletUnlockPost(jr.walletPassword)
+	err = jr.staticClient.WalletUnlockPost(jr.staticWalletPassword)
 	if err != nil {
 		return nil, err
 	}
@@ -41,5 +47,5 @@ func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jo
 // Stop signals all running jobs to stop and blocks until the jobs have
 // finished stopping.
 func (j *jobRunner) Stop() {
-	j.tg.Stop()
+	j.staticTG.Stop()
 }

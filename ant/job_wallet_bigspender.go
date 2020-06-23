@@ -13,19 +13,19 @@ var (
 )
 
 func (j *jobRunner) bigSpender() {
-	j.tg.Add()
-	defer j.tg.Done()
+	j.staticTG.Add()
+	defer j.staticTG.Done()
 
 	for {
 		select {
-		case <-j.tg.StopChan():
+		case <-j.staticTG.StopChan():
 			return
 		case <-time.After(spendInterval):
 		}
 
-		walletGet, err := j.client.WalletGet()
+		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v jobSpender ERROR]: %v\n", j.siaDirectory, err)
+			log.Printf("[%v jobSpender ERROR]: %v\n", j.staticSiaDirectory, err)
 			return
 		}
 
@@ -33,15 +33,15 @@ func (j *jobRunner) bigSpender() {
 			continue
 		}
 
-		log.Printf("[%v jobSpender INFO]: sending a large transaction\n", j.siaDirectory)
+		log.Printf("[%v jobSpender INFO]: sending a large transaction\n", j.staticSiaDirectory)
 
 		voidaddress := types.UnlockHash{}
-		_, err = j.client.WalletSiacoinsPost(spendThreshold, voidaddress, false)
+		_, err = j.staticClient.WalletSiacoinsPost(spendThreshold, voidaddress, false)
 		if err != nil {
-			log.Printf("[%v jobSpender ERROR]: %v\n", j.siaDirectory, err)
+			log.Printf("[%v jobSpender ERROR]: %v\n", j.staticSiaDirectory, err)
 			continue
 		}
 
-		log.Printf("[%v jobSpender INFO]: large transaction send successful\n", j.siaDirectory)
+		log.Printf("[%v jobSpender INFO]: large transaction send successful\n", j.staticSiaDirectory)
 	}
 }

@@ -13,19 +13,19 @@ var (
 )
 
 func (j *jobRunner) littleSupplier(sendAddress types.UnlockHash) {
-	j.tg.Add()
-	defer j.tg.Done()
+	j.staticTG.Add()
+	defer j.staticTG.Done()
 
 	for {
 		select {
-		case <-j.tg.StopChan():
+		case <-j.staticTG.StopChan():
 			return
 		case <-time.After(sendInterval):
 		}
 
-		walletGet, err := j.client.WalletGet()
+		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v jobSpender ERROR]: %v\n", j.siaDirectory, err)
+			log.Printf("[%v jobSpender ERROR]: %v\n", j.staticSiaDirectory, err)
 			return
 		}
 
@@ -33,9 +33,9 @@ func (j *jobRunner) littleSupplier(sendAddress types.UnlockHash) {
 			continue
 		}
 
-		_, err = j.client.WalletSiacoinsPost(sendAmount, sendAddress, false)
+		_, err = j.staticClient.WalletSiacoinsPost(sendAmount, sendAddress, false)
 		if err != nil {
-			log.Printf("[%v jobSupplier ERROR]: %v\n", j.siaDirectory, err)
+			log.Printf("[%v jobSupplier ERROR]: %v\n", j.staticSiaDirectory, err)
 		}
 	}
 }

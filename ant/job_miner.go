@@ -9,18 +9,18 @@ import (
 // seconds passes before the wallet has received some amount of currency, this
 // job will print an error.
 func (j *jobRunner) blockMining() {
-	j.tg.Add()
-	defer j.tg.Done()
+	j.staticTG.Add()
+	defer j.staticTG.Done()
 
-	err := j.client.MinerStartGet()
+	err := j.staticClient.MinerStartGet()
 	if err != nil {
-		log.Printf("[%v blockMining ERROR]: %v\n", j.siaDirectory, err)
+		log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)
 		return
 	}
 
-	walletInfo, err := j.client.WalletGet()
+	walletInfo, err := j.staticClient.WalletGet()
 	if err != nil {
-		log.Printf("[%v blockMining ERROR]: %v\n", j.siaDirectory, err)
+		log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)
 		return
 	}
 	lastBalance := walletInfo.ConfirmedSiacoinBalance
@@ -28,20 +28,20 @@ func (j *jobRunner) blockMining() {
 	// Every 100 seconds, verify that the balance has increased.
 	for {
 		select {
-		case <-j.tg.StopChan():
+		case <-j.staticTG.StopChan():
 			return
 		case <-time.After(time.Second * 100):
 		}
 
-		walletInfo, err = j.client.WalletGet()
+		walletInfo, err = j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v blockMining ERROR]: %v\n", j.siaDirectory, err)
+			log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(lastBalance) > 0 {
-			log.Printf("[%v SUCCESS] blockMining job succeeded", j.siaDirectory)
+			log.Printf("[%v SUCCESS] blockMining job succeeded", j.staticSiaDirectory)
 			lastBalance = walletInfo.ConfirmedSiacoinBalance
 		} else {
-			log.Printf("[%v blockMining ERROR]: it took too long to receive new funds in miner job\n", j.siaDirectory)
+			log.Printf("[%v blockMining ERROR]: it took too long to receive new funds in miner job\n", j.staticSiaDirectory)
 		}
 	}
 }

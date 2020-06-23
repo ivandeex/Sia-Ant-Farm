@@ -8,12 +8,12 @@ import (
 // gatewayConnectability will print an error to the log if the node has zero
 // peers at any time.
 func (j *jobRunner) gatewayConnectability() {
-	j.tg.Add()
-	defer j.tg.Done()
+	j.staticTG.Add()
+	defer j.staticTG.Done()
 
 	// Initially wait a while to give the other ants some time to spin up.
 	select {
-	case <-j.tg.StopChan():
+	case <-j.staticTG.StopChan():
 		return
 	case <-time.After(time.Minute):
 	}
@@ -21,7 +21,7 @@ func (j *jobRunner) gatewayConnectability() {
 	for {
 		// Wait 30 seconds between iterations.
 		select {
-		case <-j.tg.StopChan():
+		case <-j.staticTG.StopChan():
 			return
 		case <-time.After(time.Second * 30):
 		}
@@ -29,12 +29,12 @@ func (j *jobRunner) gatewayConnectability() {
 		// Count the number of peers that the gateway has. An error is reported
 		// for less than two peers because the gateway is likely connected to
 		// itself.
-		gatewayInfo, err := j.client.GatewayGet()
+		gatewayInfo, err := j.staticClient.GatewayGet()
 		if err != nil {
-			log.Printf("[ERROR] [gateway] [%v] error when calling /gateway: %v\n", j.siaDirectory, err)
+			log.Printf("[ERROR] [gateway] [%v] error when calling /gateway: %v\n", j.staticSiaDirectory, err)
 		}
 		if len(gatewayInfo.Peers) < 2 {
-			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.siaDirectory, gatewayInfo.Peers)
+			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.staticSiaDirectory, gatewayInfo.Peers)
 		}
 	}
 }
