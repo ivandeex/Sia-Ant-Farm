@@ -1,0 +1,2 @@
+- Allow local IPs for hosts.
+- Replace `UseExternalIPWithoutUPnP` with `AllowHostLocalNetAddress`.
