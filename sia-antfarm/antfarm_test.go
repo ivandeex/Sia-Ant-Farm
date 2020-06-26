@@ -32,9 +32,9 @@ func TestNewAntfarm(t *testing.T) {
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: true,
-					DataDir:  antDirs[0],
-					RPCAddr:  antAddr,
-					SiadPath: test.TestSiadPath,
+					DataDir:                  antDirs[0],
+					RPCAddr:                  antAddr,
+					SiadPath:                 test.TestSiadPath,
 				},
 				Jobs: []string{
 					"gateway",
@@ -82,8 +82,8 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress: true,
-			RPCAddr:  test.RandomLocalAddress(),
-			SiadPath: test.TestSiadPath,
+			RPCAddr:                  test.RandomLocalAddress(),
+			SiadPath:                 test.TestSiadPath,
 		},
 		Jobs: []string{
 			"gateway",
