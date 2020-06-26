@@ -157,7 +157,16 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 				opts.Password = cfg.APIPassword
 			}
 			c := client.New(opts)
-			c.HostModifySettingPost(client.HostParamNetAddress, "127.0.0.1")
+			netAddress := "127.0.0.1"
+			if strings.HasPrefix(cfg.HostAddr, ":") {
+				netAddress += cfg.HostAddr
+			} else {
+				netAddress = cfg.HostAddr
+			}
+			err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
+			if err != nil {
+				return nil, errors.AddContext(err, "couldn't set host's netAddress")
+			}
 		}
 
 		ants = append(ants, ant)
