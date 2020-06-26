@@ -144,6 +144,22 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 				ant.Close()
 			}
 		}()
+
+		// Set host netaddress if on local network
+		if config.AllowHostLocalNetAddress {
+			// Create Sia Client
+			opts, err := client.DefaultOptions()
+			if err != nil {
+				return nil, errors.AddContext(err, "couldn't create client")
+			}
+			opts.Address = config.APIAddr
+			if cfg.APIPassword != "" {
+				opts.Password = cfg.APIPassword
+			}
+			c := client.New(opts)
+			c.HostModifySettingPost(client.HostParamNetAddress, "127.0.0.1")
+		}
+
 		ants = append(ants, ant)
 	}
 
