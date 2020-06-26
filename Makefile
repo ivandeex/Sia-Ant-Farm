@@ -51,6 +51,7 @@ test: fmt vet install install-siad-dev
 	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run=$(run) -count=$(count)
 
 test-long: clean fmt vet lint-ci install-siad-dev
+	ls -al $(GOPATH)/bin
 	@mkdir -p cover
 	go test --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=3600s $(pkgs) -run=$(run) -count=$(count)
 
