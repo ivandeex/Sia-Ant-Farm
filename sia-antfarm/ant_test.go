@@ -26,22 +26,22 @@ func TestStartAnts(t *testing.T) {
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[0],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[0],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[1],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[1],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[2],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[2],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 	}
@@ -90,36 +90,36 @@ func TestConnectAnts(t *testing.T) {
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[0],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[0],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[1],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[1],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[2],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[2],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[3],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[3],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[4],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[4],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 	}
@@ -181,22 +181,22 @@ func TestAntConsensusGroups(t *testing.T) {
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[0],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[0],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[1],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[1],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
-				DataDir:  antDirs[2],
-				SiadPath: test.TestSiadPath,
+				DataDir:                  antDirs[2],
+				SiadPath:                 test.TestSiadPath,
 			},
 		},
 	}
@@ -229,8 +229,8 @@ func TestAntConsensusGroups(t *testing.T) {
 		Jobs: []string{"miner"},
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress: true,
-			DataDir:  antDirs[3],
-			SiadPath: test.TestSiadPath,
+			DataDir:                  antDirs[3],
+			SiadPath:                 test.TestSiadPath,
 		},
 	},
 	)
