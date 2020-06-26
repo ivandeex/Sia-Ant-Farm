@@ -11,6 +11,7 @@ import (
 // newTestingSiadConfig creates a generic SiadConfig for the provided datadir.
 func newTestingSiadConfig(datadir string) SiadConfig {
 	return SiadConfig{
+		AllowHostLocalNetAddress: true,
 		APIAddr:      test.RandomLocalAddress(),
 		APIPassword:  persist.RandomSuffix(),
 		DataDir:      datadir,

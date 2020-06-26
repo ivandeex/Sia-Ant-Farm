@@ -31,6 +31,7 @@ func TestNewAntfarm(t *testing.T) {
 		AntConfigs: []ant.AntConfig{
 			{
 				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: true,
 					DataDir:  antDirs[0],
 					RPCAddr:  antAddr,
 					SiadPath: test.TestSiadPath,
@@ -80,6 +81,7 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	antFarmDataDirs := []string{filepath.Join(datadir, "antfarm-data1"), filepath.Join(datadir, "antfarm-data2")}
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
+			AllowHostLocalNetAddress: true,
 			RPCAddr:  test.RandomLocalAddress(),
 			SiadPath: test.TestSiadPath,
 		},
