@@ -209,7 +209,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 	}
 
 	if config.SiadPath == "" {
-		config.SiadPath = "siad"
+		config.SiadPath = "siad-dev"
 	}
 
 	// DesiredCurrency and `miner` are mutually exclusive.
@@ -226,7 +226,10 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 	// Check if UPnP is enabled
 	ipAddr := "127.0.0.1"
 	_, err := upnp.Discover()
-	if err != nil && config.UseExternalIPWithoutUPnP {
+	if err != nil && !config.AllowHostLocalNetAddress {
+		// UPnP is not enabled and we want hosts to communicate over external
+		// IPs (this requires manual port forwarding), i.e. we do not allow
+		// local addresses for hosts
 		ipAddr, err = myExternalIP()
 		if err != nil {
 			return ant.AntConfig{}, errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")

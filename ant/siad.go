@@ -28,7 +28,7 @@ type SiadConfig struct {
 	SiadPath                 string
 	SiaMuxAddr               string
 	SiaMuxWsAddr             string
-	UseExternalIPWithoutUPnP bool
+	AllowHostLocalNetAddress bool
 }
 
 // newSiad spawns a new siad process using os/exec and waits for the api to

@@ -1,9 +1,9 @@
 all: install
 
-dependencies:
+dependencies: get-all install-siad-dev install-std
+
+get-all:
 	go get -d ./...
-	go install -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
-	go install -race std
 
 lint-dependencies:
 	go get -u golang.org/x/lint/golint
@@ -38,6 +38,9 @@ install:
 
 install-siad-dev:
 	go build -o $(GOPATH)/bin/siad-dev -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
+
+install-std:
+	go install -race std
 
 # markdown-spellcheck runs codespell on all markdown files that are not
 # vendored.
