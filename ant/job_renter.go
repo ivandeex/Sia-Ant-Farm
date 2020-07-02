@@ -51,6 +51,10 @@ const (
 	// complete, ie for an upload to reach 100%.
 	maxUploadTime = time.Minute * 10
 
+	// renterAllowanceHosts defines the number of hosts that will be used to
+	// form the allowance.
+	renterAllowanceHosts = 3
+
 	// renterAllowancePeriod defines the block duration of the renter's allowance
 	renterAllowancePeriod = 100
 
@@ -384,9 +388,20 @@ func (j *jobRunner) storageRenter() {
 
 	// Block until a minimum threshold of coins have been mined.
 	start := time.Now()
-	var walletInfo api.WalletGET
 	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", j.staticSiaDirectory)
-	for walletInfo.ConfirmedSiacoinBalance.Cmp(requiredInitialBalance) < 0 {
+	// xxx updated getting wallet info, loop
+	for {
+		// Get the wallet balance.
+		walletInfo, err := j.staticClient.WalletGet()
+		if err != nil {
+			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", j.staticSiaDirectory, err)
+		}
+
+		// Break the wait loop when we have enough balance.
+		if walletInfo.ConfirmedSiacoinBalance.Cmp(requiredInitialBalance) > 0 {
+			break
+		}
+
 		// Log an error if the time elapsed has exceeded the warning threshold.
 		if time.Since(start) > initialBalanceWarningTimeout {
 			log.Printf("[ERROR] [renter] [%v] Minimum balance for allowance has not been reached. Time elapsed: %v\n", j.staticSiaDirectory, time.Since(start))
@@ -398,12 +413,6 @@ func (j *jobRunner) storageRenter() {
 			return
 		case <-time.After(time.Second * 15):
 		}
-
-		// Update the wallet balance.
-		_, err := j.staticClient.WalletGet()
-		if err != nil {
-			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", j.staticSiaDirectory, err)
-		}
 	}
 	log.Printf("[INFO] [renter] [%v] Wallet filled successfully. Blocking until allowance has been set.\n", j.staticSiaDirectory)
 
@@ -411,7 +420,22 @@ func (j *jobRunner) storageRenter() {
 	start = time.Now()
 	for {
 		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", j.staticSiaDirectory)
-		err := j.staticClient.RenterPostAllowance(modules.Allowance{Funds: renterAllowance, Period: renterAllowancePeriod})
+		// xxx rework to constants
+		// allowance := modules.Allowance{
+		// 	Funds:       renterAllowance,
+		// 	Hosts:       renterAllowanceHosts,
+		// 	Period:      renterAllowancePeriod,
+		// 	RenewWindow: types.BlockHeight(25),
+
+		// 	ExpectedStorage:    10e9,
+		// 	ExpectedUpload:     uint64(2e9) / uint64(types.BlockHeight(renterAllowancePeriod)),
+		// 	ExpectedDownload:   uint64(1e12) / uint64(types.BlockHeight(renterAllowancePeriod)),
+		// 	ExpectedRedundancy: 3.0,
+		// 	MaxPeriodChurn:     uint64(2.5e9),
+		// }
+		// xxx do not use default allowance, it sets too many hosts
+		allowance := modules.DefaultAllowance
+		err := j.staticClient.RenterPostAllowance(allowance)
 		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", j.staticSiaDirectory, err)
 		if err == nil {
 			// Success, we can exit the loop.

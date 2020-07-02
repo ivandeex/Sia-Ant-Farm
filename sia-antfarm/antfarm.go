@@ -86,6 +86,15 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 			return nil, errors.AddContext(err, "unable to connect external ant farm")
 		}
 	}
+
+	//xxx
+	// Announce hosts
+	// err = announceHosts(ants...)
+	// if err != nil {
+	// 	return nil, errors.AddContext(err, "couldn't announce hosts")
+	// }
+	//xxx end
+
 	// start up the api server listener
 	farm.apiListener, err = net.Listen("tcp", config.ListenAddress)
 	if err != nil {

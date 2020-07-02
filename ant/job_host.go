@@ -48,6 +48,34 @@ func (j *jobRunner) jobHost() {
 		return
 	}
 
+	// xxx
+	// Wait for conection to at least 2 peers so that host announcement is seen
+	// by them
+	success = false
+	for start := time.Now(); time.Since(start) < 5*time.Minute; time.Sleep(time.Second) {
+		select {
+		case <-j.staticTG.StopChan():
+			return
+		case <-time.After(time.Second):
+		}
+
+		gatewayInfo, err := j.staticClient.GatewayGet()
+		if err != nil {
+			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+		}
+		numPeers := len(gatewayInfo.Peers)
+		if numPeers >= 2 {
+			log.Printf("[%v jobHost INFO]: connected to %d peers\n", j.staticSiaDirectory, numPeers)
+			success = true
+			break
+		}
+	}
+	if !success {
+		log.Printf("[%v jobHost ERROR]: timeout: could not connect to any peer after 5 minutes\n", j.staticSiaDirectory)
+		return
+	}
+
+	// xxx moved to antfarm after nodes are connected
 	// Announce the host to the network, retrying up to 5 times before reporting
 	// failure and returning.
 	success = false
