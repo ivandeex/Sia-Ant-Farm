@@ -16,6 +16,9 @@ func (j *jobRunner) littleSupplier(sendAddress types.UnlockHash) {
 	j.staticTG.Add()
 	defer j.staticTG.Done()
 
+	// Wait for ants to be synced if the wait group was set
+	AntSyncWG.Wait()
+
 	for {
 		select {
 		case <-j.staticTG.StopChan():

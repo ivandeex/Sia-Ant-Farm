@@ -7,11 +7,16 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sync"
 
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/go-upnp"
 )
+
+// AntSyncWG is a waitgroup to wait for all ants to be in sync and then start
+// ant jobs
+var AntSyncWG sync.WaitGroup
 
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.

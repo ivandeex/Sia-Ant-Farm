@@ -68,5 +68,6 @@
 			"desiredcurrency": 100000
 		}
 	],
-	"autoconnect": true
+	"autoconnect": true,
+	"waitforsync": true
 }

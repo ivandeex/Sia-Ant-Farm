@@ -12,6 +12,9 @@ func (j *jobRunner) blockMining() {
 	j.staticTG.Add()
 	defer j.staticTG.Done()
 
+	// Wait for ants to be synced if the wait group was set
+	AntSyncWG.Wait()
+
 	err := j.staticClient.MinerStartGet()
 	if err != nil {
 		log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)

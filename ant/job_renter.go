@@ -386,6 +386,10 @@ func (j *jobRunner) storageRenter() {
 	j.staticTG.Add()
 	defer j.staticTG.Done()
 
+	//xxx
+	// Wait for ants to be synced
+	AntSyncWG.Wait()
+
 	// Block until a minimum threshold of coins have been mined.
 	start := time.Now()
 	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", j.staticSiaDirectory)

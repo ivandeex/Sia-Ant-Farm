@@ -19,35 +19,6 @@ import (
 	"gitlab.com/NebulousLabs/go-upnp"
 )
 
-// announceHosts filters host ants from the given ants and tries to announce hosts
-func announceHosts(ants ...*ant.Ant) error {
-	hostAnts := hostAnts(ants...)
-	for _, ant := range hostAnts {
-		opts, err := client.DefaultOptions()
-		if err != nil {
-			return errors.AddContext(err, "unable to get default client options")
-		}
-		opts.Address = ant.Config.APIAddr
-		opts.Password = ant.Config.APIPassword
-		c := client.New(opts)
-
-		maxTries := 5
-		success := false
-		for try := 0; try < maxTries; try++ {
-			err := c.HostAnnouncePost()
-			if err != nil {
-				log.Printf("[%v ERROR]: %v\n", ant.Config.Name, errors.AddContext(err, "can't announce host"))
-			}
-			success = true
-		}
-		if !success {
-			msg := fmt.Sprintf("couldn't announce host %s after %d tries", ant.Config.Name, maxTries)
-			return errors.New(msg)
-		}
-	}
-	return nil
-}
-
 // getAddrs returns n free listening ports by leveraging the behaviour of
 // net.Listen(":0").  Addresses are returned in the format of ":port"
 func getAddrs(n int) ([]string, error) {
@@ -62,19 +33,6 @@ func getAddrs(n int) ([]string, error) {
 		addrs = append(addrs, fmt.Sprintf(":%v", l.Addr().(*net.TCPAddr).Port))
 	}
 	return addrs, nil
-}
-
-// hostAnts filters given ants to only ants with host job
-func hostAnts(ants ...*ant.Ant) []*ant.Ant {
-	hostAnts := []*ant.Ant{}
-	for _, ant := range ants {
-		for _, job := range ant.Config.Jobs {
-			if job == "host" {
-				hostAnts = append(hostAnts, ant)
-			}
-		}
-	}
-	return hostAnts
 }
 
 // connectAnts connects two or more ants to the first ant in the slice,
@@ -346,4 +304,33 @@ func myExternalIP() (string, error) {
 	}
 	// trim newline
 	return strings.TrimSpace(string(buf)), nil
+}
+
+// waitForAntsToSync waits a geiven timeout for all ants to be synced
+func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
+	start := time.Now()
+	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
+	for {
+		// We have reached the timeout
+		if time.Since(start) > 5*time.Minute {
+			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
+			return errors.New(msg)
+		}
+
+		// Check sync status
+		groups, err := antConsensusGroups(ants...)
+		if err != nil {
+			return errors.AddContext(err, "unable to get consensus groups")
+		}
+
+		// We have reached ants sync
+		if len(groups) == 1 {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+	log.Println("[INFO] [ant-farm] all ants are now synced")
+	ant.AntSyncWG.Done()
+	return nil
 }

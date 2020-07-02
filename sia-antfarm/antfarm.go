@@ -22,6 +22,7 @@ type (
 		DataDir       string
 		AntConfigs    []ant.AntConfig
 		AutoConnect   bool
+		WaitForSync   bool
 
 		// ExternalFarms is a slice of net addresses representing the API addresses
 		// of other antFarms to connect to.
@@ -56,6 +57,11 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 
 	farm := &antFarm{}
 
+	// Set ants sync waitgroup
+	if config.WaitForSync {
+		ant.AntSyncWG.Add(1)
+	}
+
 	// start up each ant process with its jobs
 	ants, err := startAnts(config.AntConfigs...)
 	if err != nil {
@@ -87,13 +93,13 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 		}
 	}
 
-	//xxx
-	// Announce hosts
-	// err = announceHosts(ants...)
-	// if err != nil {
-	// 	return nil, errors.AddContext(err, "couldn't announce hosts")
-	// }
-	//xxx end
+	// Wait for all ants to sync
+	if config.WaitForSync {
+		err = waitForAntsToSync(5*time.Minute, ants...)
+		if err != nil {
+			return nil, errors.AddContext(err, "wait for ants to sync failed")
+		}
+	}
 
 	// start up the api server listener
 	farm.apiListener, err = net.Listen("tcp", config.ListenAddress)

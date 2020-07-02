@@ -11,6 +11,9 @@ func (j *jobRunner) gatewayConnectability() {
 	j.staticTG.Add()
 	defer j.staticTG.Done()
 
+	// Wait for ants to be synced if the wait group was set
+	AntSyncWG.Wait()
+
 	// Initially wait a while to give the other ants some time to spin up.
 	select {
 	case <-j.staticTG.StopChan():

@@ -9,6 +9,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
@@ -16,6 +17,9 @@ import (
 func (j *jobRunner) jobHost() {
 	j.staticTG.Add()
 	defer j.staticTG.Done()
+
+	// Wait for ants to be synced if the wait group was set
+	AntSyncWG.Wait()
 
 	// Mine at least 50,000 SC
 	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)
@@ -27,6 +31,7 @@ func (j *jobRunner) jobHost() {
 			return
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {
+			log.Printf("[%v jobHost INFO]: xxx wallet balance is %v\n", j.staticSiaDirectory, walletInfo.ConfirmedSiacoinBalance)
 			success = true
 			break
 		}
@@ -49,40 +54,47 @@ func (j *jobRunner) jobHost() {
 	}
 
 	// xxx
-	// Wait for conection to at least 2 peers so that host announcement is seen
+	// Wait for connection to at least 2 peers so that host announcement is seen
 	// by them
-	success = false
-	for start := time.Now(); time.Since(start) < 5*time.Minute; time.Sleep(time.Second) {
-		select {
-		case <-j.staticTG.StopChan():
-			return
-		case <-time.After(time.Second):
-		}
+	// success = false
+	// for start := time.Now(); time.Since(start) < 5*time.Minute; time.Sleep(time.Second) {
+	// 	select {
+	// 	case <-j.staticTG.StopChan():
+	// 		return
+	// 	case <-time.After(time.Second):
+	// 	}
 
-		gatewayInfo, err := j.staticClient.GatewayGet()
-		if err != nil {
-			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
-		}
-		numPeers := len(gatewayInfo.Peers)
-		if numPeers >= 2 {
-			log.Printf("[%v jobHost INFO]: connected to %d peers\n", j.staticSiaDirectory, numPeers)
-			success = true
-			break
-		}
-	}
-	if !success {
-		log.Printf("[%v jobHost ERROR]: timeout: could not connect to any peer after 5 minutes\n", j.staticSiaDirectory)
-		return
-	}
+	// 	gatewayInfo, err := j.staticClient.GatewayGet()
+	// 	if err != nil {
+	// 		log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+	// 	}
+	// 	numPeers := len(gatewayInfo.Peers)
+	// 	if numPeers >= 2 {
+	// 		log.Printf("[%v jobHost INFO]: connected to %d peers\n", j.staticSiaDirectory, numPeers)
+	// 		success = true
+	// 		break
+	// 	}
+	// }
+	// if !success {
+	// 	log.Printf("[%v jobHost ERROR]: timeout: could not connect to any peer after 5 minutes\n", j.staticSiaDirectory)
+	// 	return
+	// }
 
 	// xxx moved to antfarm after nodes are connected
 	// Announce the host to the network, retrying up to 5 times before reporting
 	// failure and returning.
 	success = false
 	for try := 0; try < 5; try++ {
-		err = j.staticClient.HostAnnouncePost()
+		// xxx debug wallet balance
+		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
 			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+		}
+		log.Printf("[%v jobHost INFO]: wallet balance is %v\n", j.staticSiaDirectory, walletInfo.ConfirmedSiacoinBalance)
+
+		err = j.staticClient.HostAnnouncePost()
+		if err != nil {
+			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, errors.AddContext(err, "host announcement not succesful"))
 		} else {
 			success = true
 			break
