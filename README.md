@@ -83,6 +83,7 @@ manual port forwarding) if you set `AllowHostLocalNetAddress` to `true`.
 	'AntConfigs': an array of `AntConfig` objects, defining the ants to run on this antfarm
 	'AutoConnect': a boolean which automatically bootstraps the antfarm if provided
 	'ExternalFarms': an array of strings, where each string is the api address of an external antfarm to connect to.
+	'WaitForSync': wait with all jobs until all ants are in sync, defaults to false.
 }
 ```
 

@@ -58,6 +58,32 @@ const (
 	// renterAllowancePeriod defines the block duration of the renter's allowance
 	renterAllowancePeriod = 100
 
+	// renterRenewWindow defines the block duration of the renter's contract
+	// renew window
+	renterRenewWindow = renterAllowancePeriod/4
+
+	// renterExpectedStorage defines expected storage
+	renterExpectedStorage = 10e9
+
+	// renterExpectedUpload defines expected upload per allowance period
+	renterExpectedUpload = 2e9 / renterAllowancePeriod
+
+	// renterExpectedDownload defines maximum expected download per allowance
+	// period
+	renterExpectedDownload = 1e12 / renterAllowancePeriod
+
+	// renterExpectedRedundancy defines expected data redundancy
+	renterExpectedRedundancy = 3.0
+
+	// renterMaxPeriodChurn defines expected churn per allowance period
+	renterMaxPeriodChurn = 2.5e9
+
+	// renterDataPieces defines the number of data pieces per erasure-coded chunk
+	renterDataPieces = 1
+	
+	// renterParityPieces defines the number of parity pieces per erasure-coded
+	renterParityPieces = 4
+
 	// uploadFileSize defines the size of the test files to be uploaded.  Test
 	// files are filled with random data.
 	uploadFileSize = 1e8
@@ -343,7 +369,7 @@ func (r *renterJob) managedUpload() error {
 	log.Printf("[INFO] [renter] [%v] File upload preparation complete, beginning file upload.\n", r.staticJR.staticSiaDirectory)
 
 	// Upload the file to the network.
-	if err := r.staticJR.staticClient.RenterUploadPost(sourcePath, siapath, 10, 20); err != nil {
+	if err := r.staticJR.staticClient.RenterUploadPost(sourcePath, siapath, renterDataPieces, renterParityPieces); err != nil {
 		return fmt.Errorf("unable to upload file to network: %v", err)
 	}
 	log.Printf("[INFO] [renter] [%v] /renter/upload call completed successfully.  Waiting for the upload to complete\n", r.staticJR.staticSiaDirectory)
@@ -386,14 +412,12 @@ func (j *jobRunner) storageRenter() {
 	j.staticTG.Add()
 	defer j.staticTG.Done()
 
-	//xxx
 	// Wait for ants to be synced
 	AntSyncWG.Wait()
 
 	// Block until a minimum threshold of coins have been mined.
 	start := time.Now()
 	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", j.staticSiaDirectory)
-	// xxx updated getting wallet info, loop
 	for {
 		// Get the wallet balance.
 		walletInfo, err := j.staticClient.WalletGet()
@@ -424,21 +448,18 @@ func (j *jobRunner) storageRenter() {
 	start = time.Now()
 	for {
 		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", j.staticSiaDirectory)
-		// xxx rework to constants
-		// allowance := modules.Allowance{
-		// 	Funds:       renterAllowance,
-		// 	Hosts:       renterAllowanceHosts,
-		// 	Period:      renterAllowancePeriod,
-		// 	RenewWindow: types.BlockHeight(25),
+		allowance := modules.Allowance{
+			Funds:       renterAllowance,
+			Hosts:       renterAllowanceHosts,
+			Period:      renterAllowancePeriod,
+			RenewWindow: renterRenewWindow,
 
-		// 	ExpectedStorage:    10e9,
-		// 	ExpectedUpload:     uint64(2e9) / uint64(types.BlockHeight(renterAllowancePeriod)),
-		// 	ExpectedDownload:   uint64(1e12) / uint64(types.BlockHeight(renterAllowancePeriod)),
-		// 	ExpectedRedundancy: 3.0,
-		// 	MaxPeriodChurn:     uint64(2.5e9),
-		// }
-		// xxx do not use default allowance, it sets too many hosts
-		allowance := modules.DefaultAllowance
+			ExpectedStorage:    renterExpectedStorage,
+			ExpectedUpload:     renterExpectedUpload,
+			ExpectedDownload:   renterExpectedDownload,
+			ExpectedRedundancy: renterExpectedRedundancy,
+			MaxPeriodChurn:     renterMaxPeriodChurn,
+		}
 		err := j.staticClient.RenterPostAllowance(allowance)
 		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", j.staticSiaDirectory, err)
 		if err == nil {

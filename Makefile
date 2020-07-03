@@ -13,7 +13,8 @@ count = 1
 
 pkgs = \
 	./sia-antfarm \
-	./ant
+	./ant \
+	./upnprouter
 
 run = .
 

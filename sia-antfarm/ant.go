@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/go-upnp"
 )
 
 // getAddrs returns n free listening ports by leveraging the behaviour of
@@ -244,17 +244,17 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 		return ant.AntConfig{}, errors.New("error parsing config: cannot have desired currency with miner job")
 	}
 
-	// Check if UPnP is enabled
+	// Set IP address
 	ipAddr := "127.0.0.1"
-	_, err := upnp.Discover()
-	if err != nil && !config.AllowHostLocalNetAddress {
+	if !upnprouter.UPnPEnabled && !config.AllowHostLocalNetAddress {
 		// UPnP is not enabled and we want hosts to communicate over external
-		// IPs (this requires manual port forwarding), i.e. we do not allow
-		// local addresses for hosts
-		ipAddr, err = myExternalIP()
+		// IPs (this requires manual port forwarding), i.e. we do not want
+		// local addresses for hosts in config
+		externalIPAddr, err := myExternalIP()
 		if err != nil {
 			return ant.AntConfig{}, errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")
 		}
+		ipAddr = externalIPAddr
 	}
 	// Automatically generate 5 free operating system ports for the Ant's api,
 	// rpc, host, siamux, and siamux websocket addresses

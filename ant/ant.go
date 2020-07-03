@@ -9,14 +9,16 @@ import (
 	"os/exec"
 	"sync"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/go-upnp"
 )
 
-// AntSyncWG is a waitgroup to wait for all ants to be in sync and then start
-// ant jobs
-var AntSyncWG sync.WaitGroup
+var (
+	// AntSyncWG is a waitgroup to wait for all ants to be in sync and then
+	// start ant jobs
+	AntSyncWG sync.WaitGroup
+)
 
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
@@ -58,31 +60,30 @@ func PrintJSON(v interface{}) error {
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
 // ant before the ant is started.
 func clearPorts(config AntConfig) error {
-	rpcaddr, err := net.ResolveTCPAddr("tcp", config.RPCAddr)
+	RPCAddr, err := net.ResolveTCPAddr("tcp", config.RPCAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	hostaddr, err := net.ResolveTCPAddr("tcp", config.HostAddr)
+	hostAddr, err := net.ResolveTCPAddr("tcp", config.HostAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	upnprouter, err := upnp.Discover()
+	siaMuxAddr, err := net.ResolveTCPAddr("tcp", config.SiaMuxAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	err = upnprouter.Clear(uint16(rpcaddr.Port))
+	siaMuxWsAddr, err := net.ResolveTCPAddr("tcp", config.SiaMuxWsAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	err = upnprouter.Clear(uint16(hostaddr.Port))
+	err = upnprouter.ClearPorts(RPCAddr, hostAddr, siaMuxAddr, siaMuxWsAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't clear ports")
 	}
-
 	return nil
 }
 
@@ -95,9 +96,11 @@ func New(config AntConfig) (*Ant, error) {
 	}
 
 	// Unforward the ports required for this ant
-	err := clearPorts(config)
-	if err != nil {
-		log.Printf("error clearing upnp ports for ant: %v\n", err)
+	if upnprouter.UPnPEnabled {
+		err := clearPorts(config)
+		if err != nil {
+			log.Printf("error clearing upnp ports for ant: %v\n", err)
+		}
 	}
 
 	// Construct the ant's Siad instance

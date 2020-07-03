@@ -12,6 +12,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/errors"
 )
 
@@ -61,6 +62,9 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	if config.WaitForSync {
 		ant.AntSyncWG.Add(1)
 	}
+
+	// Check whether UPnP is enabled on router
+	upnprouter.CheckUPnPEnabled()
 
 	// start up each ant process with its jobs
 	ants, err := startAnts(config.AntConfigs...)
