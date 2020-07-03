@@ -10,6 +10,16 @@ Version History
 
 Latest:
 
+## Jul 3, 2020:
+### v1.0.1
+**Key Updates**
+- Allow local IPs for hosts.
+- Replace `UseExternalIPWithoutUPnP` with `AllowHostLocalNetAddress`.
+- Set host's netAddress when using `AllowHostLocalNetAddress`
+- Fix uploads.
+- Build and use `siad-dev` as default.
+- Add `WaitForSync` to config and enable waiting for ants to sync.
+
 ## Jun 23, 2020:
 ### v1.0.0
 **Key Updates**
