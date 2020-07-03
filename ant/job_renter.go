@@ -60,7 +60,7 @@ const (
 
 	// renterRenewWindow defines the block duration of the renter's contract
 	// renew window
-	renterRenewWindow = renterAllowancePeriod/4
+	renterRenewWindow = renterAllowancePeriod / 4
 
 	// renterExpectedStorage defines expected storage
 	renterExpectedStorage = 10e9
@@ -80,7 +80,7 @@ const (
 
 	// renterDataPieces defines the number of data pieces per erasure-coded chunk
 	renterDataPieces = 1
-	
+
 	// renterParityPieces defines the number of parity pieces per erasure-coded
 	renterParityPieces = 4
 
