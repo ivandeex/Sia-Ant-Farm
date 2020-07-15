@@ -51,32 +51,8 @@ const (
 	// complete, ie for an upload to reach 100%.
 	maxUploadTime = time.Minute * 10
 
-	// renterAllowanceHosts defines the number of hosts that will be used to
-	// form the allowance.
-	renterAllowanceHosts = 3
-
 	// renterAllowancePeriod defines the block duration of the renter's allowance
 	renterAllowancePeriod = 100
-
-	// renterRenewWindow defines the block duration of the renter's contract
-	// renew window
-	renterRenewWindow = renterAllowancePeriod / 4
-
-	// renterExpectedStorage defines expected storage
-	renterExpectedStorage = 10e9
-
-	// renterExpectedUpload defines expected upload per allowance period
-	renterExpectedUpload = 2e9 / renterAllowancePeriod
-
-	// renterExpectedDownload defines maximum expected download per allowance
-	// period
-	renterExpectedDownload = 1e12 / renterAllowancePeriod
-
-	// renterExpectedRedundancy defines expected data redundancy
-	renterExpectedRedundancy = 3.0
-
-	// renterMaxPeriodChurn defines expected churn per allowance period
-	renterMaxPeriodChurn = 2.5e9
 
 	// renterDataPieces defines the number of data pieces per erasure-coded chunk
 	renterDataPieces = 1
@@ -90,13 +66,24 @@ const (
 )
 
 var (
-	// renterAllowance defines the number of coins that the renter has to
-	// spend.
-	renterAllowance = types.NewCurrency64(20e3).Mul(types.SiacoinPrecision)
-
 	// requiredInitialBalance sets the number of coins that the renter requires
 	// before uploading will begin.
 	requiredInitialBalance = types.NewCurrency64(100e3).Mul(types.SiacoinPrecision)
+
+	// allowance is the set set of allowance settings that will be used by
+	// renter
+	allowance = modules.Allowance{
+		Funds:       types.NewCurrency64(20e3).Mul(types.SiacoinPrecision),
+		Hosts:       3,
+		Period:      renterAllowancePeriod,
+		RenewWindow: renterAllowancePeriod / 4,
+
+		ExpectedStorage:    10e9,
+		ExpectedUpload:     2e9 / renterAllowancePeriod,
+		ExpectedDownload:   1e12 / renterAllowancePeriod,
+		ExpectedRedundancy: 3.0,
+		MaxPeriodChurn:     2.5e9,
+	}
 )
 
 // renterFile stores the location and checksum of a file active on the renter.
@@ -448,18 +435,6 @@ func (j *jobRunner) storageRenter() {
 	start = time.Now()
 	for {
 		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", j.staticSiaDirectory)
-		allowance := modules.Allowance{
-			Funds:       renterAllowance,
-			Hosts:       renterAllowanceHosts,
-			Period:      renterAllowancePeriod,
-			RenewWindow: renterRenewWindow,
-
-			ExpectedStorage:    renterExpectedStorage,
-			ExpectedUpload:     renterExpectedUpload,
-			ExpectedDownload:   renterExpectedDownload,
-			ExpectedRedundancy: renterExpectedRedundancy,
-			MaxPeriodChurn:     renterMaxPeriodChurn,
-		}
 		err := j.staticClient.RenterPostAllowance(allowance)
 		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", j.staticSiaDirectory, err)
 		if err == nil {
