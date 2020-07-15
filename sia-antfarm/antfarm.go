@@ -18,7 +18,7 @@ import (
 
 const (
 	// monitorInitialSleep is initial sleep time of permanentSyncMonitor
-	monitorInitialSleep = time.Second * 30 
+	monitorInitialSleep = time.Second * 30
 
 	// monitorSleepTime defines how frequently to run permanentSyncMonitor
 	monitorFrequency = time.Second * 20
@@ -166,7 +166,7 @@ func (af *antFarm) permanentSyncMonitor() {
 	time.Sleep(monitorInitialSleep)
 
 	// Every 20 seconds, list all consensus groups and display the block height.
-	for { 
+	for {
 		time.Sleep(monitorFrequency)
 
 		groups, err := antConsensusGroups(af.allAnts()...)
