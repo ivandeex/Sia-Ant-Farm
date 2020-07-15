@@ -81,7 +81,7 @@ func clearPorts(config AntConfig) error {
 		return errors.AddContext(err, "can't resolve port")
 	}
 
-	// Clear ports
+	// Clear ports on the UPnP enabled router
 	err = upnprouter.ClearPorts(RPCAddr, hostAddr, siaMuxAddr, siaMuxWsAddr)
 	if err != nil {
 		return errors.AddContext(err, "can't clear ports")
