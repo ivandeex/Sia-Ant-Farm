@@ -306,7 +306,7 @@ func myExternalIP() (string, error) {
 	return strings.TrimSpace(string(buf)), nil
 }
 
-// waitForAntsToSync waits a geiven timeout for all ants to be synced
+// waitForAntsToSync waits a given timeout for all ants to be synced
 func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 	start := time.Now()
 	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
