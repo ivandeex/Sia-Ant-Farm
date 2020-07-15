@@ -69,13 +69,11 @@ made peers of each other.
 
 Note that if you have UPnP enabled on your router, the ants connect to each
 other over the public Internet. If you do not have UPnP enabled on your router
-and want the ants connect to each other over public Internet, you must set
-`UseExternalIPWithoutUPnP` in `AntConfig`-s to `true` and configure your system
-so that the ants' `RPCAddr` and `HostAddr` ports are accessible from the
-Internet, i.e. to forward ports. You can run ant farm without UPnP enabled
-router and without port forwarding if all your ants are on the same machine,
-`UseExternalIPWithoutUPnP` is unset or set to `false` and IPs are unset or set
-to `127.0.0.1`.
+and want the ants connect to each other over public Internet, you must
+configure your system so that the ants' `RPCAddr` and `HostAddr` ports are
+accessible from the Internet, i.e. to forward ports from your public IP. You
+can run ant farm local IP range (then you do not need UPnP enabled router or
+manual port forwarding) if you set `AllowHostLocalNetAddress` to `true`.
 
 ## Available configuration options:
 
@@ -85,6 +83,7 @@ to `127.0.0.1`.
 	'AntConfigs': an array of `AntConfig` objects, defining the ants to run on this antfarm
 	'AutoConnect': a boolean which automatically bootstraps the antfarm if provided
 	'ExternalFarms': an array of strings, where each string is the api address of an external antfarm to connect to.
+	'WaitForSync': wait with all jobs until all ants are in sync, defaults to false.
 }
 ```
 
@@ -97,9 +96,9 @@ to `127.0.0.1`.
 	'HostAddr': the Host address for the ant to listen on, by default an unused bind address will be used.
 	'SiamuxAddr': the SiaMux address for the ant to listen on, by default an unused bind address will be used.
 	'SiamuxWsAddr': the SiaMux websocket address for the ant to listen on, by default an unused bind address will be used.
-	'UseExternalIPWithoutUPnP': if set to true and you do not have router with UPnP enabled, external IPs will be used and you need to set port forwarding. See note above.
+	'AllowHostLocalNetAddress': if set to true allows hosts to announce on local network without needing UPnP enabled router or manual port forwarding from public IP.
 	'SiaDirectory': the data directory to use for this ant, by default a unique directory in `./antfarm-data` will be generated and used.
-	'SiadPath': the path to the `siad` binary, by default the `siad` in your path will be used.
+	'SiadPath': the path to the `siad` binary, by default the `siad-dev` in your path will be used.
 	'Jobs': an array of jobs for this ant to run. available jobs include: ['miner', 'host', 'renter', 'gateway']
 	'DesiredCurrency': a minimum (integer) amount of SiaCoin that this Ant will attempt to maintain by mining currency. This is mutually exclusive with the `miner` job.
 }

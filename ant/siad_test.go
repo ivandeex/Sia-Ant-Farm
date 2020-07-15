@@ -11,14 +11,15 @@ import (
 // newTestingSiadConfig creates a generic SiadConfig for the provided datadir.
 func newTestingSiadConfig(datadir string) SiadConfig {
 	return SiadConfig{
-		APIAddr:      test.RandomLocalAddress(),
-		APIPassword:  persist.RandomSuffix(),
-		DataDir:      datadir,
-		HostAddr:     test.RandomLocalAddress(),
-		RPCAddr:      test.RandomLocalAddress(),
-		SiadPath:     test.TestSiadPath,
-		SiaMuxAddr:   test.RandomLocalAddress(),
-		SiaMuxWsAddr: test.RandomLocalAddress(),
+		AllowHostLocalNetAddress: true,
+		APIAddr:                  test.RandomLocalAddress(),
+		APIPassword:              persist.RandomSuffix(),
+		DataDir:                  datadir,
+		HostAddr:                 test.RandomLocalAddress(),
+		RPCAddr:                  test.RandomLocalAddress(),
+		SiadPath:                 test.TestSiadPath,
+		SiaMuxAddr:               test.RandomLocalAddress(),
+		SiaMuxWsAddr:             test.RandomLocalAddress(),
 	}
 }
 

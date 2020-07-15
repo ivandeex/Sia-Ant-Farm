@@ -12,7 +12,19 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/errors"
+)
+
+const (
+	// monitorInitialSleep is initial sleep time of permanentSyncMonitor
+	monitorInitialSleep = time.Second * 30
+
+	// monitorSleepTime defines how frequently to run permanentSyncMonitor
+	monitorFrequency = time.Second * 20
+
+	// antsSyncTimeout is a timeout for all ants to sync
+	antsSyncTimeout = time.Minute * 5
 )
 
 type (
@@ -22,6 +34,7 @@ type (
 		DataDir       string
 		AntConfigs    []ant.AntConfig
 		AutoConnect   bool
+		WaitForSync   bool
 
 		// ExternalFarms is a slice of net addresses representing the API addresses
 		// of other antFarms to connect to.
@@ -56,6 +69,14 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 
 	farm := &antFarm{}
 
+	// Set ants sync waitgroup
+	if config.WaitForSync {
+		ant.AntSyncWG.Add(1)
+	}
+
+	// Check whether UPnP is enabled on router
+	upnprouter.CheckUPnPEnabled()
+
 	// start up each ant process with its jobs
 	ants, err := startAnts(config.AntConfigs...)
 	if err != nil {
@@ -86,6 +107,15 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 			return nil, errors.AddContext(err, "unable to connect external ant farm")
 		}
 	}
+
+	// Wait for all ants to sync
+	if config.WaitForSync {
+		err = waitForAntsToSync(antsSyncTimeout, ants...)
+		if err != nil {
+			return nil, errors.AddContext(err, "wait for ants to sync failed")
+		}
+	}
+
 	// start up the api server listener
 	farm.apiListener, err = net.Listen("tcp", config.ListenAddress)
 	if err != nil {
@@ -133,11 +163,11 @@ func (af *antFarm) ServeAPI() error {
 // blockchain.
 func (af *antFarm) permanentSyncMonitor() {
 	// Give 30 seconds for everything to start up.
-	time.Sleep(time.Second * 30)
+	time.Sleep(monitorInitialSleep)
 
 	// Every 20 seconds, list all consensus groups and display the block height.
 	for {
-		time.Sleep(time.Second * 20)
+		time.Sleep(monitorFrequency)
 
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {

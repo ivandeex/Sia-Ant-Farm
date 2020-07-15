@@ -5,25 +5,37 @@ import (
 	"time"
 )
 
+const (
+	// gatewayConnectabilityInitialSleepTime is initial sleep time for gateway
+	// connectability
+	gatewayConnectabilityInitialSleepTime = time.Minute
+
+	// gatewayConnectabilitySleepTime is sleep time for gateway connectability
+	gatewayConnectabilitySleepTime = time.Second * 30
+)
+
 // gatewayConnectability will print an error to the log if the node has zero
 // peers at any time.
-func (j *jobRunner) gatewayConnectability() {
-	j.staticTG.Add()
-	defer j.staticTG.Done()
+func (j *JobRunner) gatewayConnectability() {
+	j.StaticTG.Add()
+	defer j.StaticTG.Done()
+
+	// Wait for ants to be synced if the wait group was set
+	AntSyncWG.Wait()
 
 	// Initially wait a while to give the other ants some time to spin up.
 	select {
-	case <-j.staticTG.StopChan():
+	case <-j.StaticTG.StopChan():
 		return
-	case <-time.After(time.Minute):
+	case <-time.After(gatewayConnectabilityInitialSleepTime):
 	}
 
 	for {
 		// Wait 30 seconds between iterations.
 		select {
-		case <-j.staticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(time.Second * 30):
+		case <-time.After(gatewayConnectabilitySleepTime):
 		}
 
 		// Count the number of peers that the gateway has. An error is reported

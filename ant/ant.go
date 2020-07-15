@@ -7,10 +7,17 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"sync"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/go-upnp"
+)
+
+var (
+	// AntSyncWG is a waitgroup to wait for all ants to be in sync and then
+	// start ant jobs
+	AntSyncWG sync.WaitGroup
 )
 
 // AntConfig represents a configuration object passed to New(), used to
@@ -32,7 +39,7 @@ type Ant struct {
 	Config AntConfig
 
 	siad *exec.Cmd
-	jr   *jobRunner
+	Jr   *JobRunner
 
 	// A variable to track which blocks + heights the sync detector has seen
 	// for this ant. The map will just keep growing, but it shouldn't take up a
@@ -53,31 +60,32 @@ func PrintJSON(v interface{}) error {
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
 // ant before the ant is started.
 func clearPorts(config AntConfig) error {
-	rpcaddr, err := net.ResolveTCPAddr("tcp", config.RPCAddr)
+	// Resolve addresses to be cleared
+	RPCAddr, err := net.ResolveTCPAddr("tcp", config.RPCAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	hostaddr, err := net.ResolveTCPAddr("tcp", config.HostAddr)
+	hostAddr, err := net.ResolveTCPAddr("tcp", config.HostAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	upnprouter, err := upnp.Discover()
+	siaMuxAddr, err := net.ResolveTCPAddr("tcp", config.SiaMuxAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	err = upnprouter.Clear(uint16(rpcaddr.Port))
+	siaMuxWsAddr, err := net.ResolveTCPAddr("tcp", config.SiaMuxWsAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't resolve port")
 	}
 
-	err = upnprouter.Clear(uint16(hostaddr.Port))
+	// Clear ports on the UPnP enabled router
+	err = upnprouter.ClearPorts(RPCAddr, hostAddr, siaMuxAddr, siaMuxWsAddr)
 	if err != nil {
-		return err
+		return errors.AddContext(err, "can't clear ports")
 	}
-
 	return nil
 }
 
@@ -90,9 +98,11 @@ func New(config AntConfig) (*Ant, error) {
 	}
 
 	// Unforward the ports required for this ant
-	err := clearPorts(config)
-	if err != nil {
-		log.Printf("error clearing upnp ports for ant: %v\n", err)
+	if upnprouter.UPnPEnabled {
+		err := clearPorts(config)
+		if err != nil {
+			log.Printf("error clearing upnp ports for ant: %v\n", err)
+		}
 	}
 
 	// Construct the ant's Siad instance
@@ -136,7 +146,7 @@ func New(config AntConfig) (*Ant, error) {
 		Config:  config,
 
 		siad: siad,
-		jr:   j,
+		Jr:   j,
 
 		SeenBlocks: make(map[types.BlockHeight]types.BlockID),
 	}, nil
@@ -145,7 +155,7 @@ func New(config AntConfig) (*Ant, error) {
 // Close releases all resources created by the ant, including the Siad
 // subprocess.
 func (a *Ant) Close() error {
-	a.jr.Stop()
+	a.Jr.Stop()
 	stopSiad(a.APIAddr, a.siad.Process)
 	return nil
 }
@@ -153,23 +163,23 @@ func (a *Ant) Close() error {
 // StartJob starts the job indicated by `job` after an ant has been
 // initialized. Arguments are passed to the job using args.
 func (a *Ant) StartJob(job string, args ...interface{}) error {
-	if a.jr == nil {
+	if a.Jr == nil {
 		return errors.New("ant is not running")
 	}
 
 	switch job {
 	case "miner":
-		go a.jr.blockMining()
+		go a.Jr.blockMining()
 	case "host":
-		go a.jr.jobHost()
+		go a.Jr.jobHost()
 	case "renter":
-		go a.jr.storageRenter()
+		go a.Jr.storageRenter()
 	case "gateway":
-		go a.jr.gatewayConnectability()
+		go a.Jr.gatewayConnectability()
 	case "bigspender":
-		go a.jr.bigSpender()
+		go a.Jr.bigSpender()
 	case "littlesupplier":
-		go a.jr.littleSupplier(args[0].(types.UnlockHash))
+		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
 	default:
 		return errors.New("no such job")
 	}
@@ -190,11 +200,11 @@ func (a *Ant) BlockHeight() types.BlockHeight {
 
 // WalletAddress returns a wallet address that this ant can receive coins on.
 func (a *Ant) WalletAddress() (*types.UnlockHash, error) {
-	if a.jr == nil {
+	if a.Jr == nil {
 		return nil, errors.New("ant is not running")
 	}
 
-	addressGet, err := a.jr.staticClient.WalletAddressGet()
+	addressGet, err := a.Jr.staticClient.WalletAddressGet()
 	if err != nil {
 		return nil, err
 	}

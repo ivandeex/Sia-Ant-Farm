@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"os"
@@ -11,11 +12,20 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/go-upnp"
+)
+
+const (
+	// httpClientTimeout defines timeout for http client
+	httpClientTimeout = time.Second * 10
+
+	// waitForAntsToSyncFrequency defines how frequently to check if ants are
+	// synced
+	waitForAntsToSyncFrequency = time.Second
 )
 
 // getAddrs returns n free listening ports by leveraging the behaviour of
@@ -144,6 +154,26 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 				ant.Close()
 			}
 		}()
+
+		// Set host netaddress if on local network
+		if config.AllowHostLocalNetAddress {
+			// Create Sia Client
+			opts, err := client.DefaultOptions()
+			if err != nil {
+				return nil, errors.AddContext(err, "couldn't create client")
+			}
+			opts.Address = cfg.APIAddr
+			if cfg.APIPassword != "" {
+				opts.Password = cfg.APIPassword
+			}
+			c := client.New(opts)
+			netAddress := cfg.HostAddr
+			err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
+			if err != nil {
+				return nil, errors.AddContext(err, "couldn't set host's netAddress")
+			}
+		}
+
 		ants = append(ants, ant)
 	}
 
@@ -209,7 +239,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 	}
 
 	if config.SiadPath == "" {
-		config.SiadPath = "siad"
+		config.SiadPath = "siad-dev"
 	}
 
 	// DesiredCurrency and `miner` are mutually exclusive.
@@ -223,14 +253,17 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 		return ant.AntConfig{}, errors.New("error parsing config: cannot have desired currency with miner job")
 	}
 
-	// Check if UPnP is enabled
+	// Set IP address
 	ipAddr := "127.0.0.1"
-	_, err := upnp.Discover()
-	if err != nil && config.UseExternalIPWithoutUPnP {
-		ipAddr, err = myExternalIP()
+	if !upnprouter.UPnPEnabled && !config.AllowHostLocalNetAddress {
+		// UPnP is not enabled and we want hosts to communicate over external
+		// IPs (this requires manual port forwarding), i.e. we do not want
+		// local addresses for hosts in config
+		externalIPAddr, err := myExternalIP()
 		if err != nil {
 			return ant.AntConfig{}, errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")
 		}
+		ipAddr = externalIPAddr
 	}
 	// Automatically generate 5 free operating system ports for the Ant's api,
 	// rpc, host, siamux, and siamux websocket addresses
@@ -261,7 +294,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 // service, http://myexternalip.com.
 func myExternalIP() (string, error) {
 	// timeout after 10 seconds
-	client := http.Client{Timeout: time.Duration(10 * time.Second)}
+	client := http.Client{Timeout: httpClientTimeout}
 	resp, err := client.Get("http://myexternalip.com/raw")
 	if err != nil {
 		return "", err
@@ -280,4 +313,37 @@ func myExternalIP() (string, error) {
 	}
 	// trim newline
 	return strings.TrimSpace(string(buf)), nil
+}
+
+// waitForAntsToSync waits a given timeout for all ants to be synced
+func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
+	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
+	for {
+		// Check sync status
+		groups, err := antConsensusGroups(ants...)
+		if err != nil {
+			return errors.AddContext(err, "unable to get consensus groups")
+		}
+
+		// We have reached ants sync
+		if len(groups) == 1 {
+			break
+		}
+
+		// Wait for jobs stop, timout or sleep
+		select {
+		case <-ants[0].Jr.StaticTG.StopChan():
+			// Jobs were stopped
+			return errors.New("jobs were stopped")
+		case <-time.After(timeout):
+			// We have reached the timeout
+			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
+			return errors.New(msg)
+		case <-time.After(waitForAntsToSyncFrequency):
+			// Continue waiting for sync after sleep
+		}
+	}
+	log.Println("[INFO] [ant-farm] all ants are now synced")
+	ant.AntSyncWG.Done()
+	return nil
 }

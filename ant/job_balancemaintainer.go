@@ -7,11 +7,19 @@ import (
 	"gitlab.com/NebulousLabs/Sia/types"
 )
 
+const (
+	// balanceMaintainerSleepTime is sleep time for balance maintainer
+	balanceMaintainerSleepTime = time.Second * 20
+)
+
 // balanceMaintainer mines when the balance is below desiredBalance. The miner
 // is stopped if the balance exceeds the desired balance.
-func (j *jobRunner) balanceMaintainer(desiredBalance types.Currency) {
-	j.staticTG.Add()
-	defer j.staticTG.Done()
+func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
+	j.StaticTG.Add()
+	defer j.StaticTG.Done()
+
+	// Wait for ants to be synced if the wait group was set
+	AntSyncWG.Wait()
 
 	minerRunning := true
 	err := j.staticClient.MinerStartGet()
@@ -26,9 +34,9 @@ func (j *jobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	// started.
 	for {
 		select {
-		case <-j.staticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(time.Second * 20):
+		case <-time.After(balanceMaintainerSleepTime):
 		}
 
 		walletInfo, err := j.staticClient.WalletGet()
