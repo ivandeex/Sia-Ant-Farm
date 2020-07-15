@@ -12,16 +12,16 @@ var (
 	sendAmount   = types.NewCurrency64(1000).Mul(types.SiacoinPrecision)
 )
 
-func (j *jobRunner) littleSupplier(sendAddress types.UnlockHash) {
-	j.staticTG.Add()
-	defer j.staticTG.Done()
+func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
+	j.StaticTG.Add()
+	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
 	AntSyncWG.Wait()
 
 	for {
 		select {
-		case <-j.staticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
 		case <-time.After(sendInterval):
 		}

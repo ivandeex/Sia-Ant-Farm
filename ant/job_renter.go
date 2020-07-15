@@ -35,6 +35,10 @@ const (
 	// successfully.
 	setAllowanceWarningTimeout = time.Minute * 2
 
+	// setAllowanceFrequency defines how frequently the renter job tries to set
+	// renter allowance
+	setAllowanceFrequency = time.Second * 15
+
 	// uploadFileFrequency defines how frequently the renter job uploads files
 	// to the network.
 	uploadFileFrequency = time.Second * 60
@@ -51,6 +55,10 @@ const (
 	// complete, ie for an upload to reach 100%.
 	maxUploadTime = time.Minute * 10
 
+	// uploadFileCheckFrequency defines how frequently the renter job checks if
+	// file upload has reached 100%
+	uploadFileCheckFrequency = time.Second * 20
+
 	// renterAllowancePeriod defines the block duration of the renter's allowance
 	renterAllowancePeriod = 100
 
@@ -63,6 +71,25 @@ const (
 	// uploadFileSize defines the size of the test files to be uploaded.  Test
 	// files are filled with random data.
 	uploadFileSize = 1e8
+
+	// fileAppearInDownloadListTimeout defines timeout of a file to appear in the
+	// download list
+	fileAppearInDownloadListTimeout = time.Minute * 3
+
+	// fileApearInDownloadListFrequency defines how frequently the renter job
+	// checks if a file appears in the download list
+	fileApearInDownloadListFrequency = time.Second
+
+	// downloadFileTimeout defines timeout for file to be downloaded
+	downloadFileTimeout = time.Minute * 15
+
+	// downloadFileFrequency defines how frequently the renter job checks if a
+	// file is downloaded
+	downloadFileCheckFrequency = time.Second
+
+	// balanceCheckFrequency defines how frequently the renter job checks if
+	// minimum treshold of coins have been mined
+	balanceCheckFrequency = time.Second * 15
 )
 
 var (
@@ -98,7 +125,7 @@ type renterFile struct {
 type renterJob struct {
 	files []renterFile
 
-	staticJR *jobRunner
+	staticJR *JobRunner
 	mu       sync.Mutex
 }
 
@@ -118,7 +145,7 @@ func (r *renterJob) threadedDownloader() {
 	// loop.
 	for {
 		select {
-		case <-r.staticJR.staticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return
 		case <-time.After(downloadFileFrequency):
 		}
@@ -139,7 +166,7 @@ func (r *renterJob) threadedUploader() {
 	for {
 		// Wait a while between upload attempts.
 		select {
-		case <-r.staticJR.staticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return
 		case <-time.After(uploadFileFrequency):
 		}
@@ -156,7 +183,7 @@ func (r *renterJob) threadedUploader() {
 func (r *renterJob) threadedDeleter() {
 	for {
 		select {
-		case <-r.staticJR.staticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return
 		case <-time.After(deleteFileFrequency):
 		}
@@ -217,8 +244,8 @@ func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.
 
 // managedDownload will managedDownload a random file from the network.
 func (r *renterJob) managedDownload() error {
-	r.staticJR.staticTG.Add()
-	defer r.staticJR.staticTG.Done()
+	r.staticJR.StaticTG.Add()
+	defer r.staticJR.StaticTG.Done()
 
 	// Download a random file from the renter's file list
 	renterFiles, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
@@ -260,11 +287,11 @@ func (r *renterJob) managedDownload() error {
 
 	// Wait for the file to appear in the download list
 	success := false
-	for start := time.Now(); time.Since(start) < 3*time.Minute; {
+	for start := time.Now(); time.Since(start) < fileAppearInDownloadListTimeout; {
 		select {
-		case <-r.staticJR.staticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return nil
-		case <-time.After(time.Second):
+		case <-time.After(fileApearInDownloadListFrequency):
 		}
 
 		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
@@ -282,11 +309,11 @@ func (r *renterJob) managedDownload() error {
 
 	// Wait for the file to be finished downloading, with a timeout of 15 minutes.
 	success = false
-	for start := time.Now(); time.Since(start) < 15*time.Minute; {
+	for start := time.Now(); time.Since(start) < downloadFileTimeout; {
 		select {
-		case <-r.staticJR.staticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return nil
-		case <-time.After(time.Second):
+		case <-time.After(downloadFileCheckFrequency):
 		}
 
 		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
@@ -312,8 +339,8 @@ func (r *renterJob) managedDownload() error {
 // managedUpload will managedUpload a file to the network. If the api reports that there are
 // more than 10 files successfully uploaded, then a file is deleted at random.
 func (r *renterJob) managedUpload() error {
-	r.staticJR.staticTG.Add()
-	defer r.staticJR.staticTG.Done()
+	r.staticJR.StaticTG.Add()
+	defer r.staticJR.StaticTG.Done()
 
 	// Generate some random data to upload. The file needs to be closed before
 	// the upload to the network starts, so this code is wrapped in a func such
@@ -365,9 +392,9 @@ func (r *renterJob) managedUpload() error {
 	uploadProgress := 0.0
 	for start := time.Now(); time.Since(start) < maxUploadTime; {
 		select {
-		case <-r.staticJR.staticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return nil
-		case <-time.After(time.Second * 20):
+		case <-time.After(uploadFileCheckFrequency):
 		}
 
 		rfg, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
@@ -395,9 +422,9 @@ func (r *renterJob) managedUpload() error {
 // storageRenter unlocks the wallet, mines some currency, sets an allowance
 // using that currency, and uploads some files.  It will periodically try to
 // download or delete those files, printing any errors that occur.
-func (j *jobRunner) storageRenter() {
-	j.staticTG.Add()
-	defer j.staticTG.Done()
+func (j *JobRunner) storageRenter() {
+	j.StaticTG.Add()
+	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced
 	AntSyncWG.Wait()
@@ -410,6 +437,14 @@ func (j *jobRunner) storageRenter() {
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
 			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", j.staticSiaDirectory, err)
+
+			// Wait before trying to get the balance again.
+			select {
+			case <-j.StaticTG.StopChan():
+				return
+			case <-time.After(balanceCheckFrequency):
+			}
+			continue
 		}
 
 		// Break the wait loop when we have enough balance.
@@ -424,9 +459,9 @@ func (j *jobRunner) storageRenter() {
 
 		// Wait before trying to get the balance again.
 		select {
-		case <-j.staticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(time.Second * 15):
+		case <-time.After(balanceCheckFrequency):
 		}
 	}
 	log.Printf("[INFO] [renter] [%v] Wallet filled successfully. Blocking until allowance has been set.\n", j.staticSiaDirectory)
@@ -447,9 +482,9 @@ func (j *jobRunner) storageRenter() {
 
 		// Wait a bit before trying again.
 		select {
-		case <-j.staticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(time.Second * 15):
+		case <-time.After(setAllowanceFrequency):
 		}
 	}
 	log.Printf("[INFO] [renter] [%v] Renter allowance has been set successfully.\n", j.staticSiaDirectory)

@@ -5,12 +5,17 @@ import (
 	"time"
 )
 
+const (
+	// balanceIncreaseCheckSleepTime is sleep time for balance increase checks
+	balanceIncreaseCheckSleepTime = time.Second * 100
+)
+
 // blockMining indefinitely mines blocks.  If more than 100
 // seconds passes before the wallet has received some amount of currency, this
 // job will print an error.
-func (j *jobRunner) blockMining() {
-	j.staticTG.Add()
-	defer j.staticTG.Done()
+func (j *JobRunner) blockMining() {
+	j.StaticTG.Add()
+	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
 	AntSyncWG.Wait()
@@ -31,9 +36,9 @@ func (j *jobRunner) blockMining() {
 	// Every 100 seconds, verify that the balance has increased.
 	for {
 		select {
-		case <-j.staticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(time.Second * 100):
+		case <-time.After(balanceIncreaseCheckSleepTime):
 		}
 
 		walletInfo, err = j.staticClient.WalletGet()

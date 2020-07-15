@@ -39,7 +39,7 @@ type Ant struct {
 	Config AntConfig
 
 	siad *exec.Cmd
-	jr   *jobRunner
+	Jr   *JobRunner
 
 	// A variable to track which blocks + heights the sync detector has seen
 	// for this ant. The map will just keep growing, but it shouldn't take up a
@@ -146,7 +146,7 @@ func New(config AntConfig) (*Ant, error) {
 		Config:  config,
 
 		siad: siad,
-		jr:   j,
+		Jr:   j,
 
 		SeenBlocks: make(map[types.BlockHeight]types.BlockID),
 	}, nil
@@ -155,7 +155,7 @@ func New(config AntConfig) (*Ant, error) {
 // Close releases all resources created by the ant, including the Siad
 // subprocess.
 func (a *Ant) Close() error {
-	a.jr.Stop()
+	a.Jr.Stop()
 	stopSiad(a.APIAddr, a.siad.Process)
 	return nil
 }
@@ -163,23 +163,23 @@ func (a *Ant) Close() error {
 // StartJob starts the job indicated by `job` after an ant has been
 // initialized. Arguments are passed to the job using args.
 func (a *Ant) StartJob(job string, args ...interface{}) error {
-	if a.jr == nil {
+	if a.Jr == nil {
 		return errors.New("ant is not running")
 	}
 
 	switch job {
 	case "miner":
-		go a.jr.blockMining()
+		go a.Jr.blockMining()
 	case "host":
-		go a.jr.jobHost()
+		go a.Jr.jobHost()
 	case "renter":
-		go a.jr.storageRenter()
+		go a.Jr.storageRenter()
 	case "gateway":
-		go a.jr.gatewayConnectability()
+		go a.Jr.gatewayConnectability()
 	case "bigspender":
-		go a.jr.bigSpender()
+		go a.Jr.bigSpender()
 	case "littlesupplier":
-		go a.jr.littleSupplier(args[0].(types.UnlockHash))
+		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
 	default:
 		return errors.New("no such job")
 	}
@@ -200,11 +200,11 @@ func (a *Ant) BlockHeight() types.BlockHeight {
 
 // WalletAddress returns a wallet address that this ant can receive coins on.
 func (a *Ant) WalletAddress() (*types.UnlockHash, error) {
-	if a.jr == nil {
+	if a.Jr == nil {
 		return nil, errors.New("ant is not running")
 	}
 
-	addressGet, err := a.jr.staticClient.WalletAddressGet()
+	addressGet, err := a.Jr.staticClient.WalletAddressGet()
 	if err != nil {
 		return nil, err
 	}

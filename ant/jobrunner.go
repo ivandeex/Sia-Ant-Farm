@@ -6,19 +6,19 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
-// A jobRunner is used to start up jobs on the running Sia node.
-type jobRunner struct {
+// A JobRunner is used to start up jobs on the running Sia node.
+type JobRunner struct {
 	staticClient         *client.Client
 	staticWalletPassword string
 	staticSiaDirectory   string
-	staticTG             sync.ThreadGroup
+	StaticTG             sync.ThreadGroup
 }
 
 // newJobRunner creates a new job runner, using the provided api address,
 // authentication password, and sia directory.  It expects the connected api to
 // be newly initialized, and initializes a new wallet, for usage in the jobs.
 // siadirectory is used in logging to identify the job runner.
-func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jobRunner, error) {
+func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*JobRunner, error) {
 	opt, err := client.DefaultOptions()
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to get client options")
@@ -26,7 +26,7 @@ func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jo
 	opt.Address = apiaddr
 	opt.Password = authpassword
 	c := client.New(opt)
-	jr := &jobRunner{
+	jr := &JobRunner{
 		staticClient:       c,
 		staticSiaDirectory: siadirectory,
 	}
@@ -46,6 +46,6 @@ func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*jo
 
 // Stop signals all running jobs to stop and blocks until the jobs have
 // finished stopping.
-func (j *jobRunner) Stop() {
-	j.staticTG.Stop()
+func (j *JobRunner) Stop() {
+	j.StaticTG.Stop()
 }

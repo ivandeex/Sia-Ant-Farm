@@ -12,11 +12,26 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
+const (
+	// miningTimeout is timeout for mining desired balance
+	miningTimeout = time.Minute * 5
+
+	// miningSleepTime is sleep time for checking desired balance during mining
+	miningSleepTime = time.Second
+
+	// hostAnnouncementSleepTime is sleep time between host announcement tries
+	hostAnnouncementSleepTime = time.Second * 5
+
+	// hostSettingsPollSleepTime is sleep time for continuous host settings
+	// polling
+	hostSettingsPollSleepTime = time.Second * 15
+)
+
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
 // storage to the ant farm.
-func (j *jobRunner) jobHost() {
-	j.staticTG.Add()
-	defer j.staticTG.Done()
+func (j *JobRunner) jobHost() {
+	j.StaticTG.Add()
+	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
 	AntSyncWG.Wait()
@@ -24,7 +39,7 @@ func (j *jobRunner) jobHost() {
 	// Mine at least 50,000 SC
 	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)
 	success := false
-	for start := time.Now(); time.Since(start) < 5*time.Minute; time.Sleep(time.Second) {
+	for start := time.Now(); time.Since(start) < miningTimeout; time.Sleep(miningSleepTime) {
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
 			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
@@ -63,7 +78,7 @@ func (j *jobRunner) jobHost() {
 			success = true
 			break
 		}
-		time.Sleep(time.Second * 5)
+		time.Sleep(hostAnnouncementSleepTime)
 	}
 	if !success {
 		log.Printf("[%v jobHost ERROR]: could not announce after 5 tries.\n", j.staticSiaDirectory)
@@ -83,9 +98,9 @@ func (j *jobRunner) jobHost() {
 	maxRevenue := types.NewCurrency64(0)
 	for {
 		select {
-		case <-j.staticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(time.Second * 15):
+		case <-time.After(hostSettingsPollSleepTime):
 		}
 
 		hostInfo, err := j.staticClient.HostGet()

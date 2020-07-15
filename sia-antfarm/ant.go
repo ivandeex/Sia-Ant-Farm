@@ -19,6 +19,15 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
+const (
+	// httpClientTimeout defines timeout for http client
+	httpClientTimeout = time.Second * 10
+
+	// waitForAntsToSyncFrequency defines how frequently to check if ants are
+	// synced
+	waitForAntsToSyncFrequency = time.Second
+)
+
 // getAddrs returns n free listening ports by leveraging the behaviour of
 // net.Listen(":0").  Addresses are returned in the format of ":port"
 func getAddrs(n int) ([]string, error) {
@@ -285,7 +294,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 // service, http://myexternalip.com.
 func myExternalIP() (string, error) {
 	// timeout after 10 seconds
-	client := http.Client{Timeout: time.Duration(10 * time.Second)}
+	client := http.Client{Timeout: httpClientTimeout}
 	resp, err := client.Get("http://myexternalip.com/raw")
 	if err != nil {
 		return "", err
@@ -308,15 +317,8 @@ func myExternalIP() (string, error) {
 
 // waitForAntsToSync waits a given timeout for all ants to be synced
 func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
-	start := time.Now()
 	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
 	for {
-		// We have reached the timeout
-		if time.Since(start) > 5*time.Minute {
-			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
-			return errors.New(msg)
-		}
-
 		// Check sync status
 		groups, err := antConsensusGroups(ants...)
 		if err != nil {
@@ -328,7 +330,18 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 			break
 		}
 
-		time.Sleep(time.Second)
+		// Wait for jobs stop, timout or sleep
+		select {
+		case <-ants[0].Jr.StaticTG.StopChan():
+			// Jobs were stopped
+			return errors.New("jobs were stopped")
+		case <-time.After(timeout):
+			// We have reached the timeout
+			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
+			return errors.New(msg)
+		case <-time.After(waitForAntsToSyncFrequency):
+			// Continue waiting for sync after sleep
+		}
 	}
 	log.Println("[INFO] [ant-farm] all ants are now synced")
 	ant.AntSyncWG.Done()

@@ -17,6 +17,18 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
+const (
+	// stopSiadTimeout defines timeout for stopping siad process gracefully
+	stopSiadTimeout = 120 * time.Second
+
+	// waitForAPITimeout defines timeout for waiting for Sia API to become available
+	waitForAPITimeout = time.Minute * 5
+
+	// waitForAPIFrequency defines how frequently to check for new siad to be
+	// accessible via API
+	waitForAPIFrequency = time.Millisecond * 100
+)
+
 // SiadConfig contains the necessary config information to create a new siad
 // instance
 type SiadConfig struct {
@@ -114,7 +126,7 @@ func stopSiad(apiAddr string, process *os.Process) {
 	}()
 	select {
 	case <-done:
-	case <-time.After(120 * time.Second):
+	case <-time.After(stopSiadTimeout):
 		process.Kill()
 	}
 }
@@ -138,7 +150,7 @@ func waitForAPI(config SiadConfig, siad *exec.Cmd) error {
 
 	// Wait for the Sia API to become available.
 	success := false
-	for start := time.Now(); time.Since(start) < 5*time.Minute; time.Sleep(time.Millisecond * 100) {
+	for start := time.Now(); time.Since(start) < waitForAPITimeout; time.Sleep(waitForAPIFrequency) {
 		if success {
 			break
 		}

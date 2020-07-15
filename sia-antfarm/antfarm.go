@@ -16,6 +16,17 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
+const (
+	// monitorInitialSleep is initial sleep time of permanentSyncMonitor
+	monitorInitialSleep = time.Second * 30 
+
+	// monitorSleepTime defines how frequently to run permanentSyncMonitor
+	monitorFrequency = time.Second * 20
+
+	// antsSyncTimeout is a timeout for all ants to sync
+	antsSyncTimeout = time.Minute * 5
+)
+
 type (
 	// AntfarmConfig contains the fields to parse and use to create a sia-antfarm.
 	AntfarmConfig struct {
@@ -99,7 +110,7 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 
 	// Wait for all ants to sync
 	if config.WaitForSync {
-		err = waitForAntsToSync(5*time.Minute, ants...)
+		err = waitForAntsToSync(antsSyncTimeout, ants...)
 		if err != nil {
 			return nil, errors.AddContext(err, "wait for ants to sync failed")
 		}
@@ -152,11 +163,11 @@ func (af *antFarm) ServeAPI() error {
 // blockchain.
 func (af *antFarm) permanentSyncMonitor() {
 	// Give 30 seconds for everything to start up.
-	time.Sleep(time.Second * 30)
+	time.Sleep(monitorInitialSleep)
 
 	// Every 20 seconds, list all consensus groups and display the block height.
-	for {
-		time.Sleep(time.Second * 20)
+	for { 
+		time.Sleep(monitorFrequency)
 
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
