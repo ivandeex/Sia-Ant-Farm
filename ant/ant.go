@@ -60,6 +60,7 @@ func PrintJSON(v interface{}) error {
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
 // ant before the ant is started.
 func clearPorts(config AntConfig) error {
+	// Resolve addresses to be cleared
 	RPCAddr, err := net.ResolveTCPAddr("tcp", config.RPCAddr)
 	if err != nil {
 		return errors.AddContext(err, "can't resolve port")
@@ -80,6 +81,7 @@ func clearPorts(config AntConfig) error {
 		return errors.AddContext(err, "can't resolve port")
 	}
 
+	// Clear ports
 	err = upnprouter.ClearPorts(RPCAddr, hostAddr, siaMuxAddr, siaMuxWsAddr)
 	if err != nil {
 		return errors.AddContext(err, "can't clear ports")
