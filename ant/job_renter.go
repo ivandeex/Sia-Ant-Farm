@@ -97,7 +97,7 @@ var (
 	// before uploading will begin.
 	requiredInitialBalance = types.NewCurrency64(100e3).Mul(types.SiacoinPrecision)
 
-	// allowance is the set set of allowance settings that will be used by
+	// allowance is the set of allowance settings that will be used by
 	// renter
 	allowance = modules.Allowance{
 		Funds:       types.NewCurrency64(20e3).Mul(types.SiacoinPrecision),
