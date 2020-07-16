@@ -13,20 +13,20 @@ import (
 )
 
 const (
+	// hostAnnouncementInterval defines how often the host will try to
+	// announcement itself
+	hostAnnouncementInterval = time.Second * 5
+
+	// hostSettingsPollInterval defines interval for continuous host settings
+	// polling
+	hostSettingsPollInterval = time.Second * 15
+
 	// miningTimeout defines timeout for mining desired balance
 	miningTimeout = time.Minute * 5
 
 	// miningSleepTime defines sleep time for checking desired balance during
 	// mining
 	miningSleepTime = time.Second
-
-	// hostAnnouncementSleepTime defines sleep time between host announcement
-	// tries
-	hostAnnouncementSleepTime = time.Second * 5
-
-	// hostSettingsPollInterval defines interval for continuous host settings
-	// polling
-	hostSettingsPollInterval = time.Second * 15
 )
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
@@ -45,7 +45,7 @@ func (j *JobRunner) jobHost() {
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
 			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
-			return
+			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {
 			success = true
@@ -80,7 +80,7 @@ func (j *JobRunner) jobHost() {
 			success = true
 			break
 		}
-		time.Sleep(hostAnnouncementSleepTime)
+		time.Sleep(hostAnnouncementInterval)
 	}
 	if !success {
 		log.Printf("[%v jobHost ERROR]: could not announce after 5 tries.\n", j.staticSiaDirectory)
@@ -108,6 +108,7 @@ func (j *JobRunner) jobHost() {
 		hostInfo, err := j.staticClient.HostGet()
 		if err != nil {
 			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+			continue
 		}
 
 		// Print an error if storage revenue has decreased

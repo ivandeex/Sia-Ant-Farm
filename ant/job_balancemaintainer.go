@@ -8,12 +8,13 @@ import (
 )
 
 const (
-	// balanceMaintainerSleepTime defines sleep time for balance maintainer
-	balanceMaintainerSleepTime = time.Second * 20
+	// walletBalanceCheckInterval defines how often the balance maintainer's
+	// loop checks the wallet balance
+	walletBalanceCheckInterval = time.Second * 20
 
-	// balanceMaintainerErrorSleepTime defines sleep time after an error for
-	// balance maintainer
-	balanceMaintainerErrorSleepTime = time.Second * 5
+	// balanceMaintainerErrorSleepDuration defines how long the balance maintainer
+	// will sleep after an error
+	balanceMaintainerErrorSleepDuration = time.Second * 5
 )
 
 // balanceMaintainer mines when the balance is below desiredBalance. The miner
@@ -43,7 +44,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 			select {
 			case <-j.StaticTG.StopChan():
 				return
-			case <-time.After(balanceMaintainerErrorSleepTime):
+			case <-time.After(balanceMaintainerErrorSleepDuration):
 			}
 			continue
 		}
@@ -57,7 +58,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 				select {
 				case <-j.StaticTG.StopChan():
 					return
-				case <-time.After(balanceMaintainerErrorSleepTime):
+				case <-time.After(balanceMaintainerErrorSleepDuration):
 				}
 				continue
 			}
@@ -69,7 +70,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 				select {
 				case <-j.StaticTG.StopChan():
 					return
-				case <-time.After(balanceMaintainerErrorSleepTime):
+				case <-time.After(balanceMaintainerErrorSleepDuration):
 				}
 				continue
 			}
@@ -78,7 +79,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 		select {
 		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(balanceMaintainerSleepTime):
+		case <-time.After(walletBalanceCheckInterval):
 		}
 	}
 }
