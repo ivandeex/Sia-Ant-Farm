@@ -13,18 +13,20 @@ import (
 )
 
 const (
-	// miningTimeout is timeout for mining desired balance
+	// miningTimeout defines timeout for mining desired balance
 	miningTimeout = time.Minute * 5
 
-	// miningSleepTime is sleep time for checking desired balance during mining
+	// miningSleepTime defines sleep time for checking desired balance during
+	// mining
 	miningSleepTime = time.Second
 
-	// hostAnnouncementSleepTime is sleep time between host announcement tries
+	// hostAnnouncementSleepTime defines sleep time between host announcement
+	// tries
 	hostAnnouncementSleepTime = time.Second * 5
 
-	// hostSettingsPollSleepTime is sleep time for continuous host settings
+	// hostSettingsPollInterval defines interval for continuous host settings
 	// polling
-	hostSettingsPollSleepTime = time.Second * 15
+	hostSettingsPollInterval = time.Second * 15
 )
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
@@ -100,7 +102,7 @@ func (j *JobRunner) jobHost() {
 		select {
 		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(hostSettingsPollSleepTime):
+		case <-time.After(hostSettingsPollInterval):
 		}
 
 		hostInfo, err := j.staticClient.HostGet()
