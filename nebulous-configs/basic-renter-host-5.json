@@ -50,6 +50,7 @@
 		},
 		{
 			"AllowHostLocalNetAddress": true,
+			"AllowRentingOnHostsOnSameIP": true,
 			"Name": "renter",
 			"Jobs": [
 				"renter"
