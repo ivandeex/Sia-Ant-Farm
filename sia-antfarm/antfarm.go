@@ -17,10 +17,7 @@ import (
 )
 
 const (
-	// monitorInitialSleep is initial sleep time of permanentSyncMonitor
-	monitorInitialSleep = time.Second * 30
-
-	// monitorSleepTime defines how frequently to run permanentSyncMonitor
+	// monitorFrequency defines how frequently to run permanentSyncMonitor
 	monitorFrequency = time.Second * 20
 
 	// antsSyncTimeout is a timeout for all ants to sync
@@ -162,30 +159,34 @@ func (af *antFarm) ServeAPI() error {
 // permanentSyncMonitor checks that all ants in the antFarm are on the same
 // blockchain.
 func (af *antFarm) permanentSyncMonitor() {
-	// Give 30 seconds for everything to start up.
-	time.Sleep(monitorInitialSleep)
-
 	// Every 20 seconds, list all consensus groups and display the block height.
 	for {
+		// TODO: antfarm struct should have a threadgroup to be able to pick up
+		// stopchan signals
 		time.Sleep(monitorFrequency)
 
+		// Grab consensus groups
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
 			log.Println("error checking sync status of antfarm: ", err)
 			continue
 		}
+
+		// Check if ants are synced
 		if len(groups) == 1 {
 			log.Println("Ants are synchronized. Block Height: ", af.ants[0].BlockHeight())
-		} else {
-			log.Println("Ants split into multiple groups.")
-			for i, group := range groups {
-				if i != 0 {
-					log.Println()
-				}
-				log.Println("Group ", i+1)
-				for _, a := range group {
-					log.Println(a.APIAddr)
-				}
+			continue
+		}
+
+		// Log out information about the unsync ants
+		log.Println("Ants split into multiple groups.")
+		for i, group := range groups {
+			if i != 0 {
+				log.Println()
+			}
+			log.Println("Group ", i+1)
+			for _, a := range group {
+				log.Println(a.APIAddr)
 			}
 		}
 	}

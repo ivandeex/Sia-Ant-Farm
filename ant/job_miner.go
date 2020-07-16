@@ -6,8 +6,9 @@ import (
 )
 
 const (
-	// balanceIncreaseCheckSleepTime is sleep time for balance increase checks
-	balanceIncreaseCheckSleepTime = time.Second * 100
+	// balanceIncreaseCheckInterval is how often the wallet will be checke for
+	// balance increases
+	balanceIncreaseCheckInterval = time.Second * 100
 )
 
 // blockMining indefinitely mines blocks.  If more than 100
@@ -38,12 +39,13 @@ func (j *JobRunner) blockMining() {
 		select {
 		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(balanceIncreaseCheckSleepTime):
+		case <-time.After(balanceIncreaseCheckInterval):
 		}
 
 		walletInfo, err = j.staticClient.WalletGet()
 		if err != nil {
 			log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)
+			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(lastBalance) > 0 {
 			log.Printf("[%v SUCCESS] blockMining job succeeded", j.staticSiaDirectory)
