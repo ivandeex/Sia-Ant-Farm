@@ -177,6 +177,7 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 		for _, j := range config.Jobs {
 			if j == "renter" {
 				isRenter = true
+				break
 			}
 		}
 		if isRenter && config.AllowRentingOnHostsOnSameIP {
