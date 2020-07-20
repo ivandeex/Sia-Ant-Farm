@@ -50,6 +50,7 @@
 		},
 		{
 			"AllowHostLocalNetAddress": true,
+			"RenterDisableIPViolationCheck": true,
 			"Name": "renter",
 			"Jobs": [
 				"renter"

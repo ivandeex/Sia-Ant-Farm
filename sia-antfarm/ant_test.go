@@ -71,6 +71,80 @@ func TestStartAnts(t *testing.T) {
 	}
 }
 
+// TestRenterDisableIPViolationCheck verifies that IPViolationCheck can be set
+// via renter ant config
+func TestRenterDisableIPViolationCheck(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Define test cases data
+	testCases := []struct {
+		name                          string
+		dataDirPostfix                string
+		renterDisableIPViolationCheck bool
+	}{
+		{"TestDefaultIPViolationCheck", "-default", false},
+		{"TestDisabledIPViolationCheck", "-ip-check-disabled", true},
+	}
+
+	// Run test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create minimum configs
+			dataDir := test.TestDir(t.Name() + tc.dataDirPostfix)
+			antDirs := test.AntDirs(dataDir, 1)
+			configs := []ant.AntConfig{
+				{
+					SiadConfig: ant.SiadConfig{
+						AllowHostLocalNetAddress: true,
+						DataDir:                  antDirs[0],
+						SiadPath:                 test.TestSiadPath,
+					},
+					Jobs: []string{"renter"},
+				},
+			}
+
+			// Update config if testing disabled IP violation check
+			if tc.renterDisableIPViolationCheck {
+				configs[0].RenterDisableIPViolationCheck = true
+			}
+
+			// Start ant
+			ants, err := startAnts(configs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				for _, ant := range ants {
+					ant.Close()
+				}
+			}()
+			renterAnt := ants[0]
+
+			// Get http client
+			c, err := getClient(renterAnt.APIAddr, "")
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			// Get renter settings
+			renterInfo, err := c.RenterGet()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Check that IP violation check was not set by default and was set
+			// correctly if configured so
+			if !tc.renterDisableIPViolationCheck && !renterInfo.Settings.IPViolationCheck {
+				t.Fatal("Setting IPViolationCheck is supposed to be true by default")
+			} else if tc.renterDisableIPViolationCheck && renterInfo.Settings.IPViolationCheck {
+				t.Fatal("Setting IPViolationCheck is supposed to be set false by the ant config")
+			}
+		})
+	}
+}
+
 // TestTestConnectAnts verifies that ants will connect
 func TestConnectAnts(t *testing.T) {
 	if testing.Short() {

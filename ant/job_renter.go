@@ -101,7 +101,7 @@ var (
 	// renter
 	allowance = modules.Allowance{
 		Funds:       types.NewCurrency64(20e3).Mul(types.SiacoinPrecision),
-		Hosts:       3,
+		Hosts:       5,
 		Period:      renterAllowancePeriod,
 		RenewWindow: renterAllowancePeriod / 4,
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -158,15 +159,12 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 		// Set host netaddress if on local network
 		if config.AllowHostLocalNetAddress {
 			// Create Sia Client
-			opts, err := client.DefaultOptions()
+			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
 			if err != nil {
-				return nil, errors.AddContext(err, "couldn't create client")
+				return nil, err
 			}
-			opts.Address = cfg.APIAddr
-			if cfg.APIPassword != "" {
-				opts.Password = cfg.APIPassword
-			}
-			c := client.New(opts)
+
+			// Set netAddress
 			netAddress := cfg.HostAddr
 			err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
 			if err != nil {
@@ -174,10 +172,47 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 			}
 		}
 
+		// Allow renter to rent on hosts on the same IP subnets
+		isRenter := false
+		for _, j := range config.Jobs {
+			if j == "renter" {
+				isRenter = true
+				break
+			}
+		}
+		if isRenter && config.RenterDisableIPViolationCheck {
+			// Create Sia Client
+			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
+			if err != nil {
+				return nil, err
+			}
+
+			// Set checkforipviolation=false
+			values := url.Values{}
+			values.Set("checkforipviolation", "false")
+			err = c.RenterPost(values)
+			if err != nil {
+				return nil, errors.AddContext(err, "couldn't set checkforipviolation")
+			}
+		}
+
 		ants = append(ants, ant)
 	}
 
 	return ants, nil
+}
+
+// getClient returns http client
+func getClient(APIAddr, APIPassword string) (*client.Client, error) {
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		return nil, errors.AddContext(err, "couldn't create client")
+	}
+	opts.Address = APIAddr
+	if APIPassword != "" {
+		opts.Password = APIPassword
+	}
+	return client.New(opts), nil
 }
 
 // startJobs starts all the jobs for each ant.
