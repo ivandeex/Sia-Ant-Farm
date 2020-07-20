@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"reflect"
 	"testing"
 	"time"
@@ -72,68 +71,77 @@ func TestStartAnts(t *testing.T) {
 	}
 }
 
-// TestCheckForIPViolationSetting verifies that IPViolationCheck can be set
-func TestCheckForIPViolationSetting(t *testing.T) {
+// TestRenterDisableIPViolationCheck verifies that IPViolationCheck can be set
+// via renter ant config
+func TestRenterDisableIPViolationCheck(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
 
-	// Create minimum configs
-	dataDir := test.TestDir(t.Name())
-	antDirs := test.AntDirs(dataDir, 1)
-	configs := []ant.AntConfig{
-		{
-			SiadConfig: ant.SiadConfig{
-				AllowHostLocalNetAddress: true,
-				DataDir:                  antDirs[0],
-				SiadPath:                 test.TestSiadPath,
-			},
-		},
+	// Define test cases data
+	testCases := []struct {
+		name                          string
+		dataDirPostfix                string
+		renterDisableIPViolationCheck bool
+	}{
+		{"TestDefaultIPViolationCheck", "-default", false},
+		{"TestDisabledIPViolationCheck", "-ip-check-disabled", true},
 	}
 
-	// Start ant
-	ants, err := startAnts(configs...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		for _, ant := range ants {
-			ant.Close()
-		}
-	}()
-	ant := ants[0]
+	// Run test cases
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Create minimum configs
+			dataDir := test.TestDir(t.Name() + tc.dataDirPostfix)
+			antDirs := test.AntDirs(dataDir, 1)
+			configs := []ant.AntConfig{
+				{
+					SiadConfig: ant.SiadConfig{
+						AllowHostLocalNetAddress: true,
+						DataDir:                  antDirs[0],
+						SiadPath:                 test.TestSiadPath,
+					},
+					Jobs: []string{"renter"},
+				},
+			}
 
-	// Get client
-	c, err := getClient(ant.APIAddr, "")
-	if err != nil {
-		t.Fatal(err)
-	}
+			// Update config if testing disabled IP violation check
+			if tc.renterDisableIPViolationCheck {
+				configs[0].RenterDisableIPViolationCheck = true
+			}
 
-	// Check dafault checkforipviolation value
-	renterInfo, err := c.RenterGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !renterInfo.Settings.IPViolationCheck {
-		t.Fatal("Setting IPViolationCheck is supposed to be true by default")
-	}
+			// Start ant
+			ants, err := startAnts(configs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				for _, ant := range ants {
+					ant.Close()
+				}
+			}()
+			renterAnt := ants[0]
 
-	// Turn off checkforipviolation
-	values := url.Values{}
-	values.Set("checkforipviolation", "false")
-	err = c.RenterPost(values)
-	if err != nil {
-		t.Fatal(err)
-	}
+			// Get http client
+			c, err := getClient(renterAnt.APIAddr, "")
+			if err != nil {
+				t.Fatal(err)
+			}
 
-	// Check set checkforipviolation value
-	renterInfo, err = c.RenterGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if renterInfo.Settings.IPViolationCheck {
-		t.Fatal("Setting IPViolationCheck is supposed to be turned off")
+			// Get renter settings
+			renterInfo, err := c.RenterGet()
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Check that IP violation check was not set by default and was set
+			// correctly if configured so
+			if !tc.renterDisableIPViolationCheck && !renterInfo.Settings.IPViolationCheck {
+				t.Fatal("Setting IPViolationCheck is supposed to be true by default")
+			} else if tc.renterDisableIPViolationCheck && renterInfo.Settings.IPViolationCheck {
+				t.Fatal("Setting IPViolationCheck is supposed to be set false by the ant config")
+			}
+		})
 	}
 }
 

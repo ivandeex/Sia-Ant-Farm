@@ -97,7 +97,7 @@ manual port forwarding) if you set `AllowHostLocalNetAddress` to `true`.
 	'SiamuxAddr': the SiaMux address for the ant to listen on, by default an unused bind address will be used.
 	'SiamuxWsAddr': the SiaMux websocket address for the ant to listen on, by default an unused bind address will be used.
 	'AllowHostLocalNetAddress': if set to true allows hosts to announce on local network without needing UPnP enabled router or manual port forwarding from public IP.
-	'AllowRentingOnHostsOnSameIP': relevant only for renter, if set to true allows renter to rent on hosts on the same IP subnets.
+	'RenterDisableIPViolationCheck': relevant only for renter, if set to true allows renter to rent on hosts on the same IP subnets.
 	'SiaDirectory': the data directory to use for this ant, by default a unique directory in `./antfarm-data` will be generated and used.
 	'SiadPath': the path to the `siad` binary, by default the `siad-dev` in your path will be used.
 	'Jobs': an array of jobs for this ant to run. available jobs include: ['miner', 'host', 'renter', 'gateway']

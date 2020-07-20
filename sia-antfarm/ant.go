@@ -180,7 +180,7 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 				break
 			}
 		}
-		if isRenter && config.AllowRentingOnHostsOnSameIP {
+		if isRenter && config.RenterDisableIPViolationCheck {
 			// Create Sia Client
 			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
 			if err != nil {
