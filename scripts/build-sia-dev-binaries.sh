@@ -45,7 +45,7 @@ function build {
   # compile siad-dev binaries
   pkg=siad
   bin=$pkg-dev
-  GOOS=${os} GOARCH=${arch} go build -a -tags 'dev' -trimpath -ldflags="$ldflags" -o $folder/$bin ./cmd/$pkg
+  GOOS=${os} GOARCH=${arch} go build -a -tags 'dev debug profile netgo' -trimpath -ldflags="$ldflags" -o $folder/$bin ./cmd/$pkg
 
   # Checkout back to master in merkletree repository after Sia v1.4.0
   if [[ "$version" == "v1.4.0" ]]
@@ -58,7 +58,7 @@ function build {
 }
 
 # Build dev binaries.
-for version in "v1.3.7" "v1.4.0" "v1.4.1" "v1.4.1.1" "v1.4.1.2" "v1.4.2.0" "v1.4.3" "v1.4.4" "v1.4.5" "v1.4.6" "v1.4.7" "v1.4.8" "v1.4.10" "v1.4.11"
+for version in "v1.3.7" "v1.4.0" "v1.4.1" "v1.4.1.1" "v1.4.1.2" "v1.4.2.0" "v1.4.3" "v1.4.4" "v1.4.5" "v1.4.6" "v1.4.7" "v1.4.8" "v1.4.10" "v1.4.11" "master"
 do
   build $version
 done
