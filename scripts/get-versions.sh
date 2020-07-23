@@ -36,9 +36,11 @@ function echo_version_greater_or_equal() {
 export -f echo_version_greater_or_equal
 
 # Get git tags of Gitlab Sia releases greater than or equal to ${from_version}
-# curl:             Get released Sia versions through Gitlab API.
-# jq:               Parse curl response with releases.
-# sed | sort | set: Sort releases in ascending order.
-# xargs:            Keep only versions greater or equal to ${from_version}.
-
-curl "https://gitlab.com/api/v4/projects/${sia_repo_id}/releases" | jq -r '.[] | .tag_name' | sed '/-/!{s/$/_/}' | sort -V | sed 's/_$//' | xargs -n 1 -I {} bash -c "echo_version_greater_or_equal ${from_version} "'$@' _ {}
+# curl:    Get released Sia versions through Gitlab API.
+# jq:      Parse curl response with releases.
+# sort -V: Sort semantic versions of releases in ascending order.
+# xargs:   Keep only versions greater or equal to ${from_version}.
+curl "https://gitlab.com/api/v4/projects/${sia_repo_id}/releases" | \
+  jq -r '.[] | .tag_name' | \
+  sort -V | \
+  xargs -n 1 -I {} bash -c "echo_version_greater_or_equal ${from_version} "'$@' _ {}
