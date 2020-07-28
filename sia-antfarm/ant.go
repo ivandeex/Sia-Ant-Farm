@@ -366,8 +366,7 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 			return errors.New("jobs were stopped")
 		case <-time.After(timeout):
 			// We have reached the timeout
-			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
-			return errors.New(msg)
+			return fmt.Errorf("ants didn't synced within %v timeout", timeout)
 		case <-time.After(waitForAntsToSyncFrequency):
 			// Continue waiting for sync after sleep
 		}

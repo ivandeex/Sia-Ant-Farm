@@ -582,8 +582,7 @@ func (r *RenterJob) WaitForUploadReady() error {
 		return nil
 	})
 	if err != nil {
-		msg := fmt.Sprintf("[ERROR] [renter] [%v]: renter is not upload ready within %v timeout", siaDir, timeout)
-		return errors.New(msg)
+		return fmt.Errorf("[ERROR] [renter] [%v]: renter is not upload ready within %v timeout", siaDir, timeout)
 	}
 	log.Printf("[INFO] [renter] [%v] Renter is upload ready.\n", siaDir)
 	return nil
