@@ -151,7 +151,7 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 	}
 }
 
-// TestTestConnectAnts verifies that ants will connect
+// TestConnectAnts verifies that ants will connect
 func TestConnectAnts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
