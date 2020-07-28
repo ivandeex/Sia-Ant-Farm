@@ -2,13 +2,19 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"reflect"
 	"testing"
 	"time"
 
+	"gitlab.com/NebulousLabs/errors"
+
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
+	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 // TestStartAnts verifies that startAnts successfully starts ants given some
@@ -215,7 +221,7 @@ func TestConnectAnts(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get the Gateway info from on of the ants
+	// Get the Gateway info from one of the ants
 	opts, err := client.DefaultOptions()
 	if err != nil {
 		t.Fatal(err)
@@ -241,7 +247,7 @@ func TestConnectAnts(t *testing.T) {
 	}
 }
 
-// TestTestAntConsensusGroups probes the antConsensusGroup function
+// TestAntConsensusGroups probes the antConsensusGroup function
 func TestAntConsensusGroups(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -336,5 +342,187 @@ func TestAntConsensusGroups(t *testing.T) {
 	}
 	if !reflect.DeepEqual(groups[1][0], otherAnt) {
 		t.Fatal("expected the miner ant to be in the second consensus group")
+	}
+}
+
+// TestVerifyUploadDownloadFileData uploads and downloads a file and checks
+// that their content is identical by comparing their merkle root hashes
+func TestVerifyUploadDownloadFileData(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create minimum configs
+	dataDir := test.TestDir(t.Name())
+	antDirs := test.AntDirs(dataDir, 7)
+	configs := []ant.AntConfig{
+		{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: true,
+				DataDir:                  antDirs[0],
+				SiadPath:                 test.TestSiadPath,
+			},
+			Jobs: []string{"gateway", "miner"},
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: true,
+				DataDir:                  antDirs[1],
+				SiadPath:                 test.TestSiadPath,
+			},
+			Jobs:            []string{"host"},
+			DesiredCurrency: 100000,
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: true,
+				DataDir:                  antDirs[2],
+				SiadPath:                 test.TestSiadPath,
+			},
+			Jobs:            []string{"host"},
+			DesiredCurrency: 100000,
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: true,
+				DataDir:                  antDirs[3],
+				SiadPath:                 test.TestSiadPath,
+			},
+			Jobs:            []string{"host"},
+			DesiredCurrency: 100000,
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: true,
+				DataDir:                  antDirs[4],
+				SiadPath:                 test.TestSiadPath,
+			},
+			Jobs:            []string{"host"},
+			DesiredCurrency: 100000,
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: true,
+				DataDir:                  antDirs[5],
+				SiadPath:                 test.TestSiadPath,
+			},
+			Jobs:            []string{"host"},
+			DesiredCurrency: 100000,
+		},
+		{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: true,
+				DataDir:                  antDirs[6],
+				SiadPath:                 test.TestSiadPath,
+			},
+			DesiredCurrency: 100000,
+		},
+	}
+
+	// Check whether UPnP is enabled on router to speed up if testing without
+	// UPnP enabled router
+	upnprouter.CheckUPnPEnabled()
+
+	// Start ants
+	ants, err := startAnts(configs...)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		for _, ant := range ants {
+			ant.Close()
+		}
+	}()
+
+	// Connect the ants
+	err = connectAnts(ants...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for ants to sync
+	ant.AntSyncWG.Add(1)
+	err = waitForAntsToSync(antsSyncTimeout, ants...)
+	if err != nil {
+		t.Fatal(errors.AddContext(err, "wait for ants to sync failed"))
+	}
+
+	// Wait for renter wallet to be filled
+	renterAnt := ants[6]
+
+	desiredCurrency := types.NewCurrency64(renterAnt.Config.DesiredCurrency).Mul(types.SiacoinPrecision)
+	checkFrequency := ant.BalanceCheckFrequency
+	balanceTimeout := ant.InitialBalanceWarningTimeout
+	renterAnt.Jr.BlockUntilWalletIsFilled("renter", desiredCurrency, checkFrequency, balanceTimeout)
+
+	// Set allowance
+	r := ant.RenterJob{
+		StaticJR: renterAnt.Jr,
+	}
+	err = r.SetAllowance(ant.DefaultAntfarmAllowance, ant.SetAllowanceFrequency, ant.SetAllowanceWarningTimeout)
+	if err != nil {
+		t.Fatal(errors.AddContext(err, "couldn't set renter allowance"))
+	}
+
+	// Disable IP violation check
+	err = r.DisableIPViolationCheck()
+	if err != nil {
+		t.Fatal("Couldn't disable IP violation check")
+	}
+
+	// Wait for renter upload ready
+	err = r.WaitForUploadReady()
+	if err != nil {
+		t.Fatalf("Renter didn't become upload ready; %v\n", err)
+	}
+
+	// Prepare upload directory
+	err = r.CreateSourceFilesDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check no files are uploaded yet
+	if len(r.Files) > 0 {
+		t.Fatal("There are already some unexpected uploaded files")
+	}
+
+	// Upload the file
+	err = r.ManagedUpload(modules.SectorSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check exactly 1 file is uploaded
+	if l := len(r.Files); l != 1 {
+		t.Fatalf("Uploaded files: Expected: 1, got %d\n", l)
+	}
+
+	// Download a file
+	f := r.Files[0].SourceFile
+	sp, err := modules.NewSiaPath(f)
+	if err != nil {
+		t.Fatalf("Can't create SiaPath from %v. Got error: %v", f, err)
+	}
+	fi := modules.FileInfo{SiaPath: sp}
+	file, err := r.ManagedDownload(fi)
+	if err != nil {
+		t.Fatalf("Can't download a file. Error: %v", err)
+	}
+
+	// Verify the file content hash
+	// Need to reopen the file
+	file, err = os.Open(file.Name())
+	if err != nil {
+		t.Fatalf("Can't open downloaded file. Error: %v", err)
+	}
+	defer file.Close()
+	root, err := ant.MerkleRoot(file)
+	if err != nil {
+		t.Fatalf("Can't get merkle root. Error: %v", err)
+	}
+	if root != r.Files[0].MerkleRoot {
+		t.Fatal("Downloaded file merkle root doesn't equal uploaded file merkle root")
 	}
 }

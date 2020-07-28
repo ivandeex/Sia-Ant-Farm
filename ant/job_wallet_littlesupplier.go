@@ -28,7 +28,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 
 		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v jobSpender ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v jobSpender ERROR]: %v\n", j.StaticSiaDirectory, err)
 			return
 		}
 
@@ -38,7 +38,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 
 		_, err = j.staticClient.WalletSiacoinsPost(sendAmount, sendAddress, false)
 		if err != nil {
-			log.Printf("[%v jobSupplier ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v jobSupplier ERROR]: %v\n", j.StaticSiaDirectory, err)
 		}
 	}
 }

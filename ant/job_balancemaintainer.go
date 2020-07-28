@@ -29,7 +29,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	minerRunning := true
 	err := j.staticClient.MinerStartGet()
 	if err != nil {
-		log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.staticSiaDirectory, err)
+		log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.StaticSiaDirectory, err)
 		return
 	}
 
@@ -40,7 +40,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	for {
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.StaticSiaDirectory, err)
 			select {
 			case <-j.StaticTG.StopChan():
 				return
@@ -51,10 +51,10 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 
 		haveDesiredBalance := walletInfo.ConfirmedSiacoinBalance.Cmp(desiredBalance) > 0
 		if !minerRunning && !haveDesiredBalance {
-			log.Printf("[%v balanceMaintainer INFO]: not enough currency, starting the miner\n", j.staticSiaDirectory)
+			log.Printf("[%v balanceMaintainer INFO]: not enough currency, starting the miner\n", j.StaticSiaDirectory)
 			minerRunning = true
 			if err = j.staticClient.MinerStartGet(); err != nil {
-				log.Printf("[%v miner ERROR]: %v\n", j.staticSiaDirectory, err)
+				log.Printf("[%v miner ERROR]: %v\n", j.StaticSiaDirectory, err)
 				select {
 				case <-j.StaticTG.StopChan():
 					return
@@ -63,10 +63,10 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 				continue
 			}
 		} else if minerRunning && haveDesiredBalance {
-			log.Printf("[%v balanceMaintainer INFO]: mined enough currency, stopping the miner\n", j.staticSiaDirectory)
+			log.Printf("[%v balanceMaintainer INFO]: mined enough currency, stopping the miner\n", j.StaticSiaDirectory)
 			minerRunning = false
 			if err = j.staticClient.MinerStopGet(); err != nil {
-				log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.staticSiaDirectory, err)
+				log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.StaticSiaDirectory, err)
 				select {
 				case <-j.StaticTG.StopChan():
 					return

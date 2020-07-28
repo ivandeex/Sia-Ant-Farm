@@ -28,7 +28,7 @@ func (j *JobRunner) bigSpender() {
 
 		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v jobSpender ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v jobSpender ERROR]: %v\n", j.StaticSiaDirectory, err)
 			return
 		}
 
@@ -36,15 +36,15 @@ func (j *JobRunner) bigSpender() {
 			continue
 		}
 
-		log.Printf("[%v jobSpender INFO]: sending a large transaction\n", j.staticSiaDirectory)
+		log.Printf("[%v jobSpender INFO]: sending a large transaction\n", j.StaticSiaDirectory)
 
 		voidaddress := types.UnlockHash{}
 		_, err = j.staticClient.WalletSiacoinsPost(spendThreshold, voidaddress, false)
 		if err != nil {
-			log.Printf("[%v jobSpender ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v jobSpender ERROR]: %v\n", j.StaticSiaDirectory, err)
 			continue
 		}
 
-		log.Printf("[%v jobSpender INFO]: large transaction send successful\n", j.staticSiaDirectory)
+		log.Printf("[%v jobSpender INFO]: large transaction send successful\n", j.StaticSiaDirectory)
 	}
 }

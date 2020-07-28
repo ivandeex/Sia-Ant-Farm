@@ -35,11 +35,11 @@ func (j *JobRunner) gatewayConnectability() {
 		// itself.
 		gatewayInfo, err := j.staticClient.GatewayGet()
 		if err != nil {
-			log.Printf("[ERROR] [gateway] [%v] error when calling /gateway: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[ERROR] [gateway] [%v] error when calling /gateway: %v\n", j.StaticSiaDirectory, err)
 			continue
 		}
 		if len(gatewayInfo.Peers) < 2 {
-			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.staticSiaDirectory, gatewayInfo.Peers)
+			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.StaticSiaDirectory, gatewayInfo.Peers)
 			continue
 		}
 	}

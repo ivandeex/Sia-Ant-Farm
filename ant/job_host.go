@@ -44,7 +44,7 @@ func (j *JobRunner) jobHost() {
 	for start := time.Now(); time.Since(start) < miningTimeout; time.Sleep(miningSleepTime) {
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v jobHost ERROR]: %v\n", j.StaticSiaDirectory, err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {
@@ -53,19 +53,19 @@ func (j *JobRunner) jobHost() {
 		}
 	}
 	if !success {
-		log.Printf("[%v jobHost ERROR]: timeout: could not mine enough currency after 5 minutes\n", j.staticSiaDirectory)
+		log.Printf("[%v jobHost ERROR]: timeout: could not mine enough currency after 5 minutes\n", j.StaticSiaDirectory)
 		return
 	}
 
 	// Create a temporary folder for hosting
-	hostdir, _ := filepath.Abs(filepath.Join(j.staticSiaDirectory, "hostdata"))
+	hostdir, _ := filepath.Abs(filepath.Join(j.StaticSiaDirectory, "hostdata"))
 	os.MkdirAll(hostdir, 0700)
 
 	// Add the storage folder.
 	size := modules.SectorSize * 4096
 	err := j.staticClient.HostStorageFoldersAddPost(hostdir, size)
 	if err != nil {
-		log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+		log.Printf("[%v jobHost ERROR]: %v\n", j.StaticSiaDirectory, err)
 		return
 	}
 
@@ -75,7 +75,7 @@ func (j *JobRunner) jobHost() {
 	for try := 0; try < 5; try++ {
 		err := j.staticClient.HostAnnouncePost()
 		if err != nil {
-			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, errors.AddContext(err, "host announcement not successful"))
+			log.Printf("[%v jobHost ERROR]: %v\n", j.StaticSiaDirectory, errors.AddContext(err, "host announcement not successful"))
 		} else {
 			success = true
 			break
@@ -83,15 +83,15 @@ func (j *JobRunner) jobHost() {
 		time.Sleep(hostAnnouncementInterval)
 	}
 	if !success {
-		log.Printf("[%v jobHost ERROR]: could not announce after 5 tries.\n", j.staticSiaDirectory)
+		log.Printf("[%v jobHost ERROR]: could not announce after 5 tries.\n", j.StaticSiaDirectory)
 		return
 	}
-	log.Printf("[%v jobHost INFO]: successfully performed host announcement\n", j.staticSiaDirectory)
+	log.Printf("[%v jobHost INFO]: successfully performed host announcement\n", j.StaticSiaDirectory)
 
 	// Accept contracts
 	err = j.staticClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
 	if err != nil {
-		log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+		log.Printf("[%v jobHost ERROR]: %v\n", j.StaticSiaDirectory, err)
 		return
 	}
 
@@ -107,7 +107,7 @@ func (j *JobRunner) jobHost() {
 
 		hostInfo, err := j.staticClient.HostGet()
 		if err != nil {
-			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v jobHost ERROR]: %v\n", j.StaticSiaDirectory, err)
 			continue
 		}
 
@@ -116,7 +116,7 @@ func (j *JobRunner) jobHost() {
 			maxRevenue = hostInfo.FinancialMetrics.StorageRevenue
 		} else {
 			// Storage revenue has decreased!
-			log.Printf("[%v jobHost ERROR]: StorageRevenue decreased!  was %v is now %v\n", j.staticSiaDirectory, maxRevenue, hostInfo.FinancialMetrics.StorageRevenue)
+			log.Printf("[%v jobHost ERROR]: StorageRevenue decreased!  was %v is now %v\n", j.StaticSiaDirectory, maxRevenue, hostInfo.FinancialMetrics.StorageRevenue)
 		}
 	}
 }

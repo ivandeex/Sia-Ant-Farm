@@ -13,7 +13,7 @@ func newTestingAntConfig(datadir string) AntConfig {
 	return AntConfig{SiadConfig: newTestingSiadConfig(datadir)}
 }
 
-// TeTestNewAnt tests creating an Ant
+// TestNewAnt tests creating an Ant
 func TestNewAnt(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -45,7 +45,7 @@ func TestNewAnt(t *testing.T) {
 	}
 }
 
-// TTestStartJob probes the StartJob method of the ant
+// TestStartJob probes the StartJob method of the ant
 func TestStartJob(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -70,7 +70,7 @@ func TestStartJob(t *testing.T) {
 	}
 }
 
-// TestWTestWalletAddress tests getting a wallet address for an initialize ant
+// TestWalletAddress tests getting a wallet address for an initialize ant
 func TestWalletAddress(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

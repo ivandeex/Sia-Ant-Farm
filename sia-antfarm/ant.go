@@ -7,7 +7,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -146,13 +145,13 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 		}
 
 		// Create Ant
-		ant, err := ant.New(cfg)
+		a, err := ant.New(cfg)
 		if err != nil {
 			return nil, errors.AddContext(err, "unable to create ant")
 		}
 		defer func() {
 			if err != nil {
-				ant.Close()
+				a.Close()
 			}
 		}()
 
@@ -181,22 +180,17 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 			}
 		}
 		if isRenter && config.RenterDisableIPViolationCheck {
-			// Create Sia Client
-			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
+			// Disable IP violation check
+			r := ant.RenterJob{
+				StaticJR: a.Jr,
+			}
+			err := r.DisableIPViolationCheck()
 			if err != nil {
 				return nil, err
 			}
-
-			// Set checkforipviolation=false
-			values := url.Values{}
-			values.Set("checkforipviolation", "false")
-			err = c.RenterPost(values)
-			if err != nil {
-				return nil, errors.AddContext(err, "couldn't set checkforipviolation")
-			}
 		}
 
-		ants = append(ants, ant)
+		ants = append(ants, a)
 	}
 
 	return ants, nil

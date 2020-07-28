@@ -23,13 +23,13 @@ func (j *JobRunner) blockMining() {
 
 	err := j.staticClient.MinerStartGet()
 	if err != nil {
-		log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)
+		log.Printf("[%v blockMining ERROR]: %v\n", j.StaticSiaDirectory, err)
 		return
 	}
 
 	walletInfo, err := j.staticClient.WalletGet()
 	if err != nil {
-		log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)
+		log.Printf("[%v blockMining ERROR]: %v\n", j.StaticSiaDirectory, err)
 		return
 	}
 	lastBalance := walletInfo.ConfirmedSiacoinBalance
@@ -44,14 +44,14 @@ func (j *JobRunner) blockMining() {
 
 		walletInfo, err = j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v blockMining ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[%v blockMining ERROR]: %v\n", j.StaticSiaDirectory, err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(lastBalance) > 0 {
-			log.Printf("[%v SUCCESS] blockMining job succeeded", j.staticSiaDirectory)
+			log.Printf("[%v SUCCESS] blockMining job succeeded", j.StaticSiaDirectory)
 			lastBalance = walletInfo.ConfirmedSiacoinBalance
 		} else {
-			log.Printf("[%v blockMining ERROR]: it took too long to receive new funds in miner job\n", j.staticSiaDirectory)
+			log.Printf("[%v blockMining ERROR]: it took too long to receive new funds in miner job\n", j.StaticSiaDirectory)
 		}
 	}
 }
