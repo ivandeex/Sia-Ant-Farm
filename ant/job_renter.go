@@ -193,7 +193,7 @@ func (j *JobRunner) storageRenter() {
 		log.Printf("[ERROR] [renter] [%v] Trouble when setting renter allowance: %v\n", j.StaticSiaDirectory, err)
 	}
 
-	// Spawn the uploader and downloader threads.
+	// Spawn the uploader, downloader and the deleter threads.
 	go rj.threadedUploader()
 	go rj.threadedDownloader()
 	go rj.threadedDeleter()
@@ -261,7 +261,10 @@ func (r *RenterJob) managedDeleteRandom() error {
 
 // ManagedDownload downloads the given file
 func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, error) {
-	r.managedJobRunnerThreadGroupAdd()
+	err := r.managedJobRunnerThreadGroupAdd()
+	if err != nil {
+		return nil, err
+	}
 	defer r.managedJobRunnerThreadGroupDone()
 
 	// Use ioutil.TempFile to get a random temporary filename.
@@ -334,7 +337,10 @@ func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, 
 
 // managedDownloadRandom will managedDownload a random file from the network.
 func (r *RenterJob) managedDownloadRandom() error {
-	r.managedJobRunnerThreadGroupAdd()
+	err := r.managedJobRunnerThreadGroupAdd()
+	if err != nil {
+		return err
+	}
 	defer r.managedJobRunnerThreadGroupDone()
 
 	// Download a random file from the renter's file list
@@ -364,10 +370,14 @@ func (r *RenterJob) managedDownloadRandom() error {
 
 // managedJobRunnerThreadGroupAdd increments renter's jobRunner's thread group
 // counter
-func (r *RenterJob) managedJobRunnerThreadGroupAdd() {
+func (r *RenterJob) managedJobRunnerThreadGroupAdd() error {
 	r.mu.Lock()
+	err := r.StaticJR.StaticTG.Add()
+	if err != nil {
+		return err
+	}
 	defer r.mu.Unlock()
-	r.StaticJR.StaticTG.Add()
+	return nil
 }
 
 // managedJobRunnerThreadGroupDone decrements renter's jobRunner's thread group
@@ -396,7 +406,10 @@ func (r *RenterJob) managedSiaDirectory() string {
 // ManagedUpload will ManagedUpload a file to the network. If the api reports that there are
 // more than 10 files successfully uploaded, then a file is deleted at random.
 func (r *RenterJob) ManagedUpload(uploadFileSize uint64) error {
-	r.managedJobRunnerThreadGroupAdd()
+	err := r.managedJobRunnerThreadGroupAdd()
+	if err != nil {
+		return err
+	}
 	defer r.managedJobRunnerThreadGroupDone()
 
 	// Generate some random data to upload. The file needs to be closed before
