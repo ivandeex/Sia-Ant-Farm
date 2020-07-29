@@ -252,15 +252,15 @@ func (r *RenterJob) managedDeleteRandom() error {
 	return nil
 }
 
-// managedJobRunner managed returns renter's jobrunner 
+// managedJobRunner managed returns renter's jobrunner
 func (r *RenterJob) managedJobRunner() *JobRunner {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	return r.StaticJR
 }
 
-// managedDownload downloads the given file
-func (r *RenterJob) managedDownload(fileToDownload modules.FileInfo) (*os.File, error) {
+// ManagedDownload downloads the given file
+func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, error) {
 	err := r.managedJobRunner().StaticTG.Add()
 	if err != nil {
 		return nil, err
@@ -364,7 +364,7 @@ func (r *RenterJob) managedDownloadRandom() error {
 
 	// Download a file at random.
 	fileToDownload := availableFiles[fastrand.Intn(len(availableFiles))]
-	_, err = r.managedDownload(fileToDownload)
+	_, err = r.ManagedDownload(fileToDownload)
 	return err
 }
 
