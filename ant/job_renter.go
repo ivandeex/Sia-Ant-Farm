@@ -202,7 +202,7 @@ func (j *JobRunner) storageRenter() {
 // CreateSourceFilesDir creates renter's source files directory from which
 // files can be uploaded
 func (r *RenterJob) CreateSourceFilesDir() error {
-	err := os.Mkdir(filepath.Join(r.managedSiaDirectory(), renterSourceFilesDir), 0700)
+	err := os.Mkdir(filepath.Join(r.managedJobRunner().StaticSiaDirectory, renterSourceFilesDir), 0700)
 	if err != nil {
 		return errors.AddContext(err, "couldn't create renter source files directory")
 	}
@@ -212,24 +212,17 @@ func (r *RenterJob) CreateSourceFilesDir() error {
 // DisableIPViolationCheck disables IP violation check for renter so that
 // renter can rent on multiple hosts within on the same IP subnet
 func (r *RenterJob) DisableIPViolationCheck() error {
-	siaDir := r.managedSiaDirectory()
+	siaDir := r.managedJobRunner().StaticSiaDirectory
 	log.Printf("[INFO] [renter] [%v] Disabling IP violation check...\n", siaDir)
 	// Set checkforipviolation=false
 	values := url.Values{}
 	values.Set("checkforipviolation", "false")
-	err := r.managedClient().RenterPost(values)
+	err := r.managedJobRunner().staticClient.RenterPost(values)
 	if err != nil {
 		return errors.AddContext(err, "couldn't set checkforipviolation")
 	}
 	log.Printf("[INFO] [renter] [%v] Disabled IP violation check.\n", siaDir)
 	return nil
-}
-
-// managedClient gets renter's jobRunners's http client
-func (r *RenterJob) managedClient() *client.Client {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.StaticJR.staticClient
 }
 
 // managedDeleteRandom deletes a random file from the renter
@@ -259,13 +252,20 @@ func (r *RenterJob) managedDeleteRandom() error {
 	return nil
 }
 
-// ManagedDownload downloads the given file
-func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, error) {
-	err := r.managedJobRunnerThreadGroupAdd()
+// managedJobRunner managed returns renter's jobrunner 
+func (r *RenterJob) managedJobRunner() *JobRunner {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.StaticJR
+}
+
+// managedDownload downloads the given file
+func (r *RenterJob) managedDownload(fileToDownload modules.FileInfo) (*os.File, error) {
+	err := r.managedJobRunner().StaticTG.Add()
 	if err != nil {
 		return nil, err
 	}
-	defer r.managedJobRunnerThreadGroupDone()
+	defer r.managedJobRunner().StaticTG.Done()
 
 	// Use ioutil.TempFile to get a random temporary filename.
 	f, err := ioutil.TempFile("", "antfarm-renter")
@@ -276,10 +276,10 @@ func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, 
 	destPath, _ := filepath.Abs(f.Name())
 	os.Remove(destPath)
 
-	siaDir := r.managedSiaDirectory()
+	siaDir := r.managedJobRunner().StaticSiaDirectory
 	log.Printf("[INFO] [renter] [%v] downloading %v to %v", siaDir, fileToDownload.SiaPath, destPath)
 
-	_, err = r.managedClient().RenterDownloadGet(fileToDownload.SiaPath, destPath, 0, fileToDownload.Filesize, true, false)
+	_, err = r.managedJobRunner().staticClient.RenterDownloadGet(fileToDownload.SiaPath, destPath, 0, fileToDownload.Filesize, true, false)
 	if err != nil {
 		return nil, fmt.Errorf("failed in call to /renter/download: %v", err)
 	}
@@ -288,12 +288,12 @@ func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, 
 	success := false
 	for start := time.Now(); time.Since(start) < fileAppearInDownloadListTimeout; {
 		select {
-		case <-r.managedJobRunnerThreadGroupStopChan():
+		case <-r.managedJobRunner().StaticTG.StopChan():
 			return nil, nil
 		case <-time.After(fileApearInDownloadListFrequency):
 		}
 
-		hasFile, _, err := isFileInDownloads(r.managedClient(), fileToDownload)
+		hasFile, _, err := isFileInDownloads(r.managedJobRunner().staticClient, fileToDownload)
 		if err != nil {
 			return nil, fmt.Errorf("error waiting for the file to appear in the download queue: %v", err)
 		}
@@ -310,12 +310,12 @@ func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, 
 	success = false
 	for start := time.Now(); time.Since(start) < downloadFileTimeout; {
 		select {
-		case <-r.managedJobRunnerThreadGroupStopChan():
+		case <-r.managedJobRunner().StaticTG.StopChan():
 			return nil, nil
 		case <-time.After(downloadFileCheckFrequency):
 		}
 
-		hasFile, info, err := isFileInDownloads(r.managedClient(), fileToDownload)
+		hasFile, info, err := isFileInDownloads(r.managedJobRunner().staticClient, fileToDownload)
 		if err != nil {
 			return nil, fmt.Errorf("error waiting for the file to disappear from the download queue: %v", err)
 		}
@@ -337,14 +337,14 @@ func (r *RenterJob) ManagedDownload(fileToDownload modules.FileInfo) (*os.File, 
 
 // managedDownloadRandom will managedDownload a random file from the network.
 func (r *RenterJob) managedDownloadRandom() error {
-	err := r.managedJobRunnerThreadGroupAdd()
+	err := r.managedJobRunner().StaticTG.Add()
 	if err != nil {
 		return err
 	}
-	defer r.managedJobRunnerThreadGroupDone()
+	defer r.managedJobRunner().StaticTG.Done()
 
 	// Download a random file from the renter's file list
-	renterFiles, err := r.managedClient().RenterFilesGet(false) // cached=false
+	renterFiles, err := r.managedJobRunner().staticClient.RenterFilesGet(false) // cached=false
 	if err != nil {
 		return fmt.Errorf("error calling /renter/files: %v", err)
 	}
@@ -364,62 +364,27 @@ func (r *RenterJob) managedDownloadRandom() error {
 
 	// Download a file at random.
 	fileToDownload := availableFiles[fastrand.Intn(len(availableFiles))]
-	_, err = r.ManagedDownload(fileToDownload)
+	_, err = r.managedDownload(fileToDownload)
 	return err
-}
-
-// managedJobRunnerThreadGroupAdd increments renter's jobRunner's thread group
-// counter
-func (r *RenterJob) managedJobRunnerThreadGroupAdd() error {
-	r.mu.Lock()
-	err := r.StaticJR.StaticTG.Add()
-	if err != nil {
-		return err
-	}
-	defer r.mu.Unlock()
-	return nil
-}
-
-// managedJobRunnerThreadGroupDone decrements renter's jobRunner's thread group
-// counter
-func (r *RenterJob) managedJobRunnerThreadGroupDone() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.StaticJR.StaticTG.Done()
-}
-
-// managedJobRunnerThreadGroupStopChan managed calls renter's jobRunner's
-// thread group to interrupt long running reads
-func (r *RenterJob) managedJobRunnerThreadGroupStopChan() <-chan struct{} {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.StaticJR.StaticTG.StopChan()
-}
-
-// managedSiaDirectory returns renter's jobRunner's Sia directory
-func (r *RenterJob) managedSiaDirectory() string {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.StaticJR.StaticSiaDirectory
 }
 
 // ManagedUpload will ManagedUpload a file to the network. If the api reports that there are
 // more than 10 files successfully uploaded, then a file is deleted at random.
 func (r *RenterJob) ManagedUpload(uploadFileSize uint64) error {
-	err := r.managedJobRunnerThreadGroupAdd()
+	err := r.managedJobRunner().StaticTG.Add()
 	if err != nil {
 		return err
 	}
-	defer r.managedJobRunnerThreadGroupDone()
+	defer r.managedJobRunner().StaticTG.Done()
 
 	// Generate some random data to upload. The file needs to be closed before
 	// the upload to the network starts, so this code is wrapped in a func such
 	// that a `defer Close()` can be used on the file.
-	siaDir := r.managedSiaDirectory()
+	siaDir := r.managedJobRunner().StaticSiaDirectory
 	log.Printf("[INFO] [renter] [%v] File upload preparation beginning.\n", siaDir)
 	var sourcePath string
 	var merkleRoot crypto.Hash
-	err := func() error {
+	err = func() error {
 		f, err := ioutil.TempFile(filepath.Join(siaDir, "renterSourceFiles"), "renterFile")
 		if err != nil {
 			return fmt.Errorf("unable to open tmp file for renter source file: %v", err)
@@ -454,7 +419,7 @@ func (r *RenterJob) ManagedUpload(uploadFileSize uint64) error {
 	log.Printf("[INFO] [renter] [%v] File upload preparation complete, beginning file upload.\n", siaDir)
 
 	// Upload the file to the network.
-	if err := r.StaticJR.staticClient.RenterUploadPost(sourcePath, siapath, renterDataPieces, renterParityPieces); err != nil {
+	if err := r.managedJobRunner().staticClient.RenterUploadPost(sourcePath, siapath, renterDataPieces, renterParityPieces); err != nil {
 		return fmt.Errorf("unable to upload file to network: %v", err)
 	}
 	log.Printf("[INFO] [renter] [%v] /renter/upload call completed successfully.  Waiting for the upload to complete\n", siaDir)
@@ -463,12 +428,12 @@ func (r *RenterJob) ManagedUpload(uploadFileSize uint64) error {
 	uploadProgress := 0.0
 	for start := time.Now(); time.Since(start) < maxUploadTime; {
 		select {
-		case <-r.managedJobRunnerThreadGroupStopChan():
+		case <-r.managedJobRunner().StaticTG.StopChan():
 			return nil
 		case <-time.After(uploadFileCheckFrequency):
 		}
 
-		rfg, err := r.managedClient().RenterFilesGet(false) // cached=false
+		rfg, err := r.managedJobRunner().staticClient.RenterFilesGet(false) // cached=false
 		if err != nil {
 			return fmt.Errorf("error calling /renter/files: %v", err)
 		}
@@ -495,13 +460,13 @@ func (r *RenterJob) ManagedUpload(uploadFileSize uint64) error {
 func (r *RenterJob) threadedDeleter() {
 	for {
 		select {
-		case <-r.managedJobRunnerThreadGroupStopChan():
+		case <-r.managedJobRunner().StaticTG.StopChan():
 			return
 		case <-time.After(deleteFileFrequency):
 		}
 
 		if err := r.managedDeleteRandom(); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.managedSiaDirectory(), err)
+			log.Printf("[ERROR] [renter] [%v]: %v\n", r.managedJobRunner().StaticSiaDirectory, err)
 		}
 	}
 }
@@ -513,14 +478,14 @@ func (r *RenterJob) threadedDownloader() {
 	// loop.
 	for {
 		select {
-		case <-r.managedJobRunnerThreadGroupStopChan():
+		case <-r.managedJobRunner().StaticTG.StopChan():
 			return
 		case <-time.After(downloadFileFrequency):
 		}
 
 		// Download a file.
 		if err := r.managedDownloadRandom(); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.managedSiaDirectory(), err)
+			log.Printf("[ERROR] [renter] [%v]: %v\n", r.managedJobRunner().StaticSiaDirectory, err)
 		}
 	}
 }
@@ -537,14 +502,14 @@ func (r *RenterJob) threadedUploader() {
 	for {
 		// Wait a while between upload attempts.
 		select {
-		case <-r.managedJobRunnerThreadGroupStopChan():
+		case <-r.managedJobRunner().StaticTG.StopChan():
 			return
 		case <-time.After(uploadFileFrequency):
 		}
 
 		// Upload a file.
 		if err := r.ManagedUpload(uploadFileSize); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.managedSiaDirectory(), err)
+			log.Printf("[ERROR] [renter] [%v]: %v\n", r.managedJobRunner().StaticSiaDirectory, err)
 		}
 	}
 }
@@ -553,10 +518,10 @@ func (r *RenterJob) threadedUploader() {
 func (r *RenterJob) SetAllowance(allowance modules.Allowance, frequency, timeout time.Duration) error {
 	// Block until a renter allowance has successfully been set.
 	start := time.Now()
-	siaDir := r.managedSiaDirectory()
+	siaDir := r.managedJobRunner().StaticSiaDirectory
 	for {
 		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", siaDir)
-		err := r.managedClient().RenterPostAllowance(allowance)
+		err := r.managedJobRunner().staticClient.RenterPostAllowance(allowance)
 		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", siaDir, err)
 		if err == nil {
 			// Success, we can exit the loop.
@@ -568,7 +533,7 @@ func (r *RenterJob) SetAllowance(allowance modules.Allowance, frequency, timeout
 
 		// Wait a bit before trying again.
 		select {
-		case <-r.managedJobRunnerThreadGroupStopChan():
+		case <-r.managedJobRunner().StaticTG.StopChan():
 			return nil
 		case <-time.After(frequency):
 		}
@@ -579,13 +544,13 @@ func (r *RenterJob) SetAllowance(allowance modules.Allowance, frequency, timeout
 
 // WaitForUploadReady waits given timeout until renter is upload ready
 func (r *RenterJob) WaitForUploadReady() error {
-	siaDir := r.managedSiaDirectory()
+	siaDir := r.managedJobRunner().StaticSiaDirectory
 	log.Printf("[INFO] [renter] [%v] Waiting for renter is upload ready.\n", siaDir)
 	timeout := time.Minute * 5
 	frequency := time.Second * 5
 	tries := int(timeout / frequency)
 	err := build.Retry(tries, frequency, func() error {
-		rur, err := r.managedClient().RenterUploadReadyGet(renterDataPieces, renterParityPieces)
+		rur, err := r.managedJobRunner().staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
 		if err != nil {
 			return err
 		}
