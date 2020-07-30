@@ -13,7 +13,10 @@ var (
 )
 
 func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
-	j.StaticTG.Add()
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set

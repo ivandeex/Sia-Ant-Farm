@@ -20,7 +20,10 @@ const (
 // balanceMaintainer mines when the balance is below desiredBalance. The miner
 // is stopped if the balance exceeds the desired balance.
 func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
-	j.StaticTG.Add()
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set

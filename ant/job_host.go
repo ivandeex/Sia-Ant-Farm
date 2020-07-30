@@ -32,7 +32,10 @@ const (
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
 // storage to the ant farm.
 func (j *JobRunner) jobHost() {
-	j.StaticTG.Add()
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set

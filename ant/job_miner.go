@@ -15,7 +15,10 @@ const (
 // seconds passes before the wallet has received some amount of currency, this
 // job will print an error.
 func (j *JobRunner) blockMining() {
-	j.StaticTG.Add()
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set

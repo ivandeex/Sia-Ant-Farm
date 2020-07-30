@@ -244,7 +244,10 @@ func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.
 
 // managedDownload will managedDownload a random file from the network.
 func (r *renterJob) managedDownload() error {
-	r.staticJR.StaticTG.Add()
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return err
+	}
 	defer r.staticJR.StaticTG.Done()
 
 	// Download a random file from the renter's file list
@@ -339,7 +342,10 @@ func (r *renterJob) managedDownload() error {
 // managedUpload will managedUpload a file to the network. If the api reports that there are
 // more than 10 files successfully uploaded, then a file is deleted at random.
 func (r *renterJob) managedUpload() error {
-	r.staticJR.StaticTG.Add()
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return err
+	}
 	defer r.staticJR.StaticTG.Done()
 
 	// Generate some random data to upload. The file needs to be closed before
@@ -423,7 +429,10 @@ func (r *renterJob) managedUpload() error {
 // using that currency, and uploads some files.  It will periodically try to
 // download or delete those files, printing any errors that occur.
 func (j *JobRunner) storageRenter() {
-	j.StaticTG.Add()
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced
