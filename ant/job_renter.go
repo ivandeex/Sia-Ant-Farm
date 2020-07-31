@@ -66,12 +66,15 @@ const (
 	renterDataPieces = 1
 
 	// renterParityPieces defines the number of parity pieces per erasure-coded
+	// chunk
 	renterParityPieces = 4
 
-	//xxx
+	// renterUploadReadyTimeout defines timeout for renter to become upload
+	// ready
 	renterUploadReadyTimeout = time.Minute * 5
 
-	//xxx
+	// renterUploadReadyFrequency defines how frequently the renter job checks
+	// if renter became upload ready
 	renterUploadReadyFrequency = time.Second * 5
 
 	// uploadFileSize defines the size of the test files to be uploaded.  Test
@@ -135,77 +138,10 @@ type renterJob struct {
 	mu       sync.Mutex
 }
 
-//xxx reorder funcs and methods
-
-// isFileInDownloads grabs the files currently being downloaded by the
-// renter and returns bool `true` if fileToDownload exists in the
-// download list.  It also returns the DownloadInfo for the requested `file`.
-func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.DownloadInfo, error) {
-	var dlinfo api.DownloadInfo
-	renterDownloads, err := client.RenterDownloadsGet()
-	if err != nil {
-		return false, dlinfo, err
-	}
-
-	hasFile := false
-	for _, download := range renterDownloads.Downloads {
-		if download.SiaPath == file.SiaPath {
-			hasFile = true
-			dlinfo = download
-		}
-	}
-
-	return hasFile, dlinfo, nil
-}
-
-// randFillFile will append 'size' bytes to the input file, returning the
-// merkle root of the bytes that were appended.
-func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
-	tee := io.TeeReader(io.LimitReader(fastrand.Reader, int64(size)), f)
-	root, err := merkletree.ReaderRoot(tee, crypto.NewHash(), crypto.SegmentSize)
-	copy(h[:], root)
-	return
-}
-
-// autoRenter unlocks the wallet, mines some currency, sets an allowance
-// using that currency, and uploads some files.  It will periodically try to
-// download or delete those files, printing any errors that occur.
-func (j *JobRunner) autoRenter() {
-	err := j.StaticTG.Add()
-	if err != nil {
-		return
-	}
-	defer j.StaticTG.Done()
-
-	// Start basic renter
-	rj := renterJob{
-		staticJR: j,
-	}
-	rj.basicRenter()
-
-	// Spawn the uploader, downloader and deleter threads.
-	go rj.threadedUploader()
-	go rj.threadedDownloader()
-	go rj.threadedDeleter()
-}
-
-// xxx
-func (j *JobRunner) renter() {
-	err := j.StaticTG.Add()
-	if err != nil {
-		return
-	}
-	defer j.StaticTG.Done()
-
-	// Start basic renter and finish after done
-	rj := renterJob{
-		staticJR: j,
-	}
-	rj.basicRenter()
-}
-
-//xxx
-func (r *renterJob) basicRenter() error {
+// basicRenter is a helper function to be used by renter jobs. It blocks until
+// renter has sufficiently full walllet, sets renter allowance and blocks until
+// renter is upload ready
+func basicRenter(r *renterJob) error {
 	// Wait for ants to be synced
 	AntsSyncWG.Wait()
 
@@ -294,6 +230,73 @@ func (r *renterJob) basicRenter() error {
 	}
 	log.Printf("[INFO] [renter] [%v] Renter is upload ready.\n", r.staticJR.staticSiaDirectory)
 	return nil
+}
+
+// isFileInDownloads grabs the files currently being downloaded by the
+// renter and returns bool `true` if fileToDownload exists in the
+// download list.  It also returns the DownloadInfo for the requested `file`.
+func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.DownloadInfo, error) {
+	var dlinfo api.DownloadInfo
+	renterDownloads, err := client.RenterDownloadsGet()
+	if err != nil {
+		return false, dlinfo, err
+	}
+
+	hasFile := false
+	for _, download := range renterDownloads.Downloads {
+		if download.SiaPath == file.SiaPath {
+			hasFile = true
+			dlinfo = download
+		}
+	}
+
+	return hasFile, dlinfo, nil
+}
+
+// randFillFile will append 'size' bytes to the input file, returning the
+// merkle root of the bytes that were appended.
+func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
+	tee := io.TeeReader(io.LimitReader(fastrand.Reader, int64(size)), f)
+	root, err := merkletree.ReaderRoot(tee, crypto.NewHash(), crypto.SegmentSize)
+	copy(h[:], root)
+	return
+}
+
+// autoRenter job calls basicRenter helper to get renter upload ready and
+// spawns periodic file uploader, downloader and deleter renter sub jobs.
+func (j *JobRunner) autoRenter() {
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
+	defer j.StaticTG.Done()
+
+	// Start basic renter
+	rj := renterJob{
+		staticJR: j,
+	}
+	basicRenter(&rj)
+
+	// Spawn the uploader, downloader and deleter threads.
+	go rj.threadedUploader()
+	go rj.threadedDownloader()
+	go rj.threadedDeleter()
+}
+
+// renter job calls basicRenter helper to get renter upload ready and then
+// finishes.
+func (j *JobRunner) renter() {
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
+	defer j.StaticTG.Done()
+
+	// Start basic renter and finish after done
+	rj := renterJob{
+		staticJR: j,
+	}
+	basicRenter(&rj)
 }
 
 // managedDeleteRandom deletes a random file from the renter.
