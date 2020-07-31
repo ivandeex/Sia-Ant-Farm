@@ -68,7 +68,7 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
-		ant.AntSyncWG.Add(1)
+		ant.AntsSyncWG.Add(1)
 	}
 
 	// Check whether UPnP is enabled on router

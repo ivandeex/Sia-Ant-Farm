@@ -20,7 +20,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	AntSyncWG.Wait()
+	AntsSyncWG.Wait()
 
 	for {
 		select {

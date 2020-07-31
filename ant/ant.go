@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
@@ -15,9 +16,9 @@ import (
 )
 
 var (
-	// AntSyncWG is a waitgroup to wait for all ants to be in sync and then
+	// AntsSyncWG is a waitgroup to wait for all ants to be in sync and then
 	// start ant jobs
-	AntSyncWG sync.WaitGroup
+	AntsSyncWG sync.WaitGroup
 )
 
 // AntConfig represents a configuration object passed to New(), used to
@@ -45,16 +46,6 @@ type Ant struct {
 	// for this ant. The map will just keep growing, but it shouldn't take up a
 	// prohibitive amount of space.
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
-}
-
-// PrintJSON is a wrapper for json.MarshalIndent
-func PrintJSON(v interface{}) error {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(data))
-	return nil
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -130,7 +121,9 @@ func New(config AntConfig) (*Ant, error) {
 		case "host":
 			go j.jobHost()
 		case "renter":
-			go j.storageRenter()
+			go j.renter()
+		case "autoRenter":
+			go j.autoRenter()
 		case "gateway":
 			go j.gatewayConnectability()
 		}
@@ -152,12 +145,45 @@ func New(config AntConfig) (*Ant, error) {
 	}, nil
 }
 
+// PrintJSON is a wrapper for json.MarshalIndent
+func PrintJSON(v interface{}) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
+}
+
+// BlockHeight returns the highest block height seen by the ant.
+func (a *Ant) BlockHeight() types.BlockHeight {
+	height := types.BlockHeight(0)
+	for h := range a.SeenBlocks {
+		if h > height {
+			height = h
+		}
+	}
+	return height
+}
+
 // Close releases all resources created by the ant, including the Siad
 // subprocess.
 func (a *Ant) Close() error {
 	a.Jr.Stop()
 	stopSiad(a.APIAddr, a.siad.Process)
 	return nil
+}
+
+// HasRenterTypeJob returns true if the ant has renter type of job (renter or
+// autoRenter)
+func (a *Ant) HasRenterTypeJob() bool {
+	for _, jobName := range a.Config.Jobs {
+		jobNameLower := strings.ToLower(jobName)
+		if strings.Contains(jobNameLower, "renter") {
+			return true
+		}
+	}
+	return false
 }
 
 // StartJob starts the job indicated by `job` after an ant has been
@@ -173,7 +199,9 @@ func (a *Ant) StartJob(job string, args ...interface{}) error {
 	case "host":
 		go a.Jr.jobHost()
 	case "renter":
-		go a.Jr.storageRenter()
+		go a.Jr.renter()
+	case "autoRenter":
+		go a.Jr.autoRenter()
 	case "gateway":
 		go a.Jr.gatewayConnectability()
 	case "bigspender":
@@ -185,17 +213,6 @@ func (a *Ant) StartJob(job string, args ...interface{}) error {
 	}
 
 	return nil
-}
-
-// BlockHeight returns the highest block height seen by the ant.
-func (a *Ant) BlockHeight() types.BlockHeight {
-	height := types.BlockHeight(0)
-	for h := range a.SeenBlocks {
-		if h > height {
-			height = h
-		}
-	}
-	return height
 }
 
 // WalletAddress returns a wallet address that this ant can receive coins on.

@@ -173,14 +173,7 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 		}
 
 		// Allow renter to rent on hosts on the same IP subnets
-		isRenter := false
-		for _, j := range config.Jobs {
-			if j == "renter" {
-				isRenter = true
-				break
-			}
-		}
-		if isRenter && config.RenterDisableIPViolationCheck {
+		if ant.HasRenterTypeJob() && config.RenterDisableIPViolationCheck {
 			// Create Sia Client
 			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
 			if err != nil {
@@ -379,6 +372,6 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 		}
 	}
 	log.Println("[INFO] [ant-farm] all ants are now synced")
-	ant.AntSyncWG.Done()
+	ant.AntsSyncWG.Done()
 	return nil
 }

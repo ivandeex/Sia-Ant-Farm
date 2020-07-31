@@ -27,10 +27,10 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	AntSyncWG.Wait()
+	AntsSyncWG.Wait()
 
 	minerRunning := true
-	err := j.staticClient.MinerStartGet()
+	err = j.staticClient.MinerStartGet()
 	if err != nil {
 		log.Printf("[%v balanceMaintainer ERROR]: %v\n", j.staticSiaDirectory, err)
 		return

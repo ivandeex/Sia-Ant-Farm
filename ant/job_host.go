@@ -13,20 +13,24 @@ import (
 )
 
 const (
-	// hostAnnouncementInterval defines how often the host will try to
-	// announcement itself
-	hostAnnouncementInterval = time.Second * 5
+	// hostAnnouncementFrequency defines how often the host will try to
+	// announce itself
+	hostAnnouncementFrequency = time.Second * 5
 
-	// hostSettingsPollInterval defines interval for continuous host settings
+	// hostGetWalletFrequency defines how frequently the host job checks for
+	// wallet info
+	hostGetWalletFrequency = time.Second
+
+	// hostSettingsFrequency defines interval for continuous host settings
 	// polling
-	hostSettingsPollInterval = time.Second * 15
+	hostSettingsFrequency = time.Second * 15
 
 	// miningTimeout defines timeout for mining desired balance
 	miningTimeout = time.Minute * 5
 
-	// miningSleepTime defines sleep time for checking desired balance during
-	// mining
-	miningSleepTime = time.Second
+	// miningCheckFrequency defines how often the host will check for desired
+	// balance during mining
+	miningCheckFrequency = time.Second
 )
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
@@ -39,12 +43,17 @@ func (j *JobRunner) jobHost() {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	AntSyncWG.Wait()
+	AntsSyncWG.Wait()
 
 	// Mine at least 50,000 SC
 	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)
 	success := false
-	for start := time.Now(); time.Since(start) < miningTimeout; time.Sleep(miningSleepTime) {
+	for start := time.Now(); time.Since(start) < miningTimeout; time.Sleep(miningCheckFrequency) {
+		select {
+		case <-j.StaticTG.StopChan():
+			return
+		case <-time.After(hostGetWalletFrequency):
+		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
 			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
@@ -66,7 +75,7 @@ func (j *JobRunner) jobHost() {
 
 	// Add the storage folder.
 	size := modules.SectorSize * 4096
-	err := j.staticClient.HostStorageFoldersAddPost(hostdir, size)
+	err = j.staticClient.HostStorageFoldersAddPost(hostdir, size)
 	if err != nil {
 		log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
 		return
@@ -83,7 +92,7 @@ func (j *JobRunner) jobHost() {
 			success = true
 			break
 		}
-		time.Sleep(hostAnnouncementInterval)
+		time.Sleep(hostAnnouncementFrequency)
 	}
 	if !success {
 		log.Printf("[%v jobHost ERROR]: could not announce after 5 tries.\n", j.staticSiaDirectory)
@@ -105,7 +114,7 @@ func (j *JobRunner) jobHost() {
 		select {
 		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(hostSettingsPollInterval):
+		case <-time.After(hostSettingsFrequency):
 		}
 
 		hostInfo, err := j.staticClient.HostGet()

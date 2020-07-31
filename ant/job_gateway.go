@@ -21,7 +21,7 @@ func (j *JobRunner) gatewayConnectability() {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	AntSyncWG.Wait()
+	AntsSyncWG.Wait()
 
 	// Check the gateway connections in a loop
 	for {
