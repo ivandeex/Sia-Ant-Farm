@@ -139,7 +139,7 @@ type renterJob struct {
 }
 
 // basicRenter is a helper function to be used by renter jobs. It blocks until
-// renter has sufficiently full walllet, sets renter allowance and blocks until
+// renter has a sufficiently full wallet, the allowance is set, and until
 // renter is upload ready
 func basicRenter(r *renterJob) error {
 	// Wait for ants to be synced
