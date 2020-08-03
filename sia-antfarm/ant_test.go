@@ -145,7 +145,7 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 	}
 }
 
-// TestTestConnectAnts verifies that ants will connect
+// TestConnectAnts verifies that ants will connect
 func TestConnectAnts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -241,7 +241,7 @@ func TestConnectAnts(t *testing.T) {
 	}
 }
 
-// TestTestAntConsensusGroups probes the antConsensusGroup function
+// TestAntConsensusGroups probes the antConsensusGroup function
 func TestAntConsensusGroups(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
