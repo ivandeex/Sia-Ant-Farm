@@ -30,10 +30,10 @@ const (
 	// reached.
 	initialBalanceWarningTimeout = time.Minute * 10
 
-	// setAllowanceWarningTimeout defines how long the renter will wait before
+	// setAllowanceTimeout defines how long the renter will wait before
 	// reporting to the user that the allowance has not yet been set
 	// successfully.
-	setAllowanceWarningTimeout = time.Minute * 2
+	setAllowanceTimeout = time.Minute * 2
 
 	// setAllowanceFrequency defines how frequently the renter job tries to set
 	// renter allowance
@@ -138,100 +138,6 @@ type renterJob struct {
 	mu       sync.Mutex
 }
 
-// basicRenter is a helper function to be used by renter jobs. It blocks until
-// renter has a sufficiently full wallet, the allowance is set, and until
-// renter is upload ready
-func basicRenter(r *renterJob) error {
-	// Wait for ants to be synced
-	AntsSyncWG.Wait()
-
-	// Block until a minimum threshold of coins have been mined.
-	start := time.Now()
-	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", r.staticJR.staticSiaDirectory)
-	for {
-		// Get the wallet balance.
-		walletInfo, err := r.staticJR.staticClient.WalletGet()
-		if err != nil {
-			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", r.staticJR.staticSiaDirectory, err)
-
-			// Wait before trying to get the balance again.
-			select {
-			case <-r.staticJR.StaticTG.StopChan():
-				return err
-			case <-time.After(balanceCheckFrequency):
-			}
-			continue
-		}
-
-		// Break the wait loop when we have enough balance.
-		if walletInfo.ConfirmedSiacoinBalance.Cmp(requiredInitialBalance) > 0 {
-			break
-		}
-
-		// Log an error if the time elapsed has exceeded the warning threshold.
-		if time.Since(start) > initialBalanceWarningTimeout {
-			log.Printf("[ERROR] [renter] [%v] Minimum balance for allowance has not been reached. Time elapsed: %v\n", r.staticJR.staticSiaDirectory, time.Since(start))
-		}
-
-		// Wait before trying to get the balance again.
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return err
-		case <-time.After(balanceCheckFrequency):
-		}
-	}
-	log.Printf("[INFO] [renter] [%v] Wallet filled successfully. Blocking until allowance has been set.\n", r.staticJR.staticSiaDirectory)
-
-	// Block until a renter allowance has successfully been set.
-	start = time.Now()
-	for {
-		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", r.staticJR.staticSiaDirectory)
-		err := r.staticJR.staticClient.RenterPostAllowance(allowance)
-		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", r.staticJR.staticSiaDirectory, err)
-		if err == nil {
-			// Success, we can exit the loop.
-			break
-		}
-		if err != nil && time.Since(start) > setAllowanceWarningTimeout {
-			log.Printf("[ERROR] [renter] [%v] Trouble when setting renter allowance: %v\n", r.staticJR.staticSiaDirectory, err)
-		}
-
-		// Wait a bit before trying again.
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return err
-		case <-time.After(setAllowanceFrequency):
-		}
-	}
-	log.Printf("[INFO] [renter] [%v] Renter allowance has been set successfully.\n", r.staticJR.staticSiaDirectory)
-
-	// Block until renter is upload ready
-	start = time.Now()
-	for {
-		log.Printf("[DEBUG] [renter] [%v] Waiting for renter to become upload ready.\n", r.staticJR.staticSiaDirectory)
-		rur, err := r.staticJR.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
-		if err != nil {
-			// Error getting RenterUploadReady
-			log.Printf("[ERROR] [renter] [%v] Trouble when getting renter upload ready status: %v\n", r.staticJR.staticSiaDirectory, err)
-		} else if rur.Ready {
-			// Success, we can exit the loop.
-			break
-		} else if time.Since(start) > renterUploadReadyTimeout {
-			// We have hit the timeout
-			log.Printf("[ERROR] [renter] [%v] Renter is not upload ready within %v timeout.\n", r.staticJR.staticSiaDirectory, renterUploadReadyTimeout)
-		}
-
-		// Wait a bit before trying again.
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return err
-		case <-time.After(renterUploadReadyFrequency):
-		}
-	}
-	log.Printf("[INFO] [renter] [%v] Renter is upload ready.\n", r.staticJR.staticSiaDirectory)
-	return nil
-}
-
 // isFileInDownloads grabs the files currently being downloaded by the
 // renter and returns bool `true` if fileToDownload exists in the
 // download list.  It also returns the DownloadInfo for the requested `file`.
@@ -262,41 +168,110 @@ func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
 	return
 }
 
-// autoRenter job calls basicRenter helper to get renter upload ready and
-// spawns periodic file uploader, downloader and deleter renter sub jobs.
-func (j *JobRunner) autoRenter() {
+// renter blocks until renter has a sufficiently full wallet, the allowance is
+// set, and until renter is upload ready. Then it optionally starts periodic
+// uploader, downloader and deleter jobs.
+func (j *JobRunner) renter(startBackgroundJobs bool) {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
 	}
 	defer j.StaticTG.Done()
+
+	// Wait for ants to be synced
+	AntsSyncWG.Wait()
 
 	// Start basic renter
 	rj := renterJob{
 		staticJR: j,
 	}
-	basicRenter(&rj)
 
-	// Spawn the uploader, downloader and deleter threads.
-	go rj.threadedUploader()
-	go rj.threadedDownloader()
-	go rj.threadedDeleter()
-}
+	// Block until a minimum threshold of coins have been mined.
+	start := time.Now()
+	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", rj.staticJR.staticSiaDirectory)
+	for {
+		// Get the wallet balance.
+		walletInfo, err := rj.staticJR.staticClient.WalletGet()
+		if err != nil {
+			// Log if there was an error.
+			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", rj.staticJR.staticSiaDirectory, err)
+		} else if walletInfo.ConfirmedSiacoinBalance.Cmp(requiredInitialBalance) > 0 {
+			// Break the wait loop when we have enough balance.
+			break
+		}
 
-// renter job calls basicRenter helper to get renter upload ready and then
-// finishes.
-func (j *JobRunner) renter() {
-	err := j.StaticTG.Add()
-	if err != nil {
-		return
+		// Log an error if the time elapsed has exceeded the warning threshold.
+		if time.Since(start) > initialBalanceWarningTimeout {
+			log.Printf("[ERROR] [renter] [%v] Minimum balance for allowance has not been reached. Time elapsed: %v\n", rj.staticJR.staticSiaDirectory, time.Since(start))
+		}
+
+		// Wait before trying to get the balance again.
+		select {
+		case <-rj.staticJR.StaticTG.StopChan():
+			return
+		case <-time.After(balanceCheckFrequency):
+		}
 	}
-	defer j.StaticTG.Done()
+	log.Printf("[INFO] [renter] [%v] Wallet filled successfully. Blocking until allowance has been set.\n", rj.staticJR.staticSiaDirectory)
 
-	// Start basic renter and finish after done
-	rj := renterJob{
-		staticJR: j,
+	// Block until a renter allowance has successfully been set.
+	start = time.Now()
+	for {
+		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", rj.staticJR.staticSiaDirectory)
+		err := rj.staticJR.staticClient.RenterPostAllowance(allowance)
+		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", rj.staticJR.staticSiaDirectory, err)
+		if err == nil {
+			// Success, we can exit the loop.
+			break
+		}
+		// There was an error
+		log.Printf("[ERROR] [renter] [%v] Trouble when setting renter allowance: %v\n", rj.staticJR.staticSiaDirectory, err)
+		if time.Since(start) > setAllowanceTimeout {
+			// Timeout was reached
+			log.Printf("[ERROR] [renter] [%v] Couldn't set allowance within %v timeout\n", rj.staticJR.staticSiaDirectory, setAllowanceTimeout)
+		}
+
+		// Wait a bit before trying again.
+		select {
+		case <-rj.staticJR.StaticTG.StopChan():
+			return
+		case <-time.After(setAllowanceFrequency):
+		}
 	}
-	basicRenter(&rj)
+	log.Printf("[INFO] [renter] [%v] Renter allowance has been set successfully.\n", rj.staticJR.staticSiaDirectory)
+
+	// Block until renter is upload ready
+	start = time.Now()
+	log.Printf("[INFO] [renter] [%v] Waiting for renter to become upload ready.\n", rj.staticJR.staticSiaDirectory)
+	for {
+		rur, err := rj.staticJR.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
+		if err != nil {
+			// Error getting RenterUploadReady
+			log.Printf("[ERROR] [renter] [%v] Trouble when getting renter upload ready status: %v\n", rj.staticJR.staticSiaDirectory, err)
+		} else if rur.Ready {
+			// Success, we can exit the loop.
+			break
+		}
+		if time.Since(start) > renterUploadReadyTimeout {
+			// We have hit the timeout
+			log.Printf("[ERROR] [renter] [%v] Renter is not upload ready within %v timeout.\n", rj.staticJR.staticSiaDirectory, renterUploadReadyTimeout)
+		}
+
+		// Wait a bit before trying again.
+		select {
+		case <-rj.staticJR.StaticTG.StopChan():
+			return
+		case <-time.After(renterUploadReadyFrequency):
+		}
+	}
+	log.Printf("[INFO] [renter] [%v] Renter is upload ready.\n", rj.staticJR.staticSiaDirectory)
+
+	if startBackgroundJobs {
+		// Spawn the uploader, downloader and deleter threads.
+		go rj.threadedUploader()
+		go rj.threadedDownloader()
+		go rj.threadedDeleter()
+	}
 }
 
 // managedDeleteRandom deletes a random file from the renter.

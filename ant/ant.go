@@ -121,9 +121,9 @@ func New(config AntConfig) (*Ant, error) {
 		case "host":
 			go j.jobHost()
 		case "renter":
-			go j.renter()
+			go j.renter(false)
 		case "autoRenter":
-			go j.autoRenter()
+			go j.renter(true)
 		case "gateway":
 			go j.gatewayConnectability()
 		}
@@ -199,9 +199,9 @@ func (a *Ant) StartJob(job string, args ...interface{}) error {
 	case "host":
 		go a.Jr.jobHost()
 	case "renter":
-		go a.Jr.renter()
+		go a.Jr.renter(false)
 	case "autoRenter":
-		go a.Jr.autoRenter()
+		go a.Jr.renter(true)
 	case "gateway":
 		go a.Jr.gatewayConnectability()
 	case "bigspender":

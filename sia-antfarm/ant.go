@@ -361,7 +361,8 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 		// Wait for jobs stop, timout or sleep
 		select {
 		case <-ants[0].Jr.StaticTG.StopChan():
-			// Jobs were stopped
+			// Jobs were stopped, do not wait anymore
+			ant.AntsSyncWG.Done()
 			return errors.New("jobs were stopped")
 		case <-time.After(timeout):
 			// We have reached the timeout
