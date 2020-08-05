@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
@@ -50,6 +51,10 @@ type (
 		// are connected to this antfarm but managed by another antfarm.
 		externalAnts []*ant.Ant
 		router       *httprouter.Router
+
+		// antsSyncWG is a waitgroup to wait for all ants to be in sync and then
+		// start ant jobs
+		antsSyncWG sync.WaitGroup
 	}
 )
 
@@ -68,19 +73,20 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
-		ant.AntSyncWG.Add(1)
+		farm.antsSyncWG.Add(1)
+		defer farm.antsSyncWG.Done()
 	}
 
 	// Check whether UPnP is enabled on router
 	upnprouter.CheckUPnPEnabled()
 
 	// start up each ant process with its jobs
-	ants, err := startAnts(config.AntConfigs...)
+	ants, err := startAnts(&farm.antsSyncWG, config.AntConfigs...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start ants")
 	}
 
-	err = startJobs(ants...)
+	err = startJobs(&farm.antsSyncWG, ants...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start jobs")
 	}
@@ -124,6 +130,38 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	farm.router.GET("/ants", farm.getAnts)
 
 	return farm, nil
+}
+
+// waitForAntsToSync waits for all ants to be synced with a given tmeout
+func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
+	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
+	for {
+		// Check sync status
+		groups, err := antConsensusGroups(ants...)
+		if err != nil {
+			return errors.AddContext(err, "unable to get consensus groups")
+		}
+
+		// We have reached ants sync
+		if len(groups) == 1 {
+			break
+		}
+
+		// Wait for jobs stop, timout or sleep
+		select {
+		case <-ants[0].Jr.StaticTG.StopChan():
+			// Jobs were stopped, do not wait anymore
+			return errors.New("jobs were stopped")
+		case <-time.After(timeout):
+			// We have reached the timeout
+			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
+			return errors.New(msg)
+		case <-time.After(waitForAntsToSyncFrequency):
+			// Continue waiting for sync after sleep
+		}
+	}
+	log.Println("[INFO] [ant-farm] all ants are now synced")
+	return nil
 }
 
 // allAnts returns all ants, external and internal, associated with this

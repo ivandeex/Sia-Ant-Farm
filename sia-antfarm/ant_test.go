@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -47,7 +48,7 @@ func TestStartAnts(t *testing.T) {
 	}
 
 	// Start ants
-	ants, err := startAnts(configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +113,7 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 			}
 
 			// Start ant
-			ants, err := startAnts(configs...)
+			ants, err := startAnts(&sync.WaitGroup{}, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -145,7 +146,7 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 	}
 }
 
-// TestTestConnectAnts verifies that ants will connect
+// TestConnectAnts verifies that ants will connect
 func TestConnectAnts(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -199,7 +200,7 @@ func TestConnectAnts(t *testing.T) {
 	}
 
 	// Start ants
-	ants, err := startAnts(configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -241,7 +242,7 @@ func TestConnectAnts(t *testing.T) {
 	}
 }
 
-// TestTestAntConsensusGroups probes the antConsensusGroup function
+// TestAntConsensusGroups probes the antConsensusGroup function
 func TestAntConsensusGroups(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -276,7 +277,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	}
 
 	// Start Ants
-	ants, err := startAnts(configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +312,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherAnt, err := ant.New(cfg)
+	otherAnt, err := ant.New(&sync.WaitGroup{}, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

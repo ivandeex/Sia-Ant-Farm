@@ -100,7 +100,7 @@ manual port forwarding) if you set `AllowHostLocalNetAddress` to `true`.
 	'RenterDisableIPViolationCheck': relevant only for renter, if set to true allows renter to rent on hosts on the same IP subnets by disabling the `IPViolationCheck` for the renter.
 	'SiaDirectory': the data directory to use for this ant, by default a unique directory in `./antfarm-data` will be generated and used.
 	'SiadPath': the path to the `siad` binary, by default the `siad-dev` in your path will be used.
-	'Jobs': an array of jobs for this ant to run. available jobs include: ['miner', 'host', 'renter', 'gateway']
+	'Jobs': an array of jobs for this ant to run. available jobs include: ['miner', 'host', 'renter', 'autoRenter', 'gateway']. 'renter' job starts the renter and waits till the renter is upload ready, it doesn't starts any renter's background activity. 'autoRenter' does the same as 'renter' job and then starts renter's periodic file uploads, downloads, and deletions.
 	'DesiredCurrency': a minimum (integer) amount of SiaCoin that this Ant will attempt to maintain by mining currency. This is mutually exclusive with the `miner` job.
 }
 ```

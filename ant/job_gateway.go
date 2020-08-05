@@ -14,11 +14,14 @@ const (
 // gatewayConnectability will print an error to the log if the node has zero
 // peers at any time.
 func (j *JobRunner) gatewayConnectability() {
-	j.StaticTG.Add()
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	AntSyncWG.Wait()
+	j.staticAntsSyncWG.Wait()
 
 	// Check the gateway connections in a loop
 	for {

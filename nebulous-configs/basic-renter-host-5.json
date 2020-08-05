@@ -53,7 +53,7 @@
 			"RenterDisableIPViolationCheck": true,
 			"Name": "renter",
 			"Jobs": [
-				"renter"
+				"autoRenter"
 			],
 			"DesiredCurrency": 100000
 		}

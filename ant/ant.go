@@ -7,17 +7,12 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
-)
-
-var (
-	// AntSyncWG is a waitgroup to wait for all ants to be in sync and then
-	// start ant jobs
-	AntSyncWG sync.WaitGroup
 )
 
 // AntConfig represents a configuration object passed to New(), used to
@@ -45,16 +40,6 @@ type Ant struct {
 	// for this ant. The map will just keep growing, but it shouldn't take up a
 	// prohibitive amount of space.
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
-}
-
-// PrintJSON is a wrapper for json.MarshalIndent
-func PrintJSON(v interface{}) error {
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(data))
-	return nil
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -90,7 +75,7 @@ func clearPorts(config AntConfig) error {
 }
 
 // New creates a new Ant using the configuration passed through `config`.
-func New(config AntConfig) (*Ant, error) {
+func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	// Create ant working dir if it doesn't exist
 	// (e.g. ant farm deleted the whole farm dir)
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
@@ -118,7 +103,7 @@ func New(config AntConfig) (*Ant, error) {
 		}
 	}()
 
-	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
+	j, err := newJobRunner(antsSyncWG, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
@@ -130,7 +115,9 @@ func New(config AntConfig) (*Ant, error) {
 		case "host":
 			go j.jobHost()
 		case "renter":
-			go j.storageRenter()
+			go j.renter(false)
+		case "autoRenter":
+			go j.renter(true)
 		case "gateway":
 			go j.gatewayConnectability()
 		}
@@ -152,38 +139,13 @@ func New(config AntConfig) (*Ant, error) {
 	}, nil
 }
 
-// Close releases all resources created by the ant, including the Siad
-// subprocess.
-func (a *Ant) Close() error {
-	a.Jr.Stop()
-	stopSiad(a.APIAddr, a.siad.Process)
-	return nil
-}
-
-// StartJob starts the job indicated by `job` after an ant has been
-// initialized. Arguments are passed to the job using args.
-func (a *Ant) StartJob(job string, args ...interface{}) error {
-	if a.Jr == nil {
-		return errors.New("ant is not running")
+// PrintJSON is a wrapper for json.MarshalIndent
+func PrintJSON(v interface{}) error {
+	data, err := json.MarshalIndent(v, "", "  ")
+	if err != nil {
+		return err
 	}
-
-	switch job {
-	case "miner":
-		go a.Jr.blockMining()
-	case "host":
-		go a.Jr.jobHost()
-	case "renter":
-		go a.Jr.storageRenter()
-	case "gateway":
-		go a.Jr.gatewayConnectability()
-	case "bigspender":
-		go a.Jr.bigSpender()
-	case "littlesupplier":
-		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
-	default:
-		return errors.New("no such job")
-	}
-
+	fmt.Println(string(data))
 	return nil
 }
 
@@ -196,6 +158,55 @@ func (a *Ant) BlockHeight() types.BlockHeight {
 		}
 	}
 	return height
+}
+
+// Close releases all resources created by the ant, including the Siad
+// subprocess.
+func (a *Ant) Close() error {
+	a.Jr.Stop()
+	stopSiad(a.APIAddr, a.siad.Process)
+	return nil
+}
+
+// HasRenterTypeJob returns true if the ant has renter type of job (renter or
+// autoRenter)
+func (a *Ant) HasRenterTypeJob() bool {
+	for _, jobName := range a.Config.Jobs {
+		jobNameLower := strings.ToLower(jobName)
+		if strings.Contains(jobNameLower, "renter") {
+			return true
+		}
+	}
+	return false
+}
+
+// StartJob starts the job indicated by `job` after an ant has been
+// initialized. Arguments are passed to the job using args.
+func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface{}) error {
+	if a.Jr == nil {
+		return errors.New("ant is not running")
+	}
+
+	switch job {
+	case "miner":
+		go a.Jr.blockMining()
+	case "host":
+		go a.Jr.jobHost()
+	case "renter":
+		go a.Jr.renter(false)
+	case "autoRenter":
+		go a.Jr.renter(true)
+	case "gateway":
+		go a.Jr.gatewayConnectability()
+	case "bigspender":
+		go a.Jr.bigSpender()
+	case "littlesupplier":
+		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
+	default:
+		return errors.New("no such job")
+	}
+
+	return nil
 }
 
 // WalletAddress returns a wallet address that this ant can receive coins on.

@@ -13,48 +13,55 @@ import (
 )
 
 const (
-	// hostAnnouncementInterval defines how often the host will try to
-	// announcement itself
-	hostAnnouncementInterval = time.Second * 5
+	// hostAnnouncementFrequency defines how often the host will try to
+	// announce itself
+	hostAnnouncementFrequency = time.Second * 5
 
-	// hostSettingsPollInterval defines interval for continuous host settings
+	// hostSettingsFrequency defines interval for continuous host settings
 	// polling
-	hostSettingsPollInterval = time.Second * 15
+	hostSettingsFrequency = time.Second * 15
 
 	// miningTimeout defines timeout for mining desired balance
 	miningTimeout = time.Minute * 5
 
-	// miningSleepTime defines sleep time for checking desired balance during
-	// mining
-	miningSleepTime = time.Second
+	// miningCheckFrequency defines how often the host will check for desired
+	// balance during mining
+	miningCheckFrequency = time.Second
 )
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
 // storage to the ant farm.
 func (j *JobRunner) jobHost() {
-	j.StaticTG.Add()
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	AntSyncWG.Wait()
+	j.staticAntsSyncWG.Wait()
 
 	// Mine at least 50,000 SC
 	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)
-	success := false
-	for start := time.Now(); time.Since(start) < miningTimeout; time.Sleep(miningSleepTime) {
+	start := time.Now()
+	for {
+		select {
+		case <-j.StaticTG.StopChan():
+			return
+		case <-time.After(miningCheckFrequency):
+		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[ERROR] [host] [%v] Error getting wallet info: %v\n", j.staticSiaDirectory, err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {
-			success = true
 			break
 		}
-	}
-	if !success {
-		log.Printf("[%v jobHost ERROR]: timeout: could not mine enough currency after 5 minutes\n", j.staticSiaDirectory)
-		return
+		if time.Since(start) > miningTimeout {
+			log.Printf("[ERROR] [host] [%v]: timeout: could not mine enough currency after 5 minutes\n", j.staticSiaDirectory)
+			return
+		}
 	}
 
 	// Create a temporary folder for hosting
@@ -63,7 +70,7 @@ func (j *JobRunner) jobHost() {
 
 	// Add the storage folder.
 	size := modules.SectorSize * 4096
-	err := j.staticClient.HostStorageFoldersAddPost(hostdir, size)
+	err = j.staticClient.HostStorageFoldersAddPost(hostdir, size)
 	if err != nil {
 		log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
 		return
@@ -71,7 +78,7 @@ func (j *JobRunner) jobHost() {
 
 	// Announce the host to the network, retrying up to 5 times before reporting
 	// failure and returning.
-	success = false
+	success := false
 	for try := 0; try < 5; try++ {
 		err := j.staticClient.HostAnnouncePost()
 		if err != nil {
@@ -80,7 +87,7 @@ func (j *JobRunner) jobHost() {
 			success = true
 			break
 		}
-		time.Sleep(hostAnnouncementInterval)
+		time.Sleep(hostAnnouncementFrequency)
 	}
 	if !success {
 		log.Printf("[%v jobHost ERROR]: could not announce after 5 tries.\n", j.staticSiaDirectory)
@@ -102,7 +109,7 @@ func (j *JobRunner) jobHost() {
 		select {
 		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(hostSettingsPollInterval):
+		case <-time.After(hostSettingsFrequency):
 		}
 
 		hostInfo, err := j.staticClient.HostGet()

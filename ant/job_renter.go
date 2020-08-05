@@ -30,10 +30,10 @@ const (
 	// reached.
 	initialBalanceWarningTimeout = time.Minute * 10
 
-	// setAllowanceWarningTimeout defines how long the renter will wait before
+	// setAllowanceTimeout defines how long the renter will wait before
 	// reporting to the user that the allowance has not yet been set
 	// successfully.
-	setAllowanceWarningTimeout = time.Minute * 2
+	setAllowanceTimeout = time.Minute * 2
 
 	// setAllowanceFrequency defines how frequently the renter job tries to set
 	// renter allowance
@@ -66,7 +66,16 @@ const (
 	renterDataPieces = 1
 
 	// renterParityPieces defines the number of parity pieces per erasure-coded
+	// chunk
 	renterParityPieces = 4
+
+	// renterUploadReadyTimeout defines timeout for renter to become upload
+	// ready
+	renterUploadReadyTimeout = time.Minute * 5
+
+	// renterUploadReadyFrequency defines how frequently the renter job checks
+	// if renter became upload ready
+	renterUploadReadyFrequency = time.Second * 5
 
 	// uploadFileSize defines the size of the test files to be uploaded.  Test
 	// files are filled with random data.
@@ -93,10 +102,6 @@ const (
 )
 
 var (
-	// requiredInitialBalance sets the number of coins that the renter requires
-	// before uploading will begin.
-	requiredInitialBalance = types.NewCurrency64(100e3).Mul(types.SiacoinPrecision)
-
 	// allowance is the set of allowance settings that will be used by
 	// renter
 	allowance = modules.Allowance{
@@ -111,6 +116,10 @@ var (
 		ExpectedRedundancy: 3.0,
 		MaxPeriodChurn:     2.5e9,
 	}
+
+	// requiredInitialBalance sets the number of coins that the renter requires
+	// before uploading will begin.
+	requiredInitialBalance = types.NewCurrency64(100e3).Mul(types.SiacoinPrecision)
 )
 
 // renterFile stores the location and checksum of a file active on the renter.
@@ -129,6 +138,27 @@ type renterJob struct {
 	mu       sync.Mutex
 }
 
+// isFileInDownloads grabs the files currently being downloaded by the
+// renter and returns bool `true` if fileToDownload exists in the
+// download list.  It also returns the DownloadInfo for the requested `file`.
+func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.DownloadInfo, error) {
+	var dlinfo api.DownloadInfo
+	renterDownloads, err := client.RenterDownloadsGet()
+	if err != nil {
+		return false, dlinfo, err
+	}
+
+	hasFile := false
+	for _, download := range renterDownloads.Downloads {
+		if download.SiaPath == file.SiaPath {
+			hasFile = true
+			dlinfo = download
+		}
+	}
+
+	return hasFile, dlinfo, nil
+}
+
 // randFillFile will append 'size' bytes to the input file, returning the
 // merkle root of the bytes that were appended.
 func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
@@ -138,59 +168,109 @@ func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
 	return
 }
 
-// threadedDownloader is a function that continuously runs for the renter job,
-// downloading a file at random every 400 seconds.
-func (r *renterJob) threadedDownloader() {
-	// Wait for the first file to be uploaded before starting the download
-	// loop.
+// renter blocks until renter has a sufficiently full wallet, the allowance is
+// set, and until renter is upload ready. Then it optionally starts periodic
+// uploader, downloader and deleter jobs.
+func (j *JobRunner) renter(startBackgroundJobs bool) {
+	err := j.StaticTG.Add()
+	if err != nil {
+		return
+	}
+	defer j.StaticTG.Done()
+
+	// Wait for ants to be synced
+	j.staticAntsSyncWG.Wait()
+
+	// Start basic renter
+	rj := renterJob{
+		staticJR: j,
+	}
+
+	// Block until a minimum threshold of coins have been mined.
+	start := time.Now()
+	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", rj.staticJR.staticSiaDirectory)
 	for {
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return
-		case <-time.After(downloadFileFrequency):
+		// Get the wallet balance.
+		walletInfo, err := rj.staticJR.staticClient.WalletGet()
+		if err != nil {
+			// Log if there was an error.
+			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", rj.staticJR.staticSiaDirectory, err)
+		} else if walletInfo.ConfirmedSiacoinBalance.Cmp(requiredInitialBalance) > 0 {
+			// Break the wait loop when we have enough balance.
+			break
 		}
 
-		// Download a file.
-		if err := r.managedDownload(); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
+		// Log an error if the time elapsed has exceeded the warning threshold.
+		if time.Since(start) > initialBalanceWarningTimeout {
+			log.Printf("[ERROR] [renter] [%v] Minimum balance for allowance has not been reached. Time elapsed: %v\n", rj.staticJR.staticSiaDirectory, time.Since(start))
+		}
+
+		// Wait before trying to get the balance again.
+		select {
+		case <-rj.staticJR.StaticTG.StopChan():
+			return
+		case <-time.After(balanceCheckFrequency):
 		}
 	}
-}
+	log.Printf("[INFO] [renter] [%v] Wallet filled successfully. Blocking until allowance has been set.\n", rj.staticJR.staticSiaDirectory)
 
-// threadedUploader is a function that continuously runs for the renter job,
-// uploading a 500MB file every 240 seconds (10 blocks). The renter should have
-// already set an allowance.
-func (r *renterJob) threadedUploader() {
-	// Make the source files directory
-	os.Mkdir(filepath.Join(r.staticJR.staticSiaDirectory, "renterSourceFiles"), 0700)
+	// Block until a renter allowance has successfully been set.
+	start = time.Now()
 	for {
-		// Wait a while between upload attempts.
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return
-		case <-time.After(uploadFileFrequency):
+		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", rj.staticJR.staticSiaDirectory)
+		err := rj.staticJR.staticClient.RenterPostAllowance(allowance)
+		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", rj.staticJR.staticSiaDirectory, err)
+		if err == nil {
+			// Success, we can exit the loop.
+			break
+		}
+		// There was an error
+		log.Printf("[ERROR] [renter] [%v] Trouble when setting renter allowance: %v\n", rj.staticJR.staticSiaDirectory, err)
+		if time.Since(start) > setAllowanceTimeout {
+			// Timeout was reached
+			log.Printf("[ERROR] [renter] [%v] Couldn't set allowance within %v timeout\n", rj.staticJR.staticSiaDirectory, setAllowanceTimeout)
 		}
 
-		// Upload a file.
-		if err := r.managedUpload(); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
+		// Wait a bit before trying again.
+		select {
+		case <-rj.staticJR.StaticTG.StopChan():
+			return
+		case <-time.After(setAllowanceFrequency):
 		}
 	}
-}
+	log.Printf("[INFO] [renter] [%v] Renter allowance has been set successfully.\n", rj.staticJR.staticSiaDirectory)
 
-// threadedDeleter deletes one random file from the renter every 100 seconds
-// once 10 or more files have been uploaded.
-func (r *renterJob) threadedDeleter() {
+	// Block until renter is upload ready
+	start = time.Now()
+	log.Printf("[INFO] [renter] [%v] Waiting for renter to become upload ready.\n", rj.staticJR.staticSiaDirectory)
 	for {
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return
-		case <-time.After(deleteFileFrequency):
+		rur, err := rj.staticJR.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
+		if err != nil {
+			// Error getting RenterUploadReady
+			log.Printf("[ERROR] [renter] [%v] Trouble when getting renter upload ready status: %v\n", rj.staticJR.staticSiaDirectory, err)
+		} else if rur.Ready {
+			// Success, we can exit the loop.
+			break
+		}
+		if time.Since(start) > renterUploadReadyTimeout {
+			// We have hit the timeout
+			log.Printf("[ERROR] [renter] [%v] Renter is not upload ready within %v timeout.\n", rj.staticJR.staticSiaDirectory, renterUploadReadyTimeout)
 		}
 
-		if err := r.managedDeleteRandom(); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
+		// Wait a bit before trying again.
+		select {
+		case <-rj.staticJR.StaticTG.StopChan():
+			return
+		case <-time.After(renterUploadReadyFrequency):
 		}
+	}
+	log.Printf("[INFO] [renter] [%v] Renter is upload ready.\n", rj.staticJR.staticSiaDirectory)
+
+	if startBackgroundJobs {
+		// Spawn the uploader, downloader and deleter threads.
+		go rj.threadedUploader()
+		go rj.threadedDownloader()
+		go rj.threadedDeleter()
 	}
 }
 
@@ -221,30 +301,12 @@ func (r *renterJob) managedDeleteRandom() error {
 	return nil
 }
 
-// isFileInDownloads grabs the files currently being downloaded by the
-// renter and returns bool `true` if fileToDownload exists in the
-// download list.  It also returns the DownloadInfo for the requested `file`.
-func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.DownloadInfo, error) {
-	var dlinfo api.DownloadInfo
-	renterDownloads, err := client.RenterDownloadsGet()
-	if err != nil {
-		return false, dlinfo, err
-	}
-
-	hasFile := false
-	for _, download := range renterDownloads.Downloads {
-		if download.SiaPath == file.SiaPath {
-			hasFile = true
-			dlinfo = download
-		}
-	}
-
-	return hasFile, dlinfo, nil
-}
-
 // managedDownload will managedDownload a random file from the network.
 func (r *renterJob) managedDownload() error {
-	r.staticJR.StaticTG.Add()
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return err
+	}
 	defer r.staticJR.StaticTG.Done()
 
 	// Download a random file from the renter's file list
@@ -339,7 +401,10 @@ func (r *renterJob) managedDownload() error {
 // managedUpload will managedUpload a file to the network. If the api reports that there are
 // more than 10 files successfully uploaded, then a file is deleted at random.
 func (r *renterJob) managedUpload() error {
-	r.staticJR.StaticTG.Add()
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return err
+	}
 	defer r.staticJR.StaticTG.Done()
 
 	// Generate some random data to upload. The file needs to be closed before
@@ -419,82 +484,58 @@ func (r *renterJob) managedUpload() error {
 	return nil
 }
 
-// storageRenter unlocks the wallet, mines some currency, sets an allowance
-// using that currency, and uploads some files.  It will periodically try to
-// download or delete those files, printing any errors that occur.
-func (j *JobRunner) storageRenter() {
-	j.StaticTG.Add()
-	defer j.StaticTG.Done()
-
-	// Wait for ants to be synced
-	AntSyncWG.Wait()
-
-	// Block until a minimum threshold of coins have been mined.
-	start := time.Now()
-	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", j.staticSiaDirectory)
+// threadedDeleter deletes one random file from the renter every 100 seconds
+// once 10 or more files have been uploaded.
+func (r *renterJob) threadedDeleter() {
 	for {
-		// Get the wallet balance.
-		walletInfo, err := j.staticClient.WalletGet()
-		if err != nil {
-			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", j.staticSiaDirectory, err)
-
-			// Wait before trying to get the balance again.
-			select {
-			case <-j.StaticTG.StopChan():
-				return
-			case <-time.After(balanceCheckFrequency):
-			}
-			continue
-		}
-
-		// Break the wait loop when we have enough balance.
-		if walletInfo.ConfirmedSiacoinBalance.Cmp(requiredInitialBalance) > 0 {
-			break
-		}
-
-		// Log an error if the time elapsed has exceeded the warning threshold.
-		if time.Since(start) > initialBalanceWarningTimeout {
-			log.Printf("[ERROR] [renter] [%v] Minimum balance for allowance has not been reached. Time elapsed: %v\n", j.staticSiaDirectory, time.Since(start))
-		}
-
-		// Wait before trying to get the balance again.
 		select {
-		case <-j.StaticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return
-		case <-time.After(balanceCheckFrequency):
+		case <-time.After(deleteFileFrequency):
+		}
+
+		if err := r.managedDeleteRandom(); err != nil {
+			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
 		}
 	}
-	log.Printf("[INFO] [renter] [%v] Wallet filled successfully. Blocking until allowance has been set.\n", j.staticSiaDirectory)
+}
 
-	// Block until a renter allowance has successfully been set.
-	start = time.Now()
+// threadedDownloader is a function that continuously runs for the renter job,
+// downloading a file at random every 400 seconds.
+func (r *renterJob) threadedDownloader() {
+	// Wait for the first file to be uploaded before starting the download
+	// loop.
 	for {
-		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", j.staticSiaDirectory)
-		err := j.staticClient.RenterPostAllowance(allowance)
-		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", j.staticSiaDirectory, err)
-		if err == nil {
-			// Success, we can exit the loop.
-			break
-		}
-		if err != nil && time.Since(start) > setAllowanceWarningTimeout {
-			log.Printf("[ERROR] [renter] [%v] Trouble when setting renter allowance: %v\n", j.staticSiaDirectory, err)
-		}
-
-		// Wait a bit before trying again.
 		select {
-		case <-j.StaticTG.StopChan():
+		case <-r.staticJR.StaticTG.StopChan():
 			return
-		case <-time.After(setAllowanceFrequency):
+		case <-time.After(downloadFileFrequency):
+		}
+
+		// Download a file.
+		if err := r.managedDownload(); err != nil {
+			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
 		}
 	}
-	log.Printf("[INFO] [renter] [%v] Renter allowance has been set successfully.\n", j.staticSiaDirectory)
+}
 
-	// Spawn the uploader and downloader threads.
-	rj := renterJob{
-		staticJR: j,
+// threadedUploader is a function that continuously runs for the renter job,
+// uploading a 500MB file every 240 seconds (10 blocks). The renter should have
+// already set an allowance.
+func (r *renterJob) threadedUploader() {
+	// Make the source files directory
+	os.Mkdir(filepath.Join(r.staticJR.staticSiaDirectory, "renterSourceFiles"), 0700)
+	for {
+		// Wait a while between upload attempts.
+		select {
+		case <-r.staticJR.StaticTG.StopChan():
+			return
+		case <-time.After(uploadFileFrequency):
+		}
+
+		// Upload a file.
+		if err := r.managedUpload(); err != nil {
+			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
+		}
 	}
-
-	go rj.threadedUploader()
-	go rj.threadedDownloader()
-	go rj.threadedDeleter()
 }
