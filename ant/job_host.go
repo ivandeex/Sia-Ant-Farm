@@ -4,7 +4,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/modules"
@@ -32,7 +31,7 @@ const (
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
 // storage to the ant farm.
-func (j *JobRunner) jobHost(antsSyncWG *sync.WaitGroup) {
+func (j *JobRunner) jobHost() {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -40,7 +39,7 @@ func (j *JobRunner) jobHost(antsSyncWG *sync.WaitGroup) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	antsSyncWG.Wait()
+	j.staticAntsSyncWG.Wait()
 
 	// Mine at least 50,000 SC
 	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)

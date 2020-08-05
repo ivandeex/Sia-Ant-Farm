@@ -1,24 +1,27 @@
 package ant
 
 import (
+	"sync"
+
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
-	"gitlab.com/NebulousLabs/Sia/sync"
+	siasync "gitlab.com/NebulousLabs/Sia/sync"
 	"gitlab.com/NebulousLabs/errors"
 )
 
 // A JobRunner is used to start up jobs on the running Sia node.
 type JobRunner struct {
+	staticAntsSyncWG     *sync.WaitGroup
 	staticClient         *client.Client
 	staticWalletPassword string
 	staticSiaDirectory   string
-	StaticTG             sync.ThreadGroup
+	StaticTG             siasync.ThreadGroup
 }
 
 // newJobRunner creates a new job runner, using the provided api address,
 // authentication password, and sia directory.  It expects the connected api to
 // be newly initialized, and initializes a new wallet, for usage in the jobs.
 // siadirectory is used in logging to identify the job runner.
-func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*JobRunner, error) {
+func newJobRunner(antsSyncWG *sync.WaitGroup, apiaddr string, authpassword string, siadirectory string) (*JobRunner, error) {
 	opt, err := client.DefaultOptions()
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to get client options")
@@ -27,6 +30,7 @@ func newJobRunner(apiaddr string, authpassword string, siadirectory string) (*Jo
 	opt.Password = authpassword
 	c := client.New(opt)
 	jr := &JobRunner{
+		staticAntsSyncWG:   antsSyncWG,
 		staticClient:       c,
 		staticSiaDirectory: siadirectory,
 	}

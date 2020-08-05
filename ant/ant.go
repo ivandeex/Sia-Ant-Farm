@@ -103,7 +103,7 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 		}
 	}()
 
-	j, err := newJobRunner(config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
+	j, err := newJobRunner(antsSyncWG, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
@@ -111,15 +111,15 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	for _, job := range config.Jobs {
 		switch job {
 		case "miner":
-			go j.blockMining(antsSyncWG)
+			go j.blockMining()
 		case "host":
-			go j.jobHost(antsSyncWG)
+			go j.jobHost()
 		case "renter":
-			go j.renter(antsSyncWG, false)
+			go j.renter(false)
 		case "autoRenter":
-			go j.renter(antsSyncWG, true)
+			go j.renter(true)
 		case "gateway":
-			go j.gatewayConnectability(antsSyncWG)
+			go j.gatewayConnectability()
 		}
 	}
 
@@ -189,19 +189,19 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 
 	switch job {
 	case "miner":
-		go a.Jr.blockMining(antsSyncWG)
+		go a.Jr.blockMining()
 	case "host":
-		go a.Jr.jobHost(antsSyncWG)
+		go a.Jr.jobHost()
 	case "renter":
-		go a.Jr.renter(antsSyncWG, false)
+		go a.Jr.renter(false)
 	case "autoRenter":
-		go a.Jr.renter(antsSyncWG, true)
+		go a.Jr.renter(true)
 	case "gateway":
-		go a.Jr.gatewayConnectability(antsSyncWG)
+		go a.Jr.gatewayConnectability()
 	case "bigspender":
-		go a.Jr.bigSpender(antsSyncWG)
+		go a.Jr.bigSpender()
 	case "littlesupplier":
-		go a.Jr.littleSupplier(antsSyncWG, args[0].(types.UnlockHash))
+		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
 	default:
 		return errors.New("no such job")
 	}

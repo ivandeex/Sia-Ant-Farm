@@ -2,7 +2,6 @@ package ant
 
 import (
 	"log"
-	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -13,7 +12,7 @@ var (
 	spendThreshold = types.NewCurrency64(5e4).Mul(types.SiacoinPrecision)
 )
 
-func (j *JobRunner) bigSpender(antsSyncWG *sync.WaitGroup) {
+func (j *JobRunner) bigSpender() {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -21,7 +20,7 @@ func (j *JobRunner) bigSpender(antsSyncWG *sync.WaitGroup) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	antsSyncWG.Wait()
+	j.staticAntsSyncWG.Wait()
 
 	for {
 		select {

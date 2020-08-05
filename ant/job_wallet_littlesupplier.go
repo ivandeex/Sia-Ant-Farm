@@ -2,7 +2,6 @@ package ant
 
 import (
 	"log"
-	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -13,7 +12,7 @@ var (
 	sendAmount   = types.NewCurrency64(1000).Mul(types.SiacoinPrecision)
 )
 
-func (j *JobRunner) littleSupplier(antsSyncWG *sync.WaitGroup, sendAddress types.UnlockHash) {
+func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -21,7 +20,7 @@ func (j *JobRunner) littleSupplier(antsSyncWG *sync.WaitGroup, sendAddress types
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	antsSyncWG.Wait()
+	j.staticAntsSyncWG.Wait()
 
 	for {
 		select {

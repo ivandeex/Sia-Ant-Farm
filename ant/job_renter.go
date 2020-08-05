@@ -171,7 +171,7 @@ func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
 // renter blocks until renter has a sufficiently full wallet, the allowance is
 // set, and until renter is upload ready. Then it optionally starts periodic
 // uploader, downloader and deleter jobs.
-func (j *JobRunner) renter(antsSyncWG *sync.WaitGroup, startBackgroundJobs bool) {
+func (j *JobRunner) renter(startBackgroundJobs bool) {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -179,7 +179,7 @@ func (j *JobRunner) renter(antsSyncWG *sync.WaitGroup, startBackgroundJobs bool)
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced
-	antsSyncWG.Wait()
+	j.staticAntsSyncWG.Wait()
 
 	// Start basic renter
 	rj := renterJob{

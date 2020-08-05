@@ -2,7 +2,6 @@ package ant
 
 import (
 	"log"
-	"sync"
 	"time"
 )
 
@@ -14,7 +13,7 @@ const (
 
 // gatewayConnectability will print an error to the log if the node has zero
 // peers at any time.
-func (j *JobRunner) gatewayConnectability(antsSyncWG *sync.WaitGroup) {
+func (j *JobRunner) gatewayConnectability() {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -22,7 +21,7 @@ func (j *JobRunner) gatewayConnectability(antsSyncWG *sync.WaitGroup) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	antsSyncWG.Wait()
+	j.staticAntsSyncWG.Wait()
 
 	// Check the gateway connections in a loop
 	for {
