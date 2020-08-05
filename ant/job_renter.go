@@ -167,6 +167,65 @@ func createTempFile(dir, fileNamePattern string, fileSize uint64) (absFilePath s
 	return absFilePath, merkleRoot, nil
 }
 
+// downloadFile is a helper function to download the given file from the
+// network to the given path.
+func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string) error {
+	siaPath := fileToDownload.SiaPath
+	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.staticJR.staticSiaDirectory, siaPath, destPath)
+	_, err := r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
+	if err != nil {
+		return errors.AddContext(err, "failed in call to /renter/download")
+	}
+
+	// Wait for the file to appear in the download queue
+	start := time.Now()
+	for {
+		select {
+		case <-r.staticJR.StaticTG.StopChan():
+			return nil
+		case <-time.After(fileApearInDownloadListFrequency):
+		}
+
+		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		if err != nil {
+			return errors.AddContext(err, "error checking renter download queue")
+		}
+		if hasFile {
+			break
+		}
+		if time.Since(start) > fileAppearInDownloadListTimeout {
+			return fmt.Errorf("file %v hasn't apear in renter download list within %v timeout", siaPath, fileAppearInDownloadListTimeout)
+		}
+	}
+
+	// Wait for the file to be finished downloading with a timeout
+	start = time.Now()
+	for {
+		select {
+		case <-r.staticJR.StaticTG.StopChan():
+			return nil
+		case <-time.After(downloadFileCheckFrequency):
+		}
+
+		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		if err != nil {
+			return errors.AddContext(err, "error checking renter download queue")
+		}
+		if hasFile && info.Received == info.Filesize {
+			break
+		} else if !hasFile {
+			log.Printf("[INFO] [renter] [%v] file unexpectedly missing from download list\n", r.staticJR.staticSiaDirectory)
+		} else {
+			log.Printf("[INFO] [renter] [%v] currently downloading %v, received %v bytes\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, info.Received)
+		}
+		if time.Since(start) > downloadFileTimeout {
+			return fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
+		}
+	}
+	log.Printf("[INFO] [renter] [%v]: successfully downloaded %v to %v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
+	return nil
+}
+
 // isFileInDownloads grabs the files currently being downloaded by the
 // renter and returns bool `true` if fileToDownload exists in the
 // download list.  It also returns the DownloadInfo for the requested `file`.
@@ -345,7 +404,8 @@ func (r *RenterJob) managedDeleteRandom() error {
 	return nil
 }
 
-// ManagedDownload xxx
+// ManagedDownload will managed download the given file from the network to the
+// given destination path
 func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destPath string) error {
 	err := r.staticJR.StaticTG.Add()
 	if err != nil {
@@ -385,60 +445,12 @@ func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destPath string) er
 		return errors.AddContext(err, "error creating destination directory")
 	}
 
-	// Start download
-	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.staticJR.staticSiaDirectory, siaPath, destPath)
-	//xxx disable local fetch
-	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
+	// Download the file
+	err = downloadFile(r, fileToDownload, destPath)
 	if err != nil {
-		return errors.AddContext(err, "failed in call to /renter/download")
+		return errors.AddContext(err, "failed to download the file")
 	}
 
-	// Wait for the file to appear in the download queue
-	start := time.Now()
-	for {
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return nil
-		case <-time.After(fileApearInDownloadListFrequency):
-		}
-
-		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
-		if err != nil {
-			return errors.AddContext(err, "error checking renter download queue")
-		}
-		if hasFile {
-			break
-		}
-		if time.Since(start) > fileAppearInDownloadListTimeout {
-			return fmt.Errorf("File %v hasn't apear in renter download list within %v timeout", siaPath, fileAppearInDownloadListTimeout)
-		}
-	}
-
-	// Wait for the file to be finished downloading with a timeout
-	start = time.Now()
-	for {
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return nil
-		case <-time.After(downloadFileCheckFrequency):
-		}
-
-		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
-		if err != nil {
-			return errors.AddContext(err, "error checking renter download queue")
-		}
-		if hasFile && info.Received == info.Filesize {
-			break
-		} else if !hasFile {
-			log.Printf("[INFO] [renter] [%v] file unexpectedly missing from download list\n", r.staticJR.staticSiaDirectory)
-		} else {
-			log.Printf("[INFO] [renter] [%v] currently downloading %v, received %v bytes\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, info.Received)
-		}
-		if time.Since(start) > downloadFileTimeout {
-			return fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
-		}
-	}
-	log.Printf("[INFO] [renter] [%v]: successfully downloaded %v to %v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
 	return nil
 }
 
@@ -481,61 +493,12 @@ func (r *RenterJob) managedDownloadRandomFile() error {
 	destPath, _ := filepath.Abs(f.Name())
 	os.Remove(destPath)
 
-	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, destPath)
-
-	_, err = r.staticJR.staticClient.RenterDownloadGet(fileToDownload.SiaPath, destPath, 0, fileToDownload.Filesize, true, false)
+	// Download the file
+	err = downloadFile(r, fileToDownload, destPath)
 	if err != nil {
-		return fmt.Errorf("failed in call to /renter/download: %v", err)
+		return errors.AddContext(err, "failed to download the file")
 	}
 
-	// Wait for the file to appear in the download list
-	success := false
-	for start := time.Now(); time.Since(start) < fileAppearInDownloadListTimeout; {
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return nil
-		case <-time.After(fileApearInDownloadListFrequency):
-		}
-
-		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
-		if err != nil {
-			return fmt.Errorf("error waiting for the file to appear in the download queue: %v", err)
-		}
-		if hasFile {
-			success = true
-			break
-		}
-	}
-	if !success {
-		return fmt.Errorf("file %v did not appear in the renter download queue", fileToDownload.SiaPath)
-	}
-
-	// Wait for the file to be finished downloading, with a timeout of 15 minutes.
-	success = false
-	for start := time.Now(); time.Since(start) < downloadFileTimeout; {
-		select {
-		case <-r.staticJR.StaticTG.StopChan():
-			return nil
-		case <-time.After(downloadFileCheckFrequency):
-		}
-
-		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
-		if err != nil {
-			return fmt.Errorf("error waiting for the file to disappear from the download queue: %v", err)
-		}
-		if hasFile && info.Received == info.Filesize {
-			success = true
-			break
-		} else if !hasFile {
-			log.Printf("[INFO] [renter] [%v]: file unexpectedly missing from download list\n", r.staticJR.staticSiaDirectory)
-		} else {
-			log.Printf("[INFO] [renter] [%v]: currently downloading %v, received %v bytes\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, info.Received)
-		}
-	}
-	if !success {
-		return fmt.Errorf("file %v did not complete downloading", fileToDownload.SiaPath)
-	}
-	log.Printf("[INFO] [renter] [%v]: successfully downloaded %v to %v\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, destPath)
 	return nil
 }
 

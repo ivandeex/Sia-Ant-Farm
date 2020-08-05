@@ -59,7 +59,9 @@ func (j *JobRunner) Stop() {
 	j.StaticTG.Stop()
 }
 
-// WaitForRenterUploadReady xxx
+// WaitForRenterUploadReady waits for renter upload ready with a given timeout
+// if the ant has renter job. If the ant doesn't have renter job, it returns an
+// error.
 func (j *JobRunner) WaitForRenterUploadReady(timeout time.Duration) error {
 	if !j.staticAnt.HasRenterTypeJob() {
 		return errors.New("this ant hasn't renter job")
