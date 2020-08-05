@@ -124,7 +124,7 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	}
 
 	if config.DesiredCurrency != 0 {
-		go j.balanceMaintainer(antsSyncWG, types.SiacoinPrecision.Mul64(config.DesiredCurrency))
+		go j.balanceMaintainer(types.SiacoinPrecision.Mul64(config.DesiredCurrency))
 	}
 
 	return &Ant{

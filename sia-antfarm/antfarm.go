@@ -132,7 +132,7 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	return farm, nil
 }
 
-// waitForAntsToSync waits a given timeout for all ants to be synced
+// waitForAntsToSync waits for all ants to be synced with a given tmeout
 func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
 	for {
