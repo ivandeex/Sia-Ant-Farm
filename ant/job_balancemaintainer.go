@@ -2,6 +2,7 @@ package ant
 
 import (
 	"log"
+	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -19,7 +20,7 @@ const (
 
 // balanceMaintainer mines when the balance is below desiredBalance. The miner
 // is stopped if the balance exceeds the desired balance.
-func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
+func (j *JobRunner) balanceMaintainer(antsSyncWG *sync.WaitGroup, desiredBalance types.Currency) {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -27,7 +28,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	AntsSyncWG.Wait()
+	antsSyncWG.Wait()
 
 	minerRunning := true
 	err = j.staticClient.MinerStartGet()

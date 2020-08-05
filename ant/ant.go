@@ -15,12 +15,6 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 )
 
-var (
-	// AntsSyncWG is a waitgroup to wait for all ants to be in sync and then
-	// start ant jobs
-	AntsSyncWG sync.WaitGroup
-)
-
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
 type AntConfig struct {
@@ -81,7 +75,7 @@ func clearPorts(config AntConfig) error {
 }
 
 // New creates a new Ant using the configuration passed through `config`.
-func New(config AntConfig) (*Ant, error) {
+func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	// Create ant working dir if it doesn't exist
 	// (e.g. ant farm deleted the whole farm dir)
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
@@ -117,20 +111,20 @@ func New(config AntConfig) (*Ant, error) {
 	for _, job := range config.Jobs {
 		switch job {
 		case "miner":
-			go j.blockMining()
+			go j.blockMining(antsSyncWG)
 		case "host":
-			go j.jobHost()
+			go j.jobHost(antsSyncWG)
 		case "renter":
-			go j.renter(false)
+			go j.renter(antsSyncWG, false)
 		case "autoRenter":
-			go j.renter(true)
+			go j.renter(antsSyncWG, true)
 		case "gateway":
-			go j.gatewayConnectability()
+			go j.gatewayConnectability(antsSyncWG)
 		}
 	}
 
 	if config.DesiredCurrency != 0 {
-		go j.balanceMaintainer(types.SiacoinPrecision.Mul64(config.DesiredCurrency))
+		go j.balanceMaintainer(antsSyncWG, types.SiacoinPrecision.Mul64(config.DesiredCurrency))
 	}
 
 	return &Ant{
@@ -188,26 +182,26 @@ func (a *Ant) HasRenterTypeJob() bool {
 
 // StartJob starts the job indicated by `job` after an ant has been
 // initialized. Arguments are passed to the job using args.
-func (a *Ant) StartJob(job string, args ...interface{}) error {
+func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface{}) error {
 	if a.Jr == nil {
 		return errors.New("ant is not running")
 	}
 
 	switch job {
 	case "miner":
-		go a.Jr.blockMining()
+		go a.Jr.blockMining(antsSyncWG)
 	case "host":
-		go a.Jr.jobHost()
+		go a.Jr.jobHost(antsSyncWG)
 	case "renter":
-		go a.Jr.renter(false)
+		go a.Jr.renter(antsSyncWG, false)
 	case "autoRenter":
-		go a.Jr.renter(true)
+		go a.Jr.renter(antsSyncWG, true)
 	case "gateway":
-		go a.Jr.gatewayConnectability()
+		go a.Jr.gatewayConnectability(antsSyncWG)
 	case "bigspender":
-		go a.Jr.bigSpender()
+		go a.Jr.bigSpender(antsSyncWG)
 	case "littlesupplier":
-		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
+		go a.Jr.littleSupplier(antsSyncWG, args[0].(types.UnlockHash))
 	default:
 		return errors.New("no such job")
 	}

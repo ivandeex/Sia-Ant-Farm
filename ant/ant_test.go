@@ -1,6 +1,7 @@
 package ant
 
 import (
+	"sync"
 	"testing"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
@@ -25,7 +26,7 @@ func TestNewAnt(t *testing.T) {
 	config := newTestingAntConfig(datadir)
 
 	// Create Ant
-	ant, err := New(config)
+	ant, err := New(&sync.WaitGroup{}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -57,14 +58,14 @@ func TestStartJob(t *testing.T) {
 	config := newTestingAntConfig(datadir)
 
 	// Create Ant
-	ant, err := New(config)
+	ant, err := New(&sync.WaitGroup{}, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer ant.Close()
 
 	// Nonexistent job should throw an error
-	err = ant.StartJob("thisjobdoesnotexist")
+	err = ant.StartJob(&sync.WaitGroup{}, "thisjobdoesnotexist")
 	if err == nil {
 		t.Fatal("StartJob should return an error with a nonexistent job")
 	}
@@ -82,7 +83,7 @@ func TestWalletAddress(t *testing.T) {
 	config := newTestingAntConfig(datadir)
 
 	// Create Ant
-	ant, err := New(config)
+	ant, err := New(&sync.WaitGroup{}, config)
 	if err != nil {
 		t.Fatal(err)
 	}

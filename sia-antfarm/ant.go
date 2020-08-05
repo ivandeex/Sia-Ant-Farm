@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
@@ -119,7 +119,7 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
-func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
+func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) ([]*ant.Ant, error) {
 	var ants []*ant.Ant
 	var err error
 
@@ -146,7 +146,7 @@ func startAnts(configs ...ant.AntConfig) ([]*ant.Ant, error) {
 		}
 
 		// Create Ant
-		ant, err := ant.New(cfg)
+		ant, err := ant.New(antsSyncWG, cfg)
 		if err != nil {
 			return nil, errors.AddContext(err, "unable to create ant")
 		}
@@ -209,7 +209,7 @@ func getClient(APIAddr, APIPassword string) (*client.Client, error) {
 }
 
 // startJobs starts all the jobs for each ant.
-func startJobs(ants ...*ant.Ant) error {
+func startJobs(antsSyncWG *sync.WaitGroup, ants ...*ant.Ant) error {
 	// first, pull out any constants needed for the jobs
 	var spenderAddress *types.UnlockHash
 	for _, ant := range ants {
@@ -227,14 +227,14 @@ func startJobs(ants ...*ant.Ant) error {
 	for _, ant := range ants {
 		for _, job := range ant.Config.Jobs {
 			if job == "bigspender" {
-				ant.StartJob(job)
+				ant.StartJob(antsSyncWG, job)
 			}
 			if job == "littlesupplier" && spenderAddress != nil {
-				err := ant.StartJob(job, *spenderAddress)
+				err := ant.StartJob(antsSyncWG, job, *spenderAddress)
 				if err != nil {
 					return err
 				}
-				err = ant.StartJob("miner")
+				err = ant.StartJob(antsSyncWG, "miner")
 				if err != nil {
 					return err
 				}
@@ -341,38 +341,4 @@ func myExternalIP() (string, error) {
 	}
 	// trim newline
 	return strings.TrimSpace(string(buf)), nil
-}
-
-// waitForAntsToSync waits a given timeout for all ants to be synced
-func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
-	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
-	for {
-		// Check sync status
-		groups, err := antConsensusGroups(ants...)
-		if err != nil {
-			return errors.AddContext(err, "unable to get consensus groups")
-		}
-
-		// We have reached ants sync
-		if len(groups) == 1 {
-			break
-		}
-
-		// Wait for jobs stop, timout or sleep
-		select {
-		case <-ants[0].Jr.StaticTG.StopChan():
-			// Jobs were stopped, do not wait anymore
-			ant.AntsSyncWG.Done()
-			return errors.New("jobs were stopped")
-		case <-time.After(timeout):
-			// We have reached the timeout
-			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
-			return errors.New(msg)
-		case <-time.After(waitForAntsToSyncFrequency):
-			// Continue waiting for sync after sleep
-		}
-	}
-	log.Println("[INFO] [ant-farm] all ants are now synced")
-	ant.AntsSyncWG.Done()
-	return nil
 }
