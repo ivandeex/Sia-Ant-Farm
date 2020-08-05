@@ -135,6 +135,7 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 // waitForAntsToSync waits for all ants to be synced with a given tmeout
 func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
+	start := time.Now()
 	for {
 		// Check sync status
 		groups, err := antConsensusGroups(ants...)
@@ -147,15 +148,16 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 			break
 		}
 
+		// We have reached timeout
+		if time.Since(start) > timeout {
+			return fmt.Errorf("ants didn't synced within %v timeout", timeout)
+		}
+
 		// Wait for jobs stop, timout or sleep
 		select {
 		case <-ants[0].Jr.StaticTG.StopChan():
 			// Jobs were stopped, do not wait anymore
 			return errors.New("jobs were stopped")
-		case <-time.After(timeout):
-			// We have reached the timeout
-			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
-			return errors.New(msg)
 		case <-time.After(waitForAntsToSyncFrequency):
 			// Continue waiting for sync after sleep
 		}
