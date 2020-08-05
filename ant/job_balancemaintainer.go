@@ -2,7 +2,6 @@ package ant
 
 import (
 	"log"
-	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/types"
