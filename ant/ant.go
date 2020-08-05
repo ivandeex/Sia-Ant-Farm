@@ -215,15 +215,6 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 	return nil
 }
 
-// UploadFile xxx
-func (a *Ant) UploadFile(filePath string) error {
-	if a.Jr == nil {
-		return errors.New("ant is not running")
-	}
-
-	return nil
-}
-
 // WalletAddress returns a wallet address that this ant can receive coins on.
 func (a *Ant) WalletAddress() (*types.UnlockHash, error) {
 	if a.Jr == nil {

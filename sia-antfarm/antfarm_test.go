@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -156,7 +155,6 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	}
 }
 
-//xxx
 // TestVerifyUploadDownloadFileData uploads and downloads a file and checks
 // that their content is identical by comparing their merkle root hashes
 func TestVerifyUploadDownloadFileData(t *testing.T) {
@@ -269,9 +267,8 @@ func TestVerifyUploadDownloadFileData(t *testing.T) {
 	}
 
 	// Download the file
-	destDir := filepath.Join(renterAnt.Config.DataDir, "downloadedFiles")
-	destFilenamePattern := "downloadedFile"
-	destPath, err := renterJob.ManagedDownload(siaPath, destDir, destFilenamePattern)
+	destPath := filepath.Join(renterAnt.Config.DataDir, "downloadedFiles", "downloadedFile")
+	err = renterJob.ManagedDownload(siaPath, destPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -303,8 +300,6 @@ func TestVerifyUploadDownloadFileData(t *testing.T) {
 		t.Fatal(err)
 	}
 	downloadedFileHash := renterJob.Files[0].MerkleRoot
-	log.Println("xxx sh:", sourceFileHash)
-	log.Println("xxx dh:", downloadedFileHash)
 	if sourceFileHash != downloadedFileHash {
 		t.Error("Source file hash doesn't equal downloaded file hash")
 	}

@@ -203,7 +203,7 @@ func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
 	return
 }
 
-// NewRenterJob xxx
+// NewRenterJob returns new renter job
 func (j *JobRunner) NewRenterJob() RenterJob {
 	return RenterJob{
 		staticJR: j,
@@ -346,17 +346,17 @@ func (r *RenterJob) managedDeleteRandom() error {
 }
 
 // ManagedDownload xxx
-func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destDir, destFilenamePattern string) (destPath string, err error) {
-	err = r.staticJR.StaticTG.Add()
+func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destPath string) error {
+	err := r.staticJR.StaticTG.Add()
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer r.staticJR.StaticTG.Done()
 
 	// Check file is in renter file list and is available
 	renterFiles, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
 	if err != nil {
-		return "", fmt.Errorf("error calling /renter/files: %v", err)
+		return errors.AddContext(err, "error calling /renter/files")
 	}
 	var fileToDownload modules.FileInfo
 	for _, file := range renterFiles.Files {
@@ -366,36 +366,31 @@ func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destDir, destFilena
 		}
 	}
 	if fileToDownload.SiaPath != siaPath {
-		return "", fmt.Errorf("file %v is not in renter file list", siaPath)
+		return fmt.Errorf("file %v is not in renter file list", siaPath)
 	}
 	if !fileToDownload.Available {
-		return "", fmt.Errorf("file %v is in renter file list, but is not available to download", siaPath)
+		return fmt.Errorf("file %v is in renter file list, but is not available to download", siaPath)
 	}
 
-	// Use ioutil.TempFile to get a random temporary filename
-	//xxx mkdirall
+	// Delete file if it exists
+	err = os.Remove(destPath)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.AddContext(err, "error deleting destination file")
+	}
+
+	// Create destination directory if it doesn't exist
+	destDir := filepath.Dir(destPath)
 	err = os.MkdirAll(destDir, 0700)
 	if err != nil {
-		return "", errors.AddContext(err, "failed to create directory for download file")
+		return errors.AddContext(err, "error creating destination directory")
 	}
-	// xxx destDir + destFilenamePattern
-	f, err := ioutil.TempFile(destDir, destFilenamePattern)
-	if err != nil {
-		return "", errors.AddContext(err, "failed to create temporary file for download")
-	}
-	defer f.Close()
-	destPath, err = filepath.Abs(f.Name())
-	if err != nil {
-		return "", errors.AddContext(err, "couldn't get destination path")
-	}
-	os.Remove(destPath)
 
 	// Start download
 	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.staticJR.staticSiaDirectory, siaPath, destPath)
 	//xxx disable local fetch
 	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
 	if err != nil {
-		return "", errors.AddContext(err, "failed in call to /renter/download")
+		return errors.AddContext(err, "failed in call to /renter/download")
 	}
 
 	// Wait for the file to appear in the download queue
@@ -403,19 +398,19 @@ func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destDir, destFilena
 	for {
 		select {
 		case <-r.staticJR.StaticTG.StopChan():
-			return "", nil
+			return nil
 		case <-time.After(fileApearInDownloadListFrequency):
 		}
 
 		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
 		if err != nil {
-			return "", errors.AddContext(err, "error checking renter download queue")
+			return errors.AddContext(err, "error checking renter download queue")
 		}
 		if hasFile {
 			break
 		}
 		if time.Since(start) > fileAppearInDownloadListTimeout {
-			return "", fmt.Errorf("File %v hasn't apear in renter download list within %v timeout", siaPath, fileAppearInDownloadListTimeout)
+			return fmt.Errorf("File %v hasn't apear in renter download list within %v timeout", siaPath, fileAppearInDownloadListTimeout)
 		}
 	}
 
@@ -424,13 +419,13 @@ func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destDir, destFilena
 	for {
 		select {
 		case <-r.staticJR.StaticTG.StopChan():
-			return "", nil
+			return nil
 		case <-time.After(downloadFileCheckFrequency):
 		}
 
 		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
 		if err != nil {
-			return "", errors.AddContext(err, "error checking renter download queue")
+			return errors.AddContext(err, "error checking renter download queue")
 		}
 		if hasFile && info.Received == info.Filesize {
 			break
@@ -440,11 +435,11 @@ func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destDir, destFilena
 			log.Printf("[INFO] [renter] [%v] currently downloading %v, received %v bytes\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, info.Received)
 		}
 		if time.Since(start) > downloadFileTimeout {
-			return "", fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
+			return fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
 		}
 	}
 	log.Printf("[INFO] [renter] [%v]: successfully downloaded %v to %v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
-	return destPath, nil
+	return nil
 }
 
 // managedDownloadRandomFile will managed download a random file from the network.
