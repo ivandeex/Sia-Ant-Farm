@@ -103,10 +103,21 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 		}
 	}()
 
-	j, err := newJobRunner(antsSyncWG, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
+	ant := &Ant{
+		APIAddr: config.APIAddr,
+		RPCAddr: config.RPCAddr,
+		Config:  config,
+
+		siad: siad,
+
+		SeenBlocks: make(map[types.BlockHeight]types.BlockID),
+	}
+
+	j, err := newJobRunner(antsSyncWG, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
+	ant.Jr = j
 
 	for _, job := range config.Jobs {
 		switch job {
@@ -115,8 +126,10 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 		case "host":
 			go j.jobHost()
 		case "renter":
+			j.renterUploadReadyWG.Add(1)
 			go j.renter(false)
 		case "autoRenter":
+			j.renterUploadReadyWG.Add(1)
 			go j.renter(true)
 		case "gateway":
 			go j.gatewayConnectability()
@@ -127,16 +140,7 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 		go j.balanceMaintainer(types.SiacoinPrecision.Mul64(config.DesiredCurrency))
 	}
 
-	return &Ant{
-		APIAddr: config.APIAddr,
-		RPCAddr: config.RPCAddr,
-		Config:  config,
-
-		siad: siad,
-		Jr:   j,
-
-		SeenBlocks: make(map[types.BlockHeight]types.BlockID),
-	}, nil
+	return ant, nil
 }
 
 // PrintJSON is a wrapper for json.MarshalIndent
@@ -193,8 +197,10 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 	case "host":
 		go a.Jr.jobHost()
 	case "renter":
+		a.Jr.renterUploadReadyWG.Add(1)
 		go a.Jr.renter(false)
 	case "autoRenter":
+		a.Jr.renterUploadReadyWG.Add(1)
 		go a.Jr.renter(true)
 	case "gateway":
 		go a.Jr.gatewayConnectability()
@@ -204,6 +210,15 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
 	default:
 		return errors.New("no such job")
+	}
+
+	return nil
+}
+
+// UploadFile xxx
+func (a *Ant) UploadFile(filePath string) error {
+	if a.Jr == nil {
+		return errors.New("ant is not running")
 	}
 
 	return nil

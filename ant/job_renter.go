@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/merkletree"
 
 	"gitlab.com/NebulousLabs/Sia/crypto"
@@ -122,20 +123,48 @@ var (
 	requiredInitialBalance = types.NewCurrency64(100e3).Mul(types.SiacoinPrecision)
 )
 
-// renterFile stores the location and checksum of a file active on the renter.
-type renterFile struct {
-	merkleRoot crypto.Hash
-	sourceFile string
+// RenterFile stores the location and checksum of a file active on the renter.
+type RenterFile struct {
+	MerkleRoot crypto.Hash
+	SourceFile string
 }
 
-// renterJob contains statefulness that is used to drive the renter. Most
+// RenterJob contains statefulness that is used to drive the renter. Most
 // importantly, it contains a list of files that the renter is currently
 // uploading to the network.
-type renterJob struct {
-	files []renterFile
+type RenterJob struct {
+	Files []RenterFile
 
 	staticJR *JobRunner
 	mu       sync.Mutex
+}
+
+// createTempFile creates temporary file in the given temporary sub-directory,
+// with the given filename pattern. The file is filled with random data of the
+// given length.
+func createTempFile(dir, fileNamePattern string, fileSize uint64) (absFilePath string, merkleRoot crypto.Hash, err error) {
+	err = os.MkdirAll(dir, 0700)
+	if err != nil {
+		return "", crypto.Hash{}, fmt.Errorf("error creating an upload directory: %v", err)
+	}
+	f, err := ioutil.TempFile(dir, fileNamePattern)
+	if err != nil {
+		return "", crypto.Hash{}, fmt.Errorf("error creating temp file: %v", err)
+	}
+	defer f.Close()
+
+	absFilePath, err = filepath.Abs(f.Name())
+	if err != nil {
+		return "", crypto.Hash{}, fmt.Errorf("error getting temp file absolute path: %v", err)
+	}
+
+	// Fill the file with random data.
+	merkleRoot, err = randFillFile(f, fileSize)
+	if err != nil {
+		return "", crypto.Hash{}, fmt.Errorf("error filling file with random data: %v", err)
+	}
+
+	return absFilePath, merkleRoot, nil
 }
 
 // isFileInDownloads grabs the files currently being downloaded by the
@@ -159,19 +188,36 @@ func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.
 	return hasFile, dlinfo, nil
 }
 
+// MerkleRoot calculates merkle root of the file given in reader
+func MerkleRoot(r io.Reader) (h crypto.Hash, err error) {
+	root, err := merkletree.ReaderRoot(r, crypto.NewHash(), crypto.SegmentSize)
+	copy(h[:], root)
+	return
+}
+
 // randFillFile will append 'size' bytes to the input file, returning the
 // merkle root of the bytes that were appended.
 func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
 	tee := io.TeeReader(io.LimitReader(fastrand.Reader, int64(size)), f)
-	root, err := merkletree.ReaderRoot(tee, crypto.NewHash(), crypto.SegmentSize)
-	copy(h[:], root)
+	h, err = MerkleRoot(tee)
 	return
+}
+
+// NewRenterJob xxx
+func (j *JobRunner) NewRenterJob() RenterJob {
+	return RenterJob{
+		staticJR: j,
+	}
 }
 
 // renter blocks until renter has a sufficiently full wallet, the allowance is
 // set, and until renter is upload ready. Then it optionally starts periodic
 // uploader, downloader and deleter jobs.
 func (j *JobRunner) renter(startBackgroundJobs bool) {
+	// When this function finishes, the renter is upload ready or the ant was
+	// stopped
+	defer j.renterUploadReadyWG.Done()
+
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -182,9 +228,7 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 	j.staticAntsSyncWG.Wait()
 
 	// Start basic renter
-	rj := renterJob{
-		staticJR: j,
-	}
+	rj := j.NewRenterJob()
 
 	// Block until a minimum threshold of coins have been mined.
 	start := time.Now()
@@ -275,18 +319,18 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 }
 
 // managedDeleteRandom deletes a random file from the renter.
-func (r *renterJob) managedDeleteRandom() error {
+func (r *RenterJob) managedDeleteRandom() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	// no-op with fewer than 10 files
-	if len(r.files) < deleteFileThreshold {
+	if len(r.Files) < deleteFileThreshold {
 		return nil
 	}
 
-	randindex := fastrand.Intn(len(r.files))
+	randindex := fastrand.Intn(len(r.Files))
 
-	path, err := modules.NewSiaPath(r.files[randindex].sourceFile)
+	path, err := modules.NewSiaPath(r.Files[randindex].SourceFile)
 	if err != nil {
 		return err
 	}
@@ -295,14 +339,116 @@ func (r *renterJob) managedDeleteRandom() error {
 	}
 
 	log.Printf("[%v jobStorageRenter INFO]: successfully deleted file\n", r.staticJR.staticSiaDirectory)
-	os.Remove(r.files[randindex].sourceFile)
-	r.files = append(r.files[:randindex], r.files[randindex+1:]...)
+	os.Remove(r.Files[randindex].SourceFile)
+	r.Files = append(r.Files[:randindex], r.Files[randindex+1:]...)
 
 	return nil
 }
 
-// managedDownload will managedDownload a random file from the network.
-func (r *renterJob) managedDownload() error {
+// ManagedDownload xxx
+func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destDir, destFilenamePattern string) (destPath string, err error) {
+	err = r.staticJR.StaticTG.Add()
+	if err != nil {
+		return "", err
+	}
+	defer r.staticJR.StaticTG.Done()
+
+	// Check file is in renter file list and is available
+	renterFiles, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
+	if err != nil {
+		return "", fmt.Errorf("error calling /renter/files: %v", err)
+	}
+	var fileToDownload modules.FileInfo
+	for _, file := range renterFiles.Files {
+		if file.SiaPath == siaPath {
+			fileToDownload = file
+			break
+		}
+	}
+	if fileToDownload.SiaPath != siaPath {
+		return "", fmt.Errorf("file %v is not in renter file list", siaPath)
+	}
+	if !fileToDownload.Available {
+		return "", fmt.Errorf("file %v is in renter file list, but is not available to download", siaPath)
+	}
+
+	// Use ioutil.TempFile to get a random temporary filename
+	//xxx mkdirall
+	err = os.MkdirAll(destDir, 0700)
+	if err != nil {
+		return "", errors.AddContext(err, "failed to create directory for download file")
+	}
+	// xxx destDir + destFilenamePattern
+	f, err := ioutil.TempFile(destDir, destFilenamePattern)
+	if err != nil {
+		return "", errors.AddContext(err, "failed to create temporary file for download")
+	}
+	defer f.Close()
+	destPath, err = filepath.Abs(f.Name())
+	if err != nil {
+		return "", errors.AddContext(err, "couldn't get destination path")
+	}
+	os.Remove(destPath)
+
+	// Start download
+	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.staticJR.staticSiaDirectory, siaPath, destPath)
+	//xxx disable local fetch
+	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
+	if err != nil {
+		return "", errors.AddContext(err, "failed in call to /renter/download")
+	}
+
+	// Wait for the file to appear in the download queue
+	start := time.Now()
+	for {
+		select {
+		case <-r.staticJR.StaticTG.StopChan():
+			return "", nil
+		case <-time.After(fileApearInDownloadListFrequency):
+		}
+
+		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		if err != nil {
+			return "", errors.AddContext(err, "error checking renter download queue")
+		}
+		if hasFile {
+			break
+		}
+		if time.Since(start) > fileAppearInDownloadListTimeout {
+			return "", fmt.Errorf("File %v hasn't apear in renter download list within %v timeout", siaPath, fileAppearInDownloadListTimeout)
+		}
+	}
+
+	// Wait for the file to be finished downloading with a timeout
+	start = time.Now()
+	for {
+		select {
+		case <-r.staticJR.StaticTG.StopChan():
+			return "", nil
+		case <-time.After(downloadFileCheckFrequency):
+		}
+
+		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		if err != nil {
+			return "", errors.AddContext(err, "error checking renter download queue")
+		}
+		if hasFile && info.Received == info.Filesize {
+			break
+		} else if !hasFile {
+			log.Printf("[INFO] [renter] [%v] file unexpectedly missing from download list\n", r.staticJR.staticSiaDirectory)
+		} else {
+			log.Printf("[INFO] [renter] [%v] currently downloading %v, received %v bytes\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, info.Received)
+		}
+		if time.Since(start) > downloadFileTimeout {
+			return "", fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
+		}
+	}
+	log.Printf("[INFO] [renter] [%v]: successfully downloaded %v to %v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
+	return destPath, nil
+}
+
+// managedDownloadRandomFile will managed download a random file from the network.
+func (r *RenterJob) managedDownloadRandomFile() error {
 	err := r.staticJR.StaticTG.Add()
 	if err != nil {
 		return err
@@ -398,95 +544,89 @@ func (r *renterJob) managedDownload() error {
 	return nil
 }
 
-// managedUpload will managedUpload a file to the network. If the api reports that there are
+// ManagedUpload will ManagedUpload a file to the network. If the api reports that there are
 // more than 10 files successfully uploaded, then a file is deleted at random.
-func (r *renterJob) managedUpload() error {
-	err := r.staticJR.StaticTG.Add()
+func (r *RenterJob) ManagedUpload(fileSize uint64) (siaPath modules.SiaPath, err error) {
+	err = r.staticJR.StaticTG.Add()
 	if err != nil {
-		return err
+		return modules.SiaPath{}, err
 	}
 	defer r.staticJR.StaticTG.Done()
 
 	// Generate some random data to upload. The file needs to be closed before
-	// the upload to the network starts, so this code is wrapped in a func such
-	// that a `defer Close()` can be used on the file.
+	// the upload to the network starts.
 	log.Printf("[INFO] [renter] [%v] File upload preparation beginning.\n", r.staticJR.staticSiaDirectory)
-	var sourcePath string
-	var merkleRoot crypto.Hash
-	success, err := func() (bool, error) {
-		f, err := ioutil.TempFile(filepath.Join(r.staticJR.staticSiaDirectory, "renterSourceFiles"), "renterFile")
-		if err != nil {
-			return false, fmt.Errorf("unable to open tmp file for renter source file: %v", err)
-		}
-		defer f.Close()
-		sourcePath, _ = filepath.Abs(f.Name())
-
-		// Fill the file with random data.
-		merkleRoot, err = randFillFile(f, uploadFileSize)
-		if err != nil {
-			return false, fmt.Errorf("unable to fill file with randomness: %v", err)
-		}
-		return true, nil
-	}()
-	if !success {
-		return err
+	tempSubDir := filepath.Join(r.staticJR.staticSiaDirectory, "renterSourceFiles")
+	pattern := "renterFile"
+	sourcePath, merkleRoot, err := createTempFile(tempSubDir, pattern, fileSize)
+	if err != nil {
+		return modules.SiaPath{}, errors.AddContext(err, "error creating file to upload")
 	}
 
-	siapath, err := modules.NewSiaPath(sourcePath)
+	// Get Sia path
+	siaPath, err = modules.NewSiaPath(sourcePath)
 	if err != nil {
-		return err
+		return modules.SiaPath{}, errors.AddContext(err, "error creating SiaPath")
 	}
 
 	// Add the file to the renter.
-	rf := renterFile{
-		merkleRoot: merkleRoot,
-		sourceFile: sourcePath,
+	rf := RenterFile{
+		MerkleRoot: merkleRoot,
+		SourceFile: sourcePath,
 	}
 	r.mu.Lock()
-	r.files = append(r.files, rf)
+	r.Files = append(r.Files, rf)
 	r.mu.Unlock()
 	log.Printf("[INFO] [renter] [%v] File upload preparation complete, beginning file upload.\n", r.staticJR.staticSiaDirectory)
 
-	// Upload the file to the network.
-	if err := r.staticJR.staticClient.RenterUploadPost(sourcePath, siapath, renterDataPieces, renterParityPieces); err != nil {
-		return fmt.Errorf("unable to upload file to network: %v", err)
+	// Upload the file to network
+	log.Printf("[INFO] [renter] [%v] Beginning file upload.\n", r.staticJR.staticSiaDirectory)
+	err = r.staticJR.staticClient.RenterUploadPost(sourcePath, siaPath, renterDataPieces, renterParityPieces)
+	if err != nil {
+		return modules.SiaPath{}, errors.AddContext(err, "error uploading a file to network")
 	}
 	log.Printf("[INFO] [renter] [%v] /renter/upload call completed successfully.  Waiting for the upload to complete\n", r.staticJR.staticSiaDirectory)
 
-	// Block until the upload has reached 100%.
-	uploadProgress := 0.0
-	for start := time.Now(); time.Since(start) < maxUploadTime; {
+	// Block until the upload has reached 100%
+	start := time.Now()
+	for {
 		select {
 		case <-r.staticJR.StaticTG.StopChan():
-			return nil
+			return modules.SiaPath{}, nil
 		case <-time.After(uploadFileCheckFrequency):
 		}
 
 		rfg, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
 		if err != nil {
-			return fmt.Errorf("error calling /renter/files: %v", err)
+			return modules.SiaPath{}, errors.AddContext(err, "error calling /renter/files")
 		}
 
+		// Check upload progress
+		var uploadProgress float64
 		for _, file := range rfg.Files {
-			if file.SiaPath == siapath {
+			if file.SiaPath == siaPath {
 				uploadProgress = file.UploadProgress
+				break
 			}
 		}
-		log.Printf("[INFO] [renter] [%v]: upload progress: %v%%\n", r.staticJR.staticSiaDirectory, uploadProgress)
+		log.Printf("[INFO] [renter] [%v] upload progress: %v%%\n", r.staticJR.staticSiaDirectory, uploadProgress)
 		if uploadProgress == 100 {
+			// The file has finished uploading
 			break
 		}
+
+		// Check timeout
+		if time.Since(start) > maxUploadTime {
+			return modules.SiaPath{}, fmt.Errorf("file with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v", siaPath, maxUploadTime, uploadProgress)
+		}
 	}
-	if uploadProgress < 100 {
-		return fmt.Errorf("file with siapath %v could not be fully uploaded after 10 minutes.  progress reached: %v", siapath, uploadProgress)
-	}
-	log.Printf("[INFO] [renter] [%v]: file has been successfully uploaded to 100%%.\n", r.staticJR.staticSiaDirectory)
-	return nil
+	log.Printf("[INFO] [renter] [%v] file has been successfully uploaded to 100%%.\n", r.staticJR.staticSiaDirectory)
+	return siaPath, nil
 }
 
 // threadedDeleter deletes one random file from the renter every 100 seconds
 // once 10 or more files have been uploaded.
-func (r *renterJob) threadedDeleter() {
+func (r *RenterJob) threadedDeleter() {
 	for {
 		select {
 		case <-r.staticJR.StaticTG.StopChan():
@@ -502,7 +642,7 @@ func (r *renterJob) threadedDeleter() {
 
 // threadedDownloader is a function that continuously runs for the renter job,
 // downloading a file at random every 400 seconds.
-func (r *renterJob) threadedDownloader() {
+func (r *RenterJob) threadedDownloader() {
 	// Wait for the first file to be uploaded before starting the download
 	// loop.
 	for {
@@ -513,7 +653,7 @@ func (r *renterJob) threadedDownloader() {
 		}
 
 		// Download a file.
-		if err := r.managedDownload(); err != nil {
+		if err := r.managedDownloadRandomFile(); err != nil {
 			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
 		}
 	}
@@ -522,7 +662,7 @@ func (r *renterJob) threadedDownloader() {
 // threadedUploader is a function that continuously runs for the renter job,
 // uploading a 500MB file every 240 seconds (10 blocks). The renter should have
 // already set an allowance.
-func (r *renterJob) threadedUploader() {
+func (r *RenterJob) threadedUploader() {
 	// Make the source files directory
 	os.Mkdir(filepath.Join(r.staticJR.staticSiaDirectory, "renterSourceFiles"), 0700)
 	for {
@@ -534,7 +674,7 @@ func (r *renterJob) threadedUploader() {
 		}
 
 		// Upload a file.
-		if err := r.managedUpload(); err != nil {
+		if _, err := r.ManagedUpload(uploadFileSize); err != nil {
 			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
 		}
 	}
