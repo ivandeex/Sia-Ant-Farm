@@ -72,7 +72,9 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	if config.APIPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}
-	cmd := exec.Command(config.SiadPath, args...) //nolint:gosec
+	// Start siad, allow absolute and relative paths in config.SiadPath
+	siadCommand := fmt.Sprintf("%v %v", config.SiadPath, strings.Join(args, " "))
+	cmd := exec.Command(os.Getenv("SHELL"), "-c", siadCommand) //nolint:gosec
 	cmd.Stderr = logfile
 	cmd.Stdout = logfile
 	if config.APIPassword != "" {
