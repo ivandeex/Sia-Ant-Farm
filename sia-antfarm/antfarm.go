@@ -80,7 +80,19 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	// Check whether UPnP is enabled on router
 	upnprouter.CheckUPnPEnabled()
 
-	// start up each ant process with its jobs
+	// Check ant names are unique
+	antCount := len(config.AntConfigs)
+	for i := 0; i < antCount-1; i++ {
+		for j := i + 1; j < antCount; j++ {
+			name1 := config.AntConfigs[i].Name
+			name2 := config.AntConfigs[j].Name
+			if name1 != "" && name1 == name2 {
+				return farm, fmt.Errorf("ant name %v is not unique", config.AntConfigs[i].Name)
+			}
+		}
+	}
+
+	// Start up each ant process with its jobs
 	ants, err := startAnts(&farm.antsSyncWG, config.AntConfigs...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start ants")
@@ -135,6 +147,7 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 // waitForAntsToSync waits for all ants to be synced with a given tmeout
 func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
+	start := time.Now()
 	for {
 		// Check sync status
 		groups, err := antConsensusGroups(ants...)
@@ -147,15 +160,16 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 			break
 		}
 
+		// We have reached timeout
+		if time.Since(start) > timeout {
+			return fmt.Errorf("ants didn't synced within %v timeout", timeout)
+		}
+
 		// Wait for jobs stop, timout or sleep
 		select {
 		case <-ants[0].Jr.StaticTG.StopChan():
 			// Jobs were stopped, do not wait anymore
 			return errors.New("jobs were stopped")
-		case <-time.After(timeout):
-			// We have reached the timeout
-			msg := fmt.Sprintf("ants didn't synced in %v", timeout)
-			return errors.New(msg)
 		case <-time.After(waitForAntsToSyncFrequency):
 			// Continue waiting for sync after sleep
 		}
@@ -192,6 +206,17 @@ func (af *antFarm) connectExternalAntfarm(externalAddress string) error {
 func (af *antFarm) ServeAPI() error {
 	http.Serve(af.apiListener, af.router)
 	return nil
+}
+
+// GetAntByName return the ant with the given name. If there is no ant with the
+// given name error is reported.
+func (af *antFarm) GetAntByName(name string) (foundAnt *ant.Ant, err error) {
+	for _, a := range af.ants {
+		if a.Config.Name == name {
+			return a, nil
+		}
+	}
+	return &ant.Ant{}, fmt.Errorf("ant with name %v doesn't exist", name)
 }
 
 // permanentSyncMonitor checks that all ants in the antFarm are on the same

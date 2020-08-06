@@ -7,7 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -247,23 +247,21 @@ func startJobs(antsSyncWG *sync.WaitGroup, ants ...*ant.Ant) error {
 // parseConfig takes an input `config` and fills it with default values if
 // required.
 func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
-	// if config.SiadConfig.DataDir isn't set, use ioutil.TempDir to create a new
-	// temporary directory.
-	if config.SiadConfig.DataDir == "" && config.Name == "" {
-		tempdir, err := ioutil.TempDir("./antfarm-data", "ant")
-		if err != nil {
-			return ant.AntConfig{}, err
-		}
-		config.SiadConfig.DataDir = tempdir
-	}
+	if config.SiadConfig.DataDir == "" {
+		// If DataDir is not set, use default parent directory
+		dir := "./antfarm-data"
 
-	if config.Name != "" {
-		siadir := fmt.Sprintf("./antfarm-data/%v", config.Name)
-		err := os.Mkdir(siadir, 0755)
-		if err != nil {
-			return ant.AntConfig{}, err
+		if config.Name == "" {
+			// Ant name was not set, use random temporary directory
+			tempDir, err := ioutil.TempDir(dir, "ant")
+			if err != nil {
+				return ant.AntConfig{}, fmt.Errorf("error creating temporary directory in %v: %v", dir, err)
+			}
+			config.SiadConfig.DataDir = tempDir
+		} else {
+			// Ant name was set, use ant name
+			config.SiadConfig.DataDir = filepath.Join(dir, config.Name)
 		}
-		config.SiadConfig.DataDir = siadir
 	}
 
 	if config.SiadPath == "" {
