@@ -168,6 +168,7 @@ func TestVerifyUploadDownloadFileData(t *testing.T) {
 	dataDir := test.TestDir(t.Name())
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
 	antDirs := test.AntDirs(dataDir, 7)
+	renterAntName := "Renter"
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,
 		DataDir:       antFarmDir,
@@ -241,6 +242,7 @@ func TestVerifyUploadDownloadFileData(t *testing.T) {
 				},
 				Jobs:            []string{"renter"},
 				DesiredCurrency: 100000,
+				Name:            renterAntName,
 			},
 		},
 		AutoConnect: true,
@@ -253,7 +255,10 @@ func TestVerifyUploadDownloadFileData(t *testing.T) {
 	defer farm.Close()
 
 	// Timeout the test if the renter doesn't becomes upload ready
-	renterAnt := farm.ants[6]
+	renterAnt, err := farm.GetAntByName(renterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
 	err = renterAnt.Jr.WaitForRenterUploadReady(time.Minute * 5)
 	if err != nil {
 		t.Fatal(err)
@@ -261,14 +266,14 @@ func TestVerifyUploadDownloadFileData(t *testing.T) {
 
 	// Upload a file
 	renterJob := renterAnt.Jr.NewRenterJob()
-	siaPath, err := renterJob.ManagedUpload(modules.SectorSize)
+	siaPath, err := renterJob.Upload(modules.SectorSize)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Download the file
 	destPath := filepath.Join(renterAnt.Config.DataDir, "downloadedFiles", "downloadedFile")
-	err = renterJob.ManagedDownload(siaPath, destPath)
+	err = renterJob.Download(siaPath, destPath)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -171,8 +171,12 @@ func createTempFile(dir, fileNamePattern string, fileSize uint64) (absFilePath s
 // network to the given path.
 func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string) error {
 	siaPath := fileToDownload.SiaPath
+	destPath, err := filepath.Abs(destPath)
+	if err != nil {
+		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
+	}
 	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.staticJR.staticSiaDirectory, siaPath, destPath)
-	_, err := r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
+	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
 	if err != nil {
 		return errors.AddContext(err, "failed in call to /renter/download")
 	}
@@ -275,6 +279,7 @@ func (j *JobRunner) NewRenterJob() RenterJob {
 func (j *JobRunner) renter(startBackgroundJobs bool) {
 	// When this function finishes, the renter is upload ready or the ant was
 	// stopped
+	j.renterUploadReadyWG.Add(1)
 	defer j.renterUploadReadyWG.Done()
 
 	err := j.StaticTG.Add()
@@ -377,8 +382,20 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 	}
 }
 
+// Download will download the given file from the network to the given
+// destination path.
+func (r *RenterJob) Download(siaPath modules.SiaPath, destPath string) error {
+	return r.managedDownload(siaPath, destPath)
+}
+
 // managedDeleteRandom deletes a random file from the renter.
 func (r *RenterJob) managedDeleteRandom() error {
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return err
+	}
+	defer r.staticJR.StaticTG.Done()
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -404,9 +421,9 @@ func (r *RenterJob) managedDeleteRandom() error {
 	return nil
 }
 
-// ManagedDownload will managed download the given file from the network to the
-// given destination path
-func (r *RenterJob) ManagedDownload(siaPath modules.SiaPath, destPath string) error {
+// Download will managed download the given file from the network to the given
+// destination path.
+func (r *RenterJob) managedDownload(siaPath modules.SiaPath, destPath string) error {
 	err := r.staticJR.StaticTG.Add()
 	if err != nil {
 		return err
@@ -502,9 +519,8 @@ func (r *RenterJob) managedDownloadRandomFile() error {
 	return nil
 }
 
-// ManagedUpload will ManagedUpload a file to the network. If the api reports that there are
-// more than 10 files successfully uploaded, then a file is deleted at random.
-func (r *RenterJob) ManagedUpload(fileSize uint64) (siaPath modules.SiaPath, err error) {
+// managedUpload will managed upload a file with given size to the network.
+func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err error) {
 	err = r.staticJR.StaticTG.Add()
 	if err != nil {
 		return modules.SiaPath{}, err
@@ -632,8 +648,13 @@ func (r *RenterJob) threadedUploader() {
 		}
 
 		// Upload a file.
-		if _, err := r.ManagedUpload(uploadFileSize); err != nil {
+		if _, err := r.managedUpload(uploadFileSize); err != nil {
 			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticSiaDirectory, err)
 		}
 	}
+}
+
+// Upload will upload a file with given size to the network.
+func (r *RenterJob) Upload(fileSize uint64) (siaPath modules.SiaPath, err error) {
+	return r.managedUpload(fileSize)
 }
