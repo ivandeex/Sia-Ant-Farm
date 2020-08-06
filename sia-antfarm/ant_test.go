@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -81,7 +82,15 @@ func TestStartAntWithSiadPath(t *testing.T) {
 	}
 	t.Parallel()
 
-	relativeSiadPath := "../../../../../bin/siad-dev"
+	// Paths to binaries are different in local environment and in Gitlab CI/CD
+	var relativeSiadPath string
+	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
+		// In Gitlab CI/CD
+		relativeSiadPath = ".cache/bin/siad-dev"
+	} else {
+		// Locally
+		relativeSiadPath = "../../../../../bin/siad-dev"
+	}
 	absoluteSiadPath, err := filepath.Abs(relativeSiadPath)
 	if err != nil {
 		t.Fatal(err)
