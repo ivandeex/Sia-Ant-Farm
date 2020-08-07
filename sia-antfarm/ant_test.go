@@ -82,18 +82,11 @@ func TestStartAntWithSiadPath(t *testing.T) {
 	}
 	t.Parallel()
 
-	//xxx for gitlab CI  debug
-	dir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Log("xxx pwd:", dir)
-
 	// Paths to binaries are different in local environment and in Gitlab CI/CD
 	var relativeSiadPath string
 	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
 		// In Gitlab CI/CD
-		relativeSiadPath = ".cache/bin/siad-dev"
+		relativeSiadPath = "../.cache/bin/siad-dev"
 	} else {
 		// Locally
 		relativeSiadPath = "../../../../../bin/siad-dev"
