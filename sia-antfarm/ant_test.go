@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
@@ -69,6 +71,78 @@ func TestStartAnts(t *testing.T) {
 		if _, err := c.ConsensusGet(); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// TestStartAntWithSiadPath verifies that startAnts successfully starts ant
+// given relative or absolute path to siad binary that is not in PATH
+func TestStartAntWithSiadPath(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Paths to binaries are different in local environment and in Gitlab CI/CD
+	var relativeSiadPath string
+	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
+		// In Gitlab CI/CD
+		relativeSiadPath = "../.cache/bin/siad-dev"
+	} else {
+		// Locally
+		relativeSiadPath = "../../../../../bin/siad-dev"
+	}
+	absoluteSiadPath, err := filepath.Abs(relativeSiadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var tests = []struct {
+		name     string
+		siadPath string
+	}{
+		{name: "TestRelativePath", siadPath: relativeSiadPath},
+		{name: "TestAbsolutePath", siadPath: absoluteSiadPath},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create minimum configs
+			dataDir := test.TestDir(tt.name)
+			antDirs := test.AntDirs(dataDir, 1)
+			configs := []ant.AntConfig{
+				{
+					SiadConfig: ant.SiadConfig{
+						AllowHostLocalNetAddress: true,
+						DataDir:                  antDirs[0],
+						SiadPath:                 tt.siadPath,
+					},
+				},
+			}
+
+			// Start an ant
+			ants, err := startAnts(&sync.WaitGroup{}, configs...)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() {
+				for _, ant := range ants {
+					ant.Close()
+				}
+			}()
+
+			// Verify the ant has a reachable api
+			for _, ant := range ants {
+				opts, err := client.DefaultOptions()
+				if err != nil {
+					t.Fatal(err)
+				}
+				opts.Address = ant.APIAddr
+				c := client.New(opts)
+				if _, err := c.ConsensusGet(); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
 	}
 }
 
