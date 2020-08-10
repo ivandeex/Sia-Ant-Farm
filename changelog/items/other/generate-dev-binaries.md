@@ -1,1 +1,0 @@
-- Added script to generate `siad-dev` binaries.
