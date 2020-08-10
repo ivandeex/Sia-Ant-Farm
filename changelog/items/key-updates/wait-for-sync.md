@@ -1,1 +1,0 @@
-- Add `WaitForSync` to config and enable waiting for ants to sync.
