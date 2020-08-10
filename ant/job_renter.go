@@ -277,11 +277,6 @@ func (j *JobRunner) NewRenterJob() RenterJob {
 // set, and until renter is upload ready. Then it optionally starts periodic
 // uploader, downloader and deleter jobs.
 func (j *JobRunner) renter(startBackgroundJobs bool) {
-	// When this function finishes, the renter is upload ready or the ant was
-	// stopped
-	j.renterUploadReadyWG.Add(1)
-	defer j.renterUploadReadyWG.Done()
-
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -385,17 +380,17 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 // Download will download the given file from the network to the given
 // destination path.
 func (r *RenterJob) Download(siaPath modules.SiaPath, destPath string) error {
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return errors.AddContext(err, "can't download a file")
+	}
+	defer r.staticJR.StaticTG.Done()
+
 	return r.managedDownload(siaPath, destPath)
 }
 
 // managedDeleteRandom deletes a random file from the renter.
 func (r *RenterJob) managedDeleteRandom() error {
-	err := r.staticJR.StaticTG.Add()
-	if err != nil {
-		return err
-	}
-	defer r.staticJR.StaticTG.Done()
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -424,12 +419,6 @@ func (r *RenterJob) managedDeleteRandom() error {
 // Download will managed download the given file from the network to the given
 // destination path.
 func (r *RenterJob) managedDownload(siaPath modules.SiaPath, destPath string) error {
-	err := r.staticJR.StaticTG.Add()
-	if err != nil {
-		return err
-	}
-	defer r.staticJR.StaticTG.Done()
-
 	// Check file is in renter file list and is available
 	renterFiles, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
 	if err != nil {
@@ -473,12 +462,6 @@ func (r *RenterJob) managedDownload(siaPath modules.SiaPath, destPath string) er
 
 // managedDownloadRandomFile will managed download a random file from the network.
 func (r *RenterJob) managedDownloadRandomFile() error {
-	err := r.staticJR.StaticTG.Add()
-	if err != nil {
-		return err
-	}
-	defer r.staticJR.StaticTG.Done()
-
 	// Download a random file from the renter's file list
 	renterFiles, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
 	if err != nil {
@@ -521,12 +504,6 @@ func (r *RenterJob) managedDownloadRandomFile() error {
 
 // managedUpload will managed upload a file with given size to the network.
 func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err error) {
-	err = r.staticJR.StaticTG.Add()
-	if err != nil {
-		return modules.SiaPath{}, err
-	}
-	defer r.staticJR.StaticTG.Done()
-
 	// Generate some random data to upload. The file needs to be closed before
 	// the upload to the network starts.
 	log.Printf("[INFO] [renter] [%v] File upload preparation beginning.\n", r.staticJR.staticSiaDirectory)
@@ -601,6 +578,12 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 // threadedDeleter deletes one random file from the renter every 100 seconds
 // once 10 or more files have been uploaded.
 func (r *RenterJob) threadedDeleter() {
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return
+	}
+	defer r.staticJR.StaticTG.Done()
+
 	for {
 		select {
 		case <-r.staticJR.StaticTG.StopChan():
@@ -617,6 +600,12 @@ func (r *RenterJob) threadedDeleter() {
 // threadedDownloader is a function that continuously runs for the renter job,
 // downloading a file at random every 400 seconds.
 func (r *RenterJob) threadedDownloader() {
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return
+	}
+	defer r.staticJR.StaticTG.Done()
+
 	// Wait for the first file to be uploaded before starting the download
 	// loop.
 	for {
@@ -637,6 +626,12 @@ func (r *RenterJob) threadedDownloader() {
 // uploading a 500MB file every 240 seconds (10 blocks). The renter should have
 // already set an allowance.
 func (r *RenterJob) threadedUploader() {
+	err := r.staticJR.StaticTG.Add()
+	if err != nil {
+		return
+	}
+	defer r.staticJR.StaticTG.Done()
+
 	// Make the source files directory
 	os.Mkdir(filepath.Join(r.staticJR.staticSiaDirectory, "renterSourceFiles"), 0700)
 	for {
@@ -656,5 +651,11 @@ func (r *RenterJob) threadedUploader() {
 
 // Upload will upload a file with given size to the network.
 func (r *RenterJob) Upload(fileSize uint64) (siaPath modules.SiaPath, err error) {
+	err = r.staticJR.StaticTG.Add()
+	if err != nil {
+		return modules.SiaPath{}, errors.AddContext(err, "can't upload a file")
+	}
+	defer r.staticJR.StaticTG.Done()
+
 	return r.managedUpload(fileSize)
 }

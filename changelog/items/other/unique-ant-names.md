@@ -1,0 +1,1 @@
+- Fix unique ant names check.
