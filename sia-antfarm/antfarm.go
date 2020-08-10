@@ -81,15 +81,16 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	upnprouter.CheckUPnPEnabled()
 
 	// Check ant names are unique
-	antCount := len(config.AntConfigs)
-	for i := 0; i < antCount-1; i++ {
-		for j := i + 1; j < antCount; j++ {
-			name1 := config.AntConfigs[i].Name
-			name2 := config.AntConfigs[j].Name
-			if name1 != "" && name1 == name2 {
-				return farm, fmt.Errorf("ant name %v is not unique", config.AntConfigs[i].Name)
-			}
+	antNames := make(map[string]struct{})
+	for _, ant := range config.AntConfigs {
+		if ant.Name == "" {
+			continue
 		}
+		_, ok := antNames[ant.Name]
+		if ok {
+			return farm, fmt.Errorf("ant name %v is not unique", ant.Name)
+		}
+		antNames[ant.Name] = struct{}{}
 	}
 
 	// Start up each ant process with its jobs

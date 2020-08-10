@@ -126,8 +126,10 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 		case "host":
 			go j.jobHost()
 		case "renter":
+			j.renterUploadReadyWG.Add(1)
 			go j.renter(false)
 		case "autoRenter":
+			j.renterUploadReadyWG.Add(1)
 			go j.renter(true)
 		case "gateway":
 			go j.gatewayConnectability()
@@ -195,8 +197,10 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 	case "host":
 		go a.Jr.jobHost()
 	case "renter":
+		a.Jr.renterUploadReadyWG.Add(1)
 		go a.Jr.renter(false)
 	case "autoRenter":
+		a.Jr.renterUploadReadyWG.Add(1)
 		go a.Jr.renter(true)
 	case "gateway":
 		go a.Jr.gatewayConnectability()
