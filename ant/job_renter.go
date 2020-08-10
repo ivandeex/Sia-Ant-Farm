@@ -277,10 +277,6 @@ func (j *JobRunner) NewRenterJob() RenterJob {
 // set, and until renter is upload ready. Then it optionally starts periodic
 // uploader, downloader and deleter jobs.
 func (j *JobRunner) renter(startBackgroundJobs bool) {
-	// When this function finishes, the renter is upload ready or the ant was
-	// stopped
-	defer j.renterUploadReadyWG.Done()
-
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
