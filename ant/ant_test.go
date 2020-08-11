@@ -14,7 +14,7 @@ func newTestingAntConfig(datadir string) AntConfig {
 	return AntConfig{SiadConfig: newTestingSiadConfig(datadir)}
 }
 
-// TeTestNewAnt tests creating an Ant
+// TestNewAnt tests creating an Ant
 func TestNewAnt(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -46,7 +46,7 @@ func TestNewAnt(t *testing.T) {
 	}
 }
 
-// TTestStartJob probes the StartJob method of the ant
+// TestStartJob probes the StartJob method of the ant
 func TestStartJob(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -71,7 +71,49 @@ func TestStartJob(t *testing.T) {
 	}
 }
 
-// TestWTestWalletAddress tests getting a wallet address for an initialize ant
+// TestUpdateAnt verifies that ant can be updated using new siad binary path.
+// The test doesn't verify that ant's jobs will continue to run correctly.
+func TestUpdateAnt(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create testing config
+	datadir := test.TestDir(t.Name())
+	config := newTestingAntConfig(datadir)
+
+	// Create Ant
+	ant, err := New(&sync.WaitGroup{}, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer ant.Close()
+
+	// Create Sia Client
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Address = config.APIAddr
+	c := client.New(opts)
+
+	// Test the ant works by calling ConsensusGet endpoint
+	if _, err = c.ConsensusGet(); err != nil {
+		t.Fatal(err)
+	}
+
+	// Update ant
+	newSiadPath := test.RelativeSiadPath()
+	ant.UpdateSiad(newSiadPath)
+
+	// Test the updated ant works by calling ConsensusGet endpoint
+	if _, err = c.ConsensusGet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestWalletAddress tests getting a wallet address for an initialize ant
 func TestWalletAddress(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

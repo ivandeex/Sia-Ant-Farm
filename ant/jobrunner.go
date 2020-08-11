@@ -21,11 +21,13 @@ type JobRunner struct {
 	renterUploadReadyWG  sync.WaitGroup
 }
 
-// newJobRunner creates a new job runner, using the provided api address,
-// authentication password, and sia directory.  It expects the connected api to
-// be newly initialized, and initializes a new wallet, for usage in the jobs.
-// siadirectory is used in logging to identify the job runner.
-func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpassword string, siadirectory string) (*JobRunner, error) {
+// newJobRunner creates a new job runner using the provided parameters. If the
+// existingWalletPassword is empty, it expects the connected api to be newly
+// initialized, it initializes a new wallet. If existingWalletPassword is set,
+// it expects previous node directory structure including existing wallet. In
+// both cases the wallet is unlocked for usage in the jobs. siadirectory is
+// used in logging to identify the job runner.
+func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpassword string, siadirectory string, existingWalletPassword string) (*JobRunner, error) {
 	opt, err := client.DefaultOptions()
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to get client options")
@@ -39,11 +41,15 @@ func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpass
 		staticClient:       c,
 		staticSiaDirectory: siadirectory,
 	}
-	walletParams, err := jr.staticClient.WalletInitPost("", false)
-	if err != nil {
-		return nil, err
+	if existingWalletPassword == "" {
+		walletParams, err := jr.staticClient.WalletInitPost("", false)
+		if err != nil {
+			return nil, err
+		}
+		jr.staticWalletPassword = walletParams.PrimarySeed
+	} else {
+		jr.staticWalletPassword = existingWalletPassword
 	}
-	jr.staticWalletPassword = walletParams.PrimarySeed
 
 	err = jr.staticClient.WalletUnlockPost(jr.staticWalletPassword)
 	if err != nil {
@@ -57,6 +63,18 @@ func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpass
 // finished stopping.
 func (j *JobRunner) Stop() {
 	j.StaticTG.Stop()
+}
+
+// recreateJobRunner creates a newly initialized job runner according to the
+// given job runner
+func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
+	// Create new job runner
+	newJR, err := newJobRunner(j.staticAntsSyncWG, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletPassword)
+	if err != nil {
+		return &JobRunner{}, errors.AddContext(err, "couldn't create an updated job runner")
+	}
+
+	return newJR, nil
 }
 
 // WaitForRenterUploadReady waits for renter upload ready with a given timeout

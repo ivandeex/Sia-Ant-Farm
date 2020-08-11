@@ -7,11 +7,22 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/Sia/siatest"
+	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/fastrand"
 )
 
-// TestSiadPath is the siadPath used for testing
-const TestSiadPath = "siad-dev"
+// TestSiadFilename is the siad file name in PATH used for testing
+const TestSiadFilename = "siad-dev"
+
+// AbsoluteSiadPath returns default absolute siad path in local or Gitlab CI
+// environments
+func AbsoluteSiadPath() (string, error) {
+	path, err := filepath.Abs(RelativeSiadPath())
+	if err != nil {
+		return "", errors.AddContext(err, "")
+	}
+	return path, nil
+}
 
 // AntDirs creates temporary test directories for numAnt directories. This
 // should only every be called once per test. Otherwise it will delete the
@@ -34,6 +45,16 @@ func RandomLocalAddress() string {
 	// Get a random port number between 10000 and 20000 for testing
 	port := 10000 + fastrand.Intn(10000)
 	return fmt.Sprintf("127.0.0.1:%v", port)
+}
+
+// RelativeSiadPath returns default relative siad path in local or Gitlab CI
+// environments
+func RelativeSiadPath() string {
+	// Check if executing on Gitlab CI
+	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
+		return "../.cache/bin/siad-dev"
+	}
+	return "../../../../../bin/siad-dev"
 }
 
 // TestDir creates a temporary testing directory. This should only every be

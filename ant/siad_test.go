@@ -17,7 +17,7 @@ func newTestingSiadConfig(datadir string) SiadConfig {
 		DataDir:                  datadir,
 		HostAddr:                 test.RandomLocalAddress(),
 		RPCAddr:                  test.RandomLocalAddress(),
-		SiadPath:                 test.TestSiadPath,
+		SiadPath:                 test.TestSiadFilename,
 		SiaMuxAddr:               test.RandomLocalAddress(),
 		SiaMuxWsAddr:             test.RandomLocalAddress(),
 	}
