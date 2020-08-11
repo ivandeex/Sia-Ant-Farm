@@ -15,6 +15,97 @@ import (
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
 
+// renterAntName defines name of the renter ant
+const renterAntName = "Renter"
+
+// createBasicRenterAntfarmConfig creates default basic antfarm config for
+// running renter tests
+func createBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
+	antFarmAddr := test.RandomLocalAddress()
+	antFarmDir := filepath.Join(dataDir, "antfarm-data")
+	antDirs := test.AntDirs(dataDir, 7)
+	config := AntfarmConfig{
+		ListenAddress: antFarmAddr,
+		DataDir:       antFarmDir,
+		AntConfigs: []ant.AntConfig{
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: true,
+					DataDir:                  antDirs[0],
+					RPCAddr:                  test.RandomLocalAddress(),
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs: []string{"gateway", "miner"},
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: true,
+					DataDir:                  antDirs[1],
+					RPCAddr:                  test.RandomLocalAddress(),
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: true,
+					DataDir:                  antDirs[2],
+					RPCAddr:                  test.RandomLocalAddress(),
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: true,
+					DataDir:                  antDirs[3],
+					RPCAddr:                  test.RandomLocalAddress(),
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: true,
+					DataDir:                  antDirs[4],
+					RPCAddr:                  test.RandomLocalAddress(),
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: true,
+					DataDir:                  antDirs[5],
+					RPCAddr:                  test.RandomLocalAddress(),
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress:      true,
+					RenterDisableIPViolationCheck: true,
+					DataDir:                       antDirs[6],
+					RPCAddr:                       test.RandomLocalAddress(),
+					SiadPath:                      test.TestSiadFilename,
+				},
+				Jobs:            []string{"renter"},
+				DesiredCurrency: 100000,
+				Name:            renterAntName,
+			},
+		},
+		AutoConnect: true,
+		WaitForSync: true,
+	}
+	return config
+}
+
 // verify that createAntfarm() creates a new antfarm correctly.
 func TestNewAntfarm(t *testing.T) {
 	if testing.Short() {
@@ -36,7 +127,7 @@ func TestNewAntfarm(t *testing.T) {
 					AllowHostLocalNetAddress: true,
 					DataDir:                  antDirs[0],
 					RPCAddr:                  antAddr,
-					SiadPath:                 test.TestSiadPath,
+					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs: []string{
 					"gateway",
@@ -85,7 +176,7 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress: true,
 			RPCAddr:                  test.RandomLocalAddress(),
-			SiadPath:                 test.TestSiadPath,
+			SiadPath:                 test.TestSiadFilename,
 		},
 		Jobs: []string{
 			"gateway",
@@ -155,99 +246,17 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	}
 }
 
-// TestVerifyUploadDownloadFileData uploads and downloads a file and checks
-// that their content is identical by comparing their merkle root hashes
-func TestVerifyUploadDownloadFileData(t *testing.T) {
+// TestUploadDownloadFileData uploads and downloads a file and checks that
+// their content is identical by comparing their merkle root hashes
+func TestUploadDownloadFileData(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
 	t.Parallel()
 
 	// Start Antfarm
-	antFarmAddr := test.RandomLocalAddress()
 	dataDir := test.TestDir(t.Name())
-	antFarmDir := filepath.Join(dataDir, "antfarm-data")
-	antDirs := test.AntDirs(dataDir, 7)
-	renterAntName := "Renter"
-	config := AntfarmConfig{
-		ListenAddress: antFarmAddr,
-		DataDir:       antFarmDir,
-		AntConfigs: []ant.AntConfig{
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
-					DataDir:                  antDirs[0],
-					RPCAddr:                  test.RandomLocalAddress(),
-					SiadPath:                 test.TestSiadPath,
-				},
-				Jobs: []string{"gateway", "miner"},
-			},
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
-					DataDir:                  antDirs[1],
-					RPCAddr:                  test.RandomLocalAddress(),
-					SiadPath:                 test.TestSiadPath,
-				},
-				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
-			},
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
-					DataDir:                  antDirs[2],
-					RPCAddr:                  test.RandomLocalAddress(),
-					SiadPath:                 test.TestSiadPath,
-				},
-				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
-			},
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
-					DataDir:                  antDirs[3],
-					RPCAddr:                  test.RandomLocalAddress(),
-					SiadPath:                 test.TestSiadPath,
-				},
-				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
-			},
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
-					DataDir:                  antDirs[4],
-					RPCAddr:                  test.RandomLocalAddress(),
-					SiadPath:                 test.TestSiadPath,
-				},
-				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
-			},
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
-					DataDir:                  antDirs[5],
-					RPCAddr:                  test.RandomLocalAddress(),
-					SiadPath:                 test.TestSiadPath,
-				},
-				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
-			},
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress:      true,
-					RenterDisableIPViolationCheck: true,
-					DataDir:                       antDirs[6],
-					RPCAddr:                       test.RandomLocalAddress(),
-					SiadPath:                      test.TestSiadPath,
-				},
-				Jobs:            []string{"renter"},
-				DesiredCurrency: 100000,
-				Name:            renterAntName,
-			},
-		},
-		AutoConnect: true,
-		WaitForSync: true,
-	}
+	config := createBasicRenterAntfarmConfig(dataDir)
 	farm, err := createAntfarm(config)
 	if err != nil {
 		t.Fatal(err)
@@ -307,5 +316,67 @@ func TestVerifyUploadDownloadFileData(t *testing.T) {
 	downloadedFileHash := renterJob.Files[0].MerkleRoot
 	if sourceFileHash != downloadedFileHash {
 		t.Error("Source file hash doesn't equal downloaded file hash")
+	}
+}
+
+// TestUpdateRenter verifies that renter ant can be upgraded (or downgraded)
+// using given path to siad binary
+func TestUpdateRenter(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Start Antfarm
+	dataDir := test.TestDir(t.Name())
+	config := createBasicRenterAntfarmConfig(dataDir)
+	farm, err := createAntfarm(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer farm.Close()
+
+	// Timeout the test if the renter doesn't become upload ready
+	renterAnt, err := farm.GetAntByName(renterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = renterAnt.Jr.WaitForRenterUploadReady(time.Minute * 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Restart the renter with given siad path (simulates an ant update
+	// process)
+	err = renterAnt.UpdateSiad(test.RelativeSiadPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Timeout the test if the renter after update doesn't become upload ready
+	renterAnt, err = farm.GetAntByName(renterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = renterAnt.Jr.WaitForRenterUploadReady(time.Minute * 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Verify that renter is working correctly by uploading and downloading a
+	// file
+
+	// Upload a file
+	renterJob := renterAnt.Jr.NewRenterJob()
+	siaPath, err := renterJob.Upload(modules.SectorSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Download the file
+	destPath := filepath.Join(renterAnt.Config.DataDir, "downloadedFiles", "downloadedFile")
+	err = renterJob.Download(siaPath, destPath)
+	if err != nil {
+		t.Fatal(err)
 	}
 }

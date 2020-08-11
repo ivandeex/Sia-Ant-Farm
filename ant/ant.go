@@ -104,42 +104,21 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	}()
 
 	ant := &Ant{
-		APIAddr: config.APIAddr,
-		RPCAddr: config.RPCAddr,
-		Config:  config,
-
-		siad: siad,
-
+		APIAddr:    config.APIAddr,
+		RPCAddr:    config.RPCAddr,
+		Config:     config,
+		siad:       siad,
 		SeenBlocks: make(map[types.BlockHeight]types.BlockID),
 	}
 
-	j, err := newJobRunner(antsSyncWG, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir)
+	j, err := newJobRunner(antsSyncWG, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
 	ant.Jr = j
 
 	for _, job := range config.Jobs {
-		switch job {
-		case "miner":
-			go j.blockMining()
-		case "host":
-			go j.jobHost()
-		case "renter":
-			j.renterUploadReadyWG.Add(1)
-			go func() {
-				defer j.renterUploadReadyWG.Done()
-				j.renter(false)
-			}()
-		case "autoRenter":
-			j.renterUploadReadyWG.Add(1)
-			go func() {
-				defer j.renterUploadReadyWG.Done()
-				j.renter(true)
-			}()
-		case "gateway":
-			go j.gatewayConnectability()
-		}
+		ant.StartJob(antsSyncWG, job)
 	}
 
 	if config.DesiredCurrency != 0 {
@@ -222,6 +201,58 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 		go a.Jr.littleSupplier(args[0].(types.UnlockHash))
 	default:
 		return errors.New("no such job")
+	}
+
+	return nil
+}
+
+// UpdateSiad updates ant to use the given siad binary.
+func (a *Ant) UpdateSiad(siadPath string) error {
+	log.Printf("[INFO] [ant] [%v] Closing ant before siad update\n", a.Config.SiadConfig.DataDir)
+
+	// Stop ant
+	err := a.Close()
+	if err != nil {
+		return errors.AddContext(err, "can't stop running ant")
+	}
+
+	// Update path to new siad binary
+	a.Config.SiadPath = siadPath
+
+	// Construct the ant's Siad instance
+	log.Printf("[INFO] [ant] [%v] Starting new siad process\n", a.Config.SiadConfig.DataDir)
+	siad, err := newSiad(a.Config.SiadConfig)
+	if err != nil {
+		return errors.AddContext(err, "unable to create new siad process")
+	}
+	log.Printf("[INFO] [ant] [%v] Siad update done\n", a.Config.SiadConfig.DataDir)
+
+	// Ensure siad is always stopped if an error is returned.
+	defer func() {
+		if err != nil {
+			stopSiad(a.Config.APIAddr, siad.Process)
+		}
+	}()
+
+	// Update ant's siad process
+	a.siad = siad
+
+	// Update ant with recreated newly initialized job runner after siad update
+	jr, err := recreateJobRunner(a.Jr)
+	if err != nil {
+		return errors.AddContext(err, "can't update jobrunner after siad update")
+	}
+	a.Jr = jr
+
+	// Restart jobs
+	log.Printf("[INFO] [ant] [%v] Restarting ant's jobs\n", a.Config.SiadConfig.DataDir)
+	for _, job := range a.Config.Jobs {
+		a.StartJob(a.Jr.staticAntsSyncWG, job)
+	}
+
+	// Start balance maintainer if desired currency was set
+	if a.Config.DesiredCurrency > 0 {
+		go a.Jr.balanceMaintainer(types.SiacoinPrecision.Mul64(a.Config.DesiredCurrency))
 	}
 
 	return nil

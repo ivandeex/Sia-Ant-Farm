@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"reflect"
 	"sync"
 	"testing"
@@ -30,21 +28,21 @@ func TestStartAnts(t *testing.T) {
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[0],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[1],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[2],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 	}
@@ -82,16 +80,9 @@ func TestStartAntWithSiadPath(t *testing.T) {
 	}
 	t.Parallel()
 
-	// Paths to binaries are different in local environment and in Gitlab CI/CD
-	var relativeSiadPath string
-	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
-		// In Gitlab CI/CD
-		relativeSiadPath = "../.cache/bin/siad-dev"
-	} else {
-		// Locally
-		relativeSiadPath = "../../../../../bin/siad-dev"
-	}
-	absoluteSiadPath, err := filepath.Abs(relativeSiadPath)
+	// Get test paths to siad binaries
+	relativeSiadPath := test.RelativeSiadPath()
+	absoluteSiadPath, err := test.AbsoluteSiadPath()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +166,7 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 					SiadConfig: ant.SiadConfig{
 						AllowHostLocalNetAddress: true,
 						DataDir:                  antDirs[0],
-						SiadPath:                 test.TestSiadPath,
+						SiadPath:                 test.TestSiadFilename,
 					},
 					Jobs: []string{"renter"},
 				},
@@ -240,35 +231,35 @@ func TestConnectAnts(t *testing.T) {
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[0],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[1],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[2],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[3],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[4],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 	}
@@ -331,21 +322,21 @@ func TestAntConsensusGroups(t *testing.T) {
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[0],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[1],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 		{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: true,
 				DataDir:                  antDirs[2],
-				SiadPath:                 test.TestSiadPath,
+				SiadPath:                 test.TestSiadFilename,
 			},
 		},
 	}
@@ -379,7 +370,7 @@ func TestAntConsensusGroups(t *testing.T) {
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress: true,
 			DataDir:                  antDirs[3],
-			SiadPath:                 test.TestSiadPath,
+			SiadPath:                 test.TestSiadFilename,
 		},
 	},
 	)
