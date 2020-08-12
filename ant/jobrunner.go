@@ -12,22 +12,22 @@ import (
 
 // A JobRunner is used to start up jobs on the running Sia node.
 type JobRunner struct {
-	staticAntsSyncWG     *sync.WaitGroup
-	staticAnt            *Ant
-	staticClient         *client.Client
-	staticWalletPassword string
-	staticSiaDirectory   string
-	StaticTG             siasync.ThreadGroup
-	renterUploadReadyWG  sync.WaitGroup
+	staticAntsSyncWG    *sync.WaitGroup
+	staticAnt           *Ant
+	staticClient        *client.Client
+	staticWalletSeed    string
+	staticSiaDirectory  string
+	StaticTG            siasync.ThreadGroup
+	renterUploadReadyWG sync.WaitGroup
 }
 
 // newJobRunner creates a new job runner using the provided parameters. If the
-// existingWalletPassword is empty, it expects the connected api to be newly
-// initialized, it initializes a new wallet. If existingWalletPassword is set,
-// it expects previous node directory structure including existing wallet. In
-// both cases the wallet is unlocked for usage in the jobs. siadirectory is
+// existingWalletSeed is empty, it expects the connected api to be newly
+// initialized, and it will initialize a new wallet. If existingWalletSeed is
+// set, it expects previous node directory structure including existing wallet.
+// In both cases the wallet is unlocked for usage in the jobs. siadirectory is
 // used in logging to identify the job runner.
-func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpassword string, siadirectory string, existingWalletPassword string) (*JobRunner, error) {
+func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpassword string, siadirectory string, existingWalletSeed string) (*JobRunner, error) {
 	opt, err := client.DefaultOptions()
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to get client options")
@@ -41,17 +41,17 @@ func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpass
 		staticClient:       c,
 		staticSiaDirectory: siadirectory,
 	}
-	if existingWalletPassword == "" {
+	if existingWalletSeed == "" {
 		walletParams, err := jr.staticClient.WalletInitPost("", false)
 		if err != nil {
 			return nil, err
 		}
-		jr.staticWalletPassword = walletParams.PrimarySeed
+		jr.staticWalletSeed = walletParams.PrimarySeed
 	} else {
-		jr.staticWalletPassword = existingWalletPassword
+		jr.staticWalletSeed = existingWalletSeed
 	}
 
-	err = jr.staticClient.WalletUnlockPost(jr.staticWalletPassword)
+	err = jr.staticClient.WalletUnlockPost(jr.staticWalletSeed)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (j *JobRunner) Stop() {
 // given job runner
 func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
 	// Create new job runner
-	newJR, err := newJobRunner(j.staticAntsSyncWG, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletPassword)
+	newJR, err := newJobRunner(j.staticAntsSyncWG, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletSeed)
 	if err != nil {
 		return &JobRunner{}, errors.AddContext(err, "couldn't create an updated job runner")
 	}
@@ -80,7 +80,7 @@ func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
 // WaitForRenterUploadReady waits for renter upload ready with a given timeout
 // if the ant has renter job. If the ant doesn't have renter job, it returns an
 // error.
-func (j *JobRunner) WaitForRenterUploadReady(timeout time.Duration) error {
+func (j *JobRunner) WaitForRenterUploadReady() error {
 	if !j.staticAnt.HasRenterTypeJob() {
 		return errors.New("this ant hasn't renter job")
 	}
@@ -94,8 +94,8 @@ func (j *JobRunner) WaitForRenterUploadReady(timeout time.Duration) error {
 	select {
 	case <-ready:
 		return nil
-	case <-time.After(timeout):
-		return fmt.Errorf("waiting for upload ready reached timeout %v", timeout)
+	case <-time.After(renterUploadReadyTimeout):
+		return fmt.Errorf("waiting for upload ready reached timeout %v", renterUploadReadyTimeout)
 	case <-j.StaticTG.StopChan():
 		return errors.New("ant was stopped")
 	}
