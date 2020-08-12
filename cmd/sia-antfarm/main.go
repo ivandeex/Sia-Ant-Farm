@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
 )
 
 func main() {
@@ -16,7 +18,7 @@ func main() {
 	signal.Notify(sigchan, os.Interrupt)
 
 	// Read and decode the sia-antfarm configuration file.
-	var antfarmConfig AntfarmConfig
+	var antfarmConfig antfarm.AntfarmConfig
 	f, err := os.Open(*configPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error opening %v: %v\n", *configPath, err)
@@ -29,14 +31,14 @@ func main() {
 	}
 	f.Close()
 
-	farm, err := createAntfarm(antfarmConfig)
+	farm, err := antfarm.CreateAntfarm(antfarmConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating antfarm: %v\n", err)
 		os.Exit(1)
 	}
 	defer farm.Close()
 	go farm.ServeAPI()
-	go farm.permanentSyncMonitor()
+	go farm.PermanentSyncMonitor()
 
 	fmt.Printf("Finished.  Running sia-antfarm with %v ants.\n", len(antfarmConfig.AntConfigs))
 	<-sigchan

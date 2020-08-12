@@ -1,4 +1,4 @@
-package main
+package antfarm
 
 import (
 	"encoding/json"
@@ -136,7 +136,7 @@ func TestNewAntfarm(t *testing.T) {
 		},
 	}
 
-	antfarm, err := createAntfarm(config)
+	antfarm, err := CreateAntfarm(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -198,14 +198,14 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
-	farm1, err := createAntfarm(config1)
+	farm1, err := CreateAntfarm(config1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer farm1.Close()
 	go farm1.ServeAPI()
 
-	farm2, err := createAntfarm(config2)
+	farm2, err := CreateAntfarm(config2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -257,7 +257,7 @@ func TestUploadDownloadFileData(t *testing.T) {
 	// Start Antfarm
 	dataDir := test.TestDir(t.Name())
 	config := createBasicRenterAntfarmConfig(dataDir)
-	farm, err := createAntfarm(config)
+	farm, err := CreateAntfarm(config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +330,7 @@ func TestUpdateRenter(t *testing.T) {
 	// Start Antfarm
 	dataDir := test.TestDir(t.Name())
 	config := createBasicRenterAntfarmConfig(dataDir)
-	farm, err := createAntfarm(config)
+	farm, err := CreateAntfarm(config)
 	if err != nil {
 		t.Fatal(err)
 	}

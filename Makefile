@@ -12,8 +12,9 @@ lint-dependencies:
 count = 1
 
 pkgs = \
-	./sia-antfarm \
+	./cmd/sia-antfarm \
 	./ant \
+	./antfarm \
 	./upnprouter
 
 run = .
