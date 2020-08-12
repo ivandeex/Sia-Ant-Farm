@@ -268,7 +268,7 @@ func TestUploadDownloadFileData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = renterAnt.Jr.WaitForRenterUploadReady(time.Minute * 5)
+	err = renterAnt.Jr.WaitForRenterUploadReady()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -319,8 +319,8 @@ func TestUploadDownloadFileData(t *testing.T) {
 	}
 }
 
-// TestUpdateRenter verifies that renter ant can be upgraded (or downgraded)
-// using given path to siad binary
+// TestUpdateRenter verifies that renter ant's siad can be upgraded using given
+// path to siad binary
 func TestUpdateRenter(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
@@ -341,7 +341,7 @@ func TestUpdateRenter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = renterAnt.Jr.WaitForRenterUploadReady(time.Minute * 5)
+	err = renterAnt.Jr.WaitForRenterUploadReady()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -358,7 +358,7 @@ func TestUpdateRenter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	err = renterAnt.Jr.WaitForRenterUploadReady(time.Minute * 5)
+	err = renterAnt.Jr.WaitForRenterUploadReady()
 	if err != nil {
 		t.Fatal(err)
 	}
