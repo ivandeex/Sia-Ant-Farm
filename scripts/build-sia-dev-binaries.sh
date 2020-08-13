@@ -36,6 +36,11 @@ function build_version {
   # checkout the version
   git reset --hard HEAD
   git checkout $version
+  if [[ "$version" == "master" ]]
+  then
+    git pull
+  fi
+  git pull
   
   # create workspace
   folder=$target_folder/Sia-$version-$os-$arch

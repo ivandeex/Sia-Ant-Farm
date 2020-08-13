@@ -11,8 +11,13 @@ import (
 	"gitlab.com/NebulousLabs/fastrand"
 )
 
-// TestSiadFilename is the siad file name in PATH used for testing
-const TestSiadFilename = "siad-dev"
+const (
+	// TestSiadFilename is the siad file name in PATH used for testing
+	TestSiadFilename = "siad-dev"
+
+	// RenterAntName defines name of the renter ant
+	RenterAntName = "Renter"
+)
 
 // AbsoluteSiadPath returns default absolute siad path in local or Gitlab CI
 // environments
