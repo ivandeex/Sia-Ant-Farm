@@ -31,7 +31,7 @@ func main() {
 	}
 	f.Close()
 
-	farm, err := antfarm.CreateAntfarm(antfarmConfig)
+	farm, err := antfarm.New(antfarmConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating antfarm: %v\n", err)
 		os.Exit(1)

@@ -17,6 +17,9 @@ pkgs = \
 	./cmd/sia-antfarm \
 	./upnprouter
 
+release-pkgs = \
+	./cmd/sia-antfarm
+
 run = .
 
 clean:
@@ -36,7 +39,7 @@ fmt:
 
 # install builds and installs binaries.
 install:
-	go install $(pkgs)
+	go install $(release-pkgs)
 
 install-siad-dev:
 	go build -o $(GOPATH)/bin/siad-dev -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad

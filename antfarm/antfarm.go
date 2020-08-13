@@ -58,8 +58,8 @@ type (
 	}
 )
 
-// CreateAntfarm creates a new antFarm given the supplied AntfarmConfig
-func CreateAntfarm(config AntfarmConfig) (*AntFarm, error) {
+// New creates a new antFarm given the supplied AntfarmConfig
+func New(config AntfarmConfig) (*AntFarm, error) {
 	// clear old antfarm data before creating an antfarm
 	datadir := "./antfarm-data"
 	if config.DataDir != "" {
