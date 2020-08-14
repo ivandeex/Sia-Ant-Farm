@@ -275,3 +275,14 @@ func (af *AntFarm) Close() error {
 	}
 	return nil
 }
+
+// GetAntConfigIndexByName returns index of ant config in antfarm's AntConfigs
+// by given ant name
+func (afc *AntfarmConfig) GetAntConfigIndexByName(name string) (antConfigIndex int, err error) {
+	for i, ac := range afc.AntConfigs {
+		if ac.Name == name {
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("ant with name %v doesn't exist", name)
+}

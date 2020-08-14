@@ -96,7 +96,7 @@ func TestRenterSiadUpdates(t *testing.T) {
 
 	// Configure Antfarm
 	dataDir := test.TestDir(t.Name())
-	config := antfarm.CreateBasicRenterAntfarmConfig(dataDir, false)
+	antfarmConfig := antfarm.CreateBasicRenterAntfarmConfig(dataDir, false)
 	var farm *antfarm.AntFarm
 
 	var uploadedFiles []ant.RenterFile
@@ -105,8 +105,12 @@ func TestRenterSiadUpdates(t *testing.T) {
 		if i == 0 {
 			// First start antfarm with initial renter siad version
 			log.Printf("[INFO] Starting antfarm with renter's siad-dev version %v", version)
-			config.AntConfigs[6].SiadConfig.SiadPath = siadBinaryPath(version)
-			farm, err = antfarm.New(config)
+			antConfigIndex, err := antfarmConfig.GetAntConfigIndexByName(test.RenterAntName)
+			if err != nil {
+				t.Fatal(err)
+			}
+			antfarmConfig.AntConfigs[antConfigIndex].SiadConfig.SiadPath = siadBinaryPath(version)
+			farm, err = antfarm.New(antfarmConfig)
 			if err != nil {
 				t.Fatal(err)
 			}
