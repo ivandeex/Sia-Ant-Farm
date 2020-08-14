@@ -20,8 +20,10 @@ func CheckUPnPEnabled() {
 	_, err := upnp.Discover()
 	if err != nil {
 		UPnPEnabled = false
+		log.Printf("[INFO] [ant-farm] UPnP enabled router is not available: %v", err)
+	} else {
+		log.Println("[INFO] [ant-farm] UPnP enabled router is available")
 	}
-	log.Printf("[INFO] [ant-farm] UPnP enabled router is available: %v\n", UPnPEnabled)
 }
 
 // ClearPorts clears ports on UPnP enabled router
