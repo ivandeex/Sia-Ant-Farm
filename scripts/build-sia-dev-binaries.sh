@@ -35,11 +35,9 @@ function build_version {
   
   # checkout the version
   git reset --hard HEAD
+  echo xxx1
+  pwd
   git checkout $version
-  if [[ "$version" == "master" ]]
-  then
-    git pull
-  fi
   git pull
   
   # create workspace
@@ -52,9 +50,14 @@ function build_version {
   then
     pushd ../merkletree > /dev/null
     git reset --hard HEAD
+    echo xxx2
+    pwd
     git checkout bc4a11e
     popd > /dev/null
   fi
+
+  # compile dependencies
+  make dependencies
 
   # compile siad-dev binaries
   pkg=siad
@@ -66,6 +69,8 @@ function build_version {
   then
     pushd ../merkletree > /dev/null
     git reset --hard HEAD
+    echo xxx3
+    pwd
     git checkout master
     popd > /dev/null
   fi
