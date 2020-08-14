@@ -75,14 +75,19 @@ func TestRenterSiadUpdates(t *testing.T) {
 	t.Parallel()
 
 	// Get versions to test.
-	upgradePathVersions, err := siaVersions()
-	if err != nil {
-		t.Fatal(err)
-	}
+	// TODO:
+	// v1.3.7 and on can be enabled on the Hetzner box when
+	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
+	// is done
+	// upgradePathVersions, err := siaVersions()
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+	upgradePathVersions := []string{"v1.5.0", "master"}
 
 	// Build binaries to test.
 	if !skipBuildingBinaries {
-		err = buildSiadDevBinaries()
+		err := buildSiadDevBinaries()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -96,7 +101,12 @@ func TestRenterSiadUpdates(t *testing.T) {
 
 	// Configure Antfarm
 	dataDir := test.TestDir(t.Name())
-	antfarmConfig := antfarm.CreateBasicRenterAntfarmConfig(dataDir, false)
+	// TODO:
+	// antfarmConfig := antfarm.CreateBasicRenterAntfarmConfig(dataDir, false)
+	// Testing on external IPs on the Hetzner box can be enabled when
+	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
+	// is done
+	antfarmConfig := antfarm.CreateBasicRenterAntfarmConfig(dataDir, true)
 	var farm *antfarm.AntFarm
 
 	var uploadedFiles []ant.RenterFile
