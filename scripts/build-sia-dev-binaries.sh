@@ -35,8 +35,6 @@ function build_version {
   
   # checkout the version
   git reset --hard HEAD
-  echo xxx1
-  pwd
   git checkout $version
   git pull
   
@@ -50,8 +48,6 @@ function build_version {
   then
     pushd ../merkletree > /dev/null
     git reset --hard HEAD
-    echo xxx2
-    pwd
     git checkout bc4a11e
     popd > /dev/null
   fi
@@ -69,8 +65,6 @@ function build_version {
   then
     pushd ../merkletree > /dev/null
     git reset --hard HEAD
-    echo xxx3
-    pwd
     git checkout master
     popd > /dev/null
   fi
