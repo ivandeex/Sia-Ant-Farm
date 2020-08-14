@@ -96,7 +96,7 @@ func TestRenterSiadUpdates(t *testing.T) {
 
 	// Configure Antfarm
 	dataDir := test.TestDir(t.Name())
-	config := antfarm.CreateBasicRenterAntfarmConfig(dataDir)
+	config := antfarm.CreateBasicRenterAntfarmConfig(dataDir, false)
 	var farm *antfarm.AntFarm
 
 	var uploadedFiles []ant.RenterFile

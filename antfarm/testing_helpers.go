@@ -14,7 +14,7 @@ import (
 
 // CreateBasicRenterAntfarmConfig creates default basic antfarm config for
 // running renter tests
-func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
+func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmConfig {
 	antFarmAddr := test.RandomLocalAddress()
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
 	antDirs := test.AntDirs(dataDir, 7)
@@ -24,7 +24,7 @@ func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
 		AntConfigs: []ant.AntConfig{
 			{
 				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
+					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[0],
 					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
@@ -33,7 +33,7 @@ func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
 			},
 			{
 				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
+					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[1],
 					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
@@ -43,7 +43,7 @@ func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
 			},
 			{
 				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
+					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[2],
 					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
@@ -53,7 +53,7 @@ func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
 			},
 			{
 				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
+					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[3],
 					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
@@ -63,7 +63,7 @@ func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
 			},
 			{
 				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
+					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[4],
 					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
@@ -73,7 +73,7 @@ func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
 			},
 			{
 				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: true,
+					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[5],
 					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
@@ -83,8 +83,8 @@ func CreateBasicRenterAntfarmConfig(dataDir string) AntfarmConfig {
 			},
 			{
 				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress:      true,
-					RenterDisableIPViolationCheck: true,
+					AllowHostLocalNetAddress:      allowLocalIPs,
+					RenterDisableIPViolationCheck: allowLocalIPs,
 					DataDir:                       antDirs[6],
 					RPCAddr:                       test.RandomLocalAddress(),
 					SiadPath:                      test.TestSiadFilename,
