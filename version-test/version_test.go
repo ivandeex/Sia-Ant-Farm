@@ -18,7 +18,7 @@ const (
 	// skipBuildingBinaries controls whether siad-binaries should be built.
 	// Initially this should be set to false, if you want rerun the test and do
 	// not need to rebuild the binaries, you can set it to true.
-	skipBuildingBinaries = true
+	skipBuildingBinaries = false
 )
 
 // buildSiadDevBinaries calls script to get Sia releases starting from v1.3.7,
