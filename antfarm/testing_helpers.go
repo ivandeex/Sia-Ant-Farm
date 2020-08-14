@@ -26,7 +26,6 @@ func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmC
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[0],
-					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs: []string{"gateway", "miner"},
@@ -35,7 +34,6 @@ func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmC
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[1],
-					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
@@ -45,7 +43,6 @@ func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmC
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[2],
-					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
@@ -55,7 +52,6 @@ func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmC
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[3],
-					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
@@ -65,7 +61,6 @@ func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmC
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[4],
-					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
@@ -75,7 +70,6 @@ func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmC
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
 					DataDir:                  antDirs[5],
-					RPCAddr:                  test.RandomLocalAddress(),
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
@@ -86,7 +80,6 @@ func CreateBasicRenterAntfarmConfig(dataDir string, allowLocalIPs bool) AntfarmC
 					AllowHostLocalNetAddress:      allowLocalIPs,
 					RenterDisableIPViolationCheck: allowLocalIPs,
 					DataDir:                       antDirs[6],
-					RPCAddr:                       test.RandomLocalAddress(),
 					SiadPath:                      test.TestSiadFilename,
 				},
 				Jobs:            []string{"renter"},

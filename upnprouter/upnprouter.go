@@ -1,6 +1,7 @@
 package upnprouter
 
 import (
+	"log"
 	"net"
 
 	"gitlab.com/NebulousLabs/errors"
@@ -20,6 +21,7 @@ func CheckUPnPEnabled() {
 	if err != nil {
 		UPnPEnabled = false
 	}
+	log.Printf("[INFO] [ant-farm] UPnP enabled router is available: %v\n", UPnPEnabled)
 }
 
 // ClearPorts clears ports on UPnP enabled router
