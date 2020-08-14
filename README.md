@@ -6,6 +6,12 @@ tests of the [Sia](https://gitlab.com/NebulousLabs/Sia) platform.  These test
 are long-running and offer superior insight into high-level network behaviour
 than Sia's existing automated testing suite.
 
+# Docker
+
+sia-antfarm is also available as a docker image `nebulouslabs/siaantfarm`:
+* [GitHub repository](https://github.com/NebulousLabs/docker-sia-ant-farm)
+* [Docker Hub](https://hub.docker.com/r/nebulouslabs/siaantfarm)
+
 # Install
 
 ```shell
