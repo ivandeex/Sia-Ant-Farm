@@ -5,7 +5,7 @@ stages:
 variables:
   pkgs: >-
     ./ant
-    ./sia-antfarm
+    ./antfarm
 
 default: &default_params
   ## Run tests with most recent golang version to take advantage of any perf

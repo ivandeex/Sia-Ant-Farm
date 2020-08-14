@@ -1,4 +1,4 @@
-package main
+package antfarm
 
 import (
 	"encoding/json"
@@ -39,9 +39,9 @@ type (
 		ExternalFarms []string
 	}
 
-	// antFarm defines the 'antfarm' type. antFarm orchestrates a collection of
+	// AntFarm defines the 'antfarm' type. antFarm orchestrates a collection of
 	// ants and provides an API server to interact with them.
-	antFarm struct {
+	AntFarm struct {
 		apiListener net.Listener
 
 		// ants is a slice of Ants in this antfarm.
@@ -58,8 +58,8 @@ type (
 	}
 )
 
-// createAntfarm creates a new antFarm given the supplied AntfarmConfig
-func createAntfarm(config AntfarmConfig) (*antFarm, error) {
+// New creates a new antFarm given the supplied AntfarmConfig
+func New(config AntfarmConfig) (*AntFarm, error) {
 	// clear old antfarm data before creating an antfarm
 	datadir := "./antfarm-data"
 	if config.DataDir != "" {
@@ -69,7 +69,7 @@ func createAntfarm(config AntfarmConfig) (*antFarm, error) {
 	os.RemoveAll(datadir)
 	os.MkdirAll(datadir, 0700)
 
-	farm := &antFarm{}
+	farm := &AntFarm{}
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
@@ -181,13 +181,13 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 
 // allAnts returns all ants, external and internal, associated with this
 // antFarm.
-func (af *antFarm) allAnts() []*ant.Ant {
+func (af *AntFarm) allAnts() []*ant.Ant {
 	return append(af.ants, af.externalAnts...)
 }
 
 // connectExternalAntfarm connects the current antfarm to an external antfarm,
 // using the antfarm api at externalAddress.
-func (af *antFarm) connectExternalAntfarm(externalAddress string) error {
+func (af *AntFarm) connectExternalAntfarm(externalAddress string) error {
 	res, err := http.DefaultClient.Get("http://" + externalAddress + "/ants")
 	if err != nil {
 		return err
@@ -204,14 +204,14 @@ func (af *antFarm) connectExternalAntfarm(externalAddress string) error {
 }
 
 // ServeAPI serves the antFarm's http API.
-func (af *antFarm) ServeAPI() error {
+func (af *AntFarm) ServeAPI() error {
 	http.Serve(af.apiListener, af.router)
 	return nil
 }
 
 // GetAntByName return the ant with the given name. If there is no ant with the
 // given name error is reported.
-func (af *antFarm) GetAntByName(name string) (foundAnt *ant.Ant, err error) {
+func (af *AntFarm) GetAntByName(name string) (foundAnt *ant.Ant, err error) {
 	for _, a := range af.ants {
 		if a.Config.Name == name {
 			return a, nil
@@ -220,9 +220,9 @@ func (af *antFarm) GetAntByName(name string) (foundAnt *ant.Ant, err error) {
 	return &ant.Ant{}, fmt.Errorf("ant with name %v doesn't exist", name)
 }
 
-// permanentSyncMonitor checks that all ants in the antFarm are on the same
+// PermanentSyncMonitor checks that all ants in the antFarm are on the same
 // blockchain.
-func (af *antFarm) permanentSyncMonitor() {
+func (af *AntFarm) PermanentSyncMonitor() {
 	// Every 20 seconds, list all consensus groups and display the block height.
 	for {
 		// TODO: antfarm struct should have a threadgroup to be able to pick up
@@ -258,7 +258,7 @@ func (af *antFarm) permanentSyncMonitor() {
 
 // getAnts is a http handler that returns the ants currently running on the
 // antfarm.
-func (af *antFarm) getAnts(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
+func (af *AntFarm) getAnts(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 	err := json.NewEncoder(w).Encode(af.ants)
 	if err != nil {
 		http.Error(w, "error encoding ants", 500)
@@ -266,7 +266,7 @@ func (af *antFarm) getAnts(w http.ResponseWriter, r *http.Request, _ httprouter.
 }
 
 // Close signals all the ants to stop and waits for them to return.
-func (af *antFarm) Close() error {
+func (af *AntFarm) Close() error {
 	if af.apiListener != nil {
 		af.apiListener.Close()
 	}

@@ -12,9 +12,13 @@ lint-dependencies:
 count = 1
 
 pkgs = \
-	./sia-antfarm \
 	./ant \
+	./antfarm \
+	./cmd/sia-antfarm \
 	./upnprouter
+
+release-pkgs = \
+	./cmd/sia-antfarm
 
 run = .
 
@@ -35,7 +39,7 @@ fmt:
 
 # install builds and installs binaries.
 install:
-	go install $(pkgs)
+	go install $(release-pkgs)
 
 install-siad-dev:
 	go build -o $(GOPATH)/bin/siad-dev -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
