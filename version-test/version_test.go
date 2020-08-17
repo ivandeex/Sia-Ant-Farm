@@ -106,7 +106,7 @@ func TestRenterSiadUpdates(t *testing.T) {
 	// Testing on external IPs on the Hetzner box can be enabled when
 	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
 	// is done
-	antfarmConfig := antfarm.CreateBasicRenterAntfarmConfig(dataDir, true)
+	antfarmConfig := antfarm.NewDefaultRenterAntfarmTestingConfig(dataDir, true)
 	var farm *antfarm.AntFarm
 
 	var uploadedFiles []ant.RenterFile
