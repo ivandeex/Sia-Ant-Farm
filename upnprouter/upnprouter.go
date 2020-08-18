@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 
+	"github.com/sqs/goreturns/returns"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/go-upnp"
 )
@@ -17,6 +18,10 @@ var (
 // CheckUPnPEnabled checks wheteher there is UPnP enabled router connected and
 // sets the flag accordingly
 func CheckUPnPEnabled() {
+	// If we already know that UPnP is not enabled, do not check again
+	if !UPnPEnabled {
+		return
+	}
 	_, err := upnp.Discover()
 	if err != nil {
 		UPnPEnabled = false
