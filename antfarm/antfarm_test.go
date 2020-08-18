@@ -133,14 +133,14 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts.Address = farm1.ants[0].APIAddr
+	opts.Address = farm1.Ants[0].APIAddr
 	c := client.New(opts)
 	gatewayInfo, err := c.GatewayGet()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	for _, ant := range farm2.ants {
+	for _, ant := range farm2.Ants {
 		hasAddr := false
 		for _, peer := range gatewayInfo.Peers {
 			if fmt.Sprint(peer.NetAddress) == ant.RPCAddr {

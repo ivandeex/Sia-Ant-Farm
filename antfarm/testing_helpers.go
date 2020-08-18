@@ -12,8 +12,8 @@ import (
 	"gitlab.com/NebulousLabs/Sia/modules"
 )
 
-// NewDefaultRenterAntfarmTestingConfig creates default basic antfarm config for
-// running renter tests
+// NewDefaultRenterAntfarmTestingConfig creates default basic antfarm config
+// for running renter tests
 func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) AntfarmConfig {
 	antFarmAddr := test.RandomLocalAddress()
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
