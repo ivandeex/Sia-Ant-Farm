@@ -217,18 +217,16 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		// become upload ready
 		err = renterAnt.Jr.WaitForRenterUploadReady()
 		if err != nil {
-			t.Log(err)
-			t.Fail()
-			return
+			t.Error(err)
+			continue
 		}
 
 		// Upload a file
 		renterJob := renterAnt.Jr.NewRenterJob()
 		_, err = renterJob.Upload(modules.SectorSize)
 		if err != nil {
-			t.Log(err)
-			t.Fail()
-			return
+			t.Error(err)
+			continue
 		}
 
 		// Add file to file list
@@ -237,9 +235,8 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		// Download and verify files
 		err = antfarm.DownloadAndVerifyFiles(t, renterAnt, uploadedFiles)
 		if err != nil {
-			t.Log(err)
-			t.Fail()
-			return
+			t.Error(err)
+			continue
 		}
 	}
 }

@@ -69,18 +69,21 @@ func (j *JobRunner) jobHost() {
 	// jobHost after the ant upgrade.
 	hostdir, err := filepath.Abs(filepath.Join(j.staticSiaDirectory, "hostdata"))
 	if err != nil {
-		panic(err)
+		log.Printf("[ERROR] [jobHost] [%v] Can't get hostdata directory absolute path: %v\n", j.staticSiaDirectory, err)
+		return
 	}
 	_, err = os.Stat(hostdir)
 	if err != nil && !os.IsNotExist(err) {
-		panic(err)
+		log.Printf("[ERROR] [jobHost] [%v] Can't get hostdata directory info: %v\n", j.staticSiaDirectory, err)
+		return
 	}
 	// Folder doesn't exist
 	if os.IsNotExist(err) {
 		// Create a temporary folder for hosting
 		err = os.MkdirAll(hostdir, 0700)
 		if err != nil {
-			panic(err)
+			log.Printf("[ERROR] [jobHost] [%v] Can't create hostdata directory: %v\n", j.staticSiaDirectory, err)
+			return
 		}
 
 		// Add the storage folder.
