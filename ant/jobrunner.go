@@ -95,7 +95,7 @@ func (j *JobRunner) WaitForRenterUploadReady() error {
 	case <-ready:
 		return nil
 	case <-time.After(renterUploadReadyTimeout):
-		return fmt.Errorf("waiting for upload ready reached timeout %v", renterUploadReadyTimeout)
+		return fmt.Errorf("waiting for renter to become upload ready reached timeout %v", renterUploadReadyTimeout)
 	case <-j.StaticTG.StopChan():
 		return errors.New("ant was stopped")
 	}

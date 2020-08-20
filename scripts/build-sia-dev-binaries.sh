@@ -36,6 +36,7 @@ function build_version {
   # checkout the version
   git reset --hard HEAD
   git checkout $version
+  git pull
   
   # create workspace
   folder=$target_folder/Sia-$version-$os-$arch
@@ -50,6 +51,9 @@ function build_version {
     git checkout bc4a11e
     popd > /dev/null
   fi
+
+  # compile dependencies
+  make dependencies
 
   # compile siad-dev binaries
   pkg=siad

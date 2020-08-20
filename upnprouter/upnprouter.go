@@ -1,6 +1,7 @@
 package upnprouter
 
 import (
+	"log"
 	"net"
 
 	"gitlab.com/NebulousLabs/errors"
@@ -16,9 +17,16 @@ var (
 // CheckUPnPEnabled checks wheteher there is UPnP enabled router connected and
 // sets the flag accordingly
 func CheckUPnPEnabled() {
+	// If we already know that UPnP is not enabled, do not check again
+	if !UPnPEnabled {
+		return
+	}
 	_, err := upnp.Discover()
 	if err != nil {
 		UPnPEnabled = false
+		log.Printf("[INFO] [ant-farm] UPnP enabled router is not available: %v", err)
+	} else {
+		log.Println("[INFO] [ant-farm] UPnP enabled router is available")
 	}
 }
 

@@ -44,8 +44,8 @@ type (
 	AntFarm struct {
 		apiListener net.Listener
 
-		// ants is a slice of Ants in this antfarm.
-		ants []*ant.Ant
+		// Ants is a slice of Ants in this antfarm.
+		Ants []*ant.Ant
 
 		// externalAnts is a slice of externally connected ants, that is, ants that
 		// are connected to this antfarm but managed by another antfarm.
@@ -104,7 +104,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 		return nil, errors.AddContext(err, "unable to start jobs")
 	}
 
-	farm.ants = ants
+	farm.Ants = ants
 	defer func() {
 		if err != nil {
 			farm.Close()
@@ -182,7 +182,7 @@ func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
 // allAnts returns all ants, external and internal, associated with this
 // antFarm.
 func (af *AntFarm) allAnts() []*ant.Ant {
-	return append(af.ants, af.externalAnts...)
+	return append(af.Ants, af.externalAnts...)
 }
 
 // connectExternalAntfarm connects the current antfarm to an external antfarm,
@@ -212,7 +212,7 @@ func (af *AntFarm) ServeAPI() error {
 // GetAntByName return the ant with the given name. If there is no ant with the
 // given name error is reported.
 func (af *AntFarm) GetAntByName(name string) (foundAnt *ant.Ant, err error) {
-	for _, a := range af.ants {
+	for _, a := range af.Ants {
 		if a.Config.Name == name {
 			return a, nil
 		}
@@ -238,7 +238,7 @@ func (af *AntFarm) PermanentSyncMonitor() {
 
 		// Check if ants are synced
 		if len(groups) == 1 {
-			log.Println("Ants are synchronized. Block Height: ", af.ants[0].BlockHeight())
+			log.Println("Ants are synchronized. Block Height: ", af.Ants[0].BlockHeight())
 			continue
 		}
 
@@ -259,7 +259,7 @@ func (af *AntFarm) PermanentSyncMonitor() {
 // getAnts is a http handler that returns the ants currently running on the
 // antfarm.
 func (af *AntFarm) getAnts(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
-	err := json.NewEncoder(w).Encode(af.ants)
+	err := json.NewEncoder(w).Encode(af.Ants)
 	if err != nil {
 		http.Error(w, "error encoding ants", 500)
 	}
@@ -270,8 +270,33 @@ func (af *AntFarm) Close() error {
 	if af.apiListener != nil {
 		af.apiListener.Close()
 	}
-	for _, ant := range af.ants {
+	for _, ant := range af.Ants {
 		ant.Close()
 	}
 	return nil
+}
+
+// GetAntConfigIndexByName returns index of ant config in antfarm's AntConfigs
+// by given ant name
+func (afc *AntfarmConfig) GetAntConfigIndexByName(name string) (antConfigIndex int, err error) {
+	for i, ac := range afc.AntConfigs {
+		if ac.Name == name {
+			return i, nil
+		}
+	}
+	return 0, fmt.Errorf("ant with name %v doesn't exist", name)
+}
+
+// GetHostAntConfigIndices returns slice of indices of ant configs which have
+// defined host job
+func (afc *AntfarmConfig) GetHostAntConfigIndices() (antConfigIndices []int) {
+	for i, ac := range afc.AntConfigs {
+		for _, j := range ac.Jobs {
+			if j == "host" {
+				antConfigIndices = append(antConfigIndices, i)
+				break
+			}
+		}
+	}
+	return antConfigIndices
 }

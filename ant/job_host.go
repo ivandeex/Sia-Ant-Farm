@@ -64,16 +64,35 @@ func (j *JobRunner) jobHost() {
 		}
 	}
 
-	// Create a temporary folder for hosting
-	hostdir, _ := filepath.Abs(filepath.Join(j.staticSiaDirectory, "hostdata"))
-	os.MkdirAll(hostdir, 0700)
-
-	// Add the storage folder.
-	size := modules.SectorSize * 4096
-	err = j.staticClient.HostStorageFoldersAddPost(hostdir, size)
+	// Create a temporary folder for hosting if it does not exist. The folder
+	// can exist when we are performing host upgrade and we are restarting its
+	// jobHost after the ant upgrade.
+	hostdir, err := filepath.Abs(filepath.Join(j.staticSiaDirectory, "hostdata"))
 	if err != nil {
-		log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+		log.Printf("[ERROR] [jobHost] [%v] Can't get hostdata directory absolute path: %v\n", j.staticSiaDirectory, err)
 		return
+	}
+	_, err = os.Stat(hostdir)
+	if err != nil && !os.IsNotExist(err) {
+		log.Printf("[ERROR] [jobHost] [%v] Can't get hostdata directory info: %v\n", j.staticSiaDirectory, err)
+		return
+	}
+	// Folder doesn't exist
+	if os.IsNotExist(err) {
+		// Create a temporary folder for hosting
+		err = os.MkdirAll(hostdir, 0700)
+		if err != nil {
+			log.Printf("[ERROR] [jobHost] [%v] Can't create hostdata directory: %v\n", j.staticSiaDirectory, err)
+			return
+		}
+
+		// Add the storage folder.
+		size := modules.SectorSize * 4096
+		err = j.staticClient.HostStorageFoldersAddPost(hostdir, size)
+		if err != nil {
+			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+			return
+		}
 	}
 
 	// Announce the host to the network, retrying up to 5 times before reporting

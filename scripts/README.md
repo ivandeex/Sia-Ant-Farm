@@ -11,6 +11,9 @@ format `Sia-{version}-{os}-{architecture}` in the created directory
 
 The script gets all released Sia versions from `v1.3.7` on by calling
 `get-versions.sh` script.
+### Requirements
+`Sia` git repository must be a sibling of `Sia-Ant-Farm` git repository on
+local machine when this script is executed.
 ### Execution
 Execute the script e.g. from the `Sia Ant Farm` repository root:
 ```
@@ -31,6 +34,8 @@ line.
 
 It is intended to be helper script for `build-sia-dev-binaries.sh` and for
 `Sia Ant Farm` Go code to get upgrade path for version tests.
+### Requirements
+* `jq` library installed in PATH
 ### Execution
 Execute the script e.g. from the `Sia Ant Farm` repository root:
 ```

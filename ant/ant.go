@@ -217,10 +217,10 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	}
 
 	// Update path to new siad binary
-	a.Config.SiadPath = siadPath
+	a.Config.SiadConfig.SiadPath = siadPath
 
 	// Construct the ant's Siad instance
-	log.Printf("[INFO] [ant] [%v] Starting new siad process\n", a.Config.SiadConfig.DataDir)
+	log.Printf("[INFO] [ant] [%v] Starting new siad process using %v\n", a.Config.SiadConfig.DataDir, siadPath)
 	siad, err := newSiad(a.Config.SiadConfig)
 	if err != nil {
 		return errors.AddContext(err, "unable to create new siad process")
