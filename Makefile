@@ -15,7 +15,8 @@ pkgs = \
 	./ant \
 	./antfarm \
 	./cmd/sia-antfarm \
-	./upnprouter
+	./upnprouter \
+	./version-test
 
 release-pkgs = \
 	./cmd/sia-antfarm
@@ -93,6 +94,5 @@ staticcheck:
 # NOTE: go vet requires packages to be built in order to obtain type info.
 vet:
 	go vet $(pkgs)
-
 
 .PHONY: all dependencies pkgs fmt vet install test lint clean cover

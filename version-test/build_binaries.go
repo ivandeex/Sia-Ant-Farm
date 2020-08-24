@@ -31,7 +31,7 @@ type (
 	// semantic version.
 	bySemanticVersion []string
 
-	// command defines a struct for parameters to call executeCommand function.
+	// command defines a struct for parameters to call execute method.
 	command struct {
 		// Specific environment variables to set
 		envVars map[string]string
@@ -50,22 +50,26 @@ func buildSiad(binariesDir string, versions ...string) error {
 	msg := fmt.Sprintf("[INFO] [build-binaries] Preparing to build siad versions: %v", vs)
 	log.Println(msg)
 
-	// Check Sia repository exists locally
-	goPath, ok := os.LookupEnv("GOPATH")
-	if !ok {
-		return errors.New("couldn't get GOPATH environment variable")
-	}
-	siaPath := fmt.Sprintf("%v/src/gitlab.com/NebulousLabs/Sia", goPath)
-	if _, err := os.Stat(siaPath); os.IsNotExist(err) {
-		return errors.AddContext(err, "Sia directory doesn't exist in GOPATH")
-	}
-
 	// Get current working directory and change back to it when done
 	startDir, err := os.Getwd()
 	if err != nil {
 		return errors.AddContext(err, "can't get current working directory")
 	}
 	defer os.Chdir(startDir)
+
+	// Clone Sia repository if it doesn't exist locally
+	goPath, ok := os.LookupEnv("GOPATH")
+	if !ok {
+		return errors.New("couldn't get GOPATH environment variable")
+	}
+	gitlabNebulous := "gitlab.com/NebulousLabs"
+	gitlabSia := fmt.Sprintf("%v/Sia", gitlabNebulous)
+	siaPath := fmt.Sprintf("%v/src/%v", goPath, gitlabSia)
+	siaRepoURL := fmt.Sprintf("https://%v.git", gitlabSia)
+	err = gitClone(siaRepoURL, siaPath)
+	if err != nil {
+		return errors.AddContext(err, "can't clone Sia repository")
+	}
 
 	// Set working dir to Sia repository
 	err = os.Chdir(siaPath)
@@ -78,7 +82,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 		name: "git",
 		args: []string{"reset", "--hard", "HEAD"},
 	}
-	_, err = executeCommand(cmd)
+	_, err = cmd.execute()
 	if err != nil {
 		return errors.AddContext(err, "can't reset Sia git repository")
 	}
@@ -88,7 +92,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 		name: "git",
 		args: []string{"pull", "origin", "master"},
 	}
-	_, err = executeCommand(cmd)
+	_, err = cmd.execute()
 	if err != nil {
 		return errors.AddContext(err, "can't pull Sia git repository")
 	}
@@ -112,9 +116,18 @@ func buildSiad(binariesDir string, versions ...string) error {
 		}
 
 		// Checkout merkletree repository correct commit in for Sia v1.4.0
-		merkletreePath := filepath.Join(goPath, "src/gitlab.com/NebulousLabs/merkletree")
+		merkletreePath := filepath.Join(goPath, "src", gitlabNebulous, "merkletree")
 		if version == "v1.4.0" {
-			err := gitCheckout(merkletreePath, "bc4a11e")
+			// Clone merkletree repo if not yet available
+			gitlabMerkletree := fmt.Sprintf("%v/merkletree", gitlabNebulous)
+			merkletreeRepoURL := fmt.Sprintf("https://%v.git", gitlabMerkletree)
+			err := gitClone(merkletreeRepoURL, merkletreePath)
+			if err != nil {
+				return errors.AddContext(err, "can't clone merkletree repository")
+			}
+
+			// Checkout the specific merkletree commit
+			err = gitCheckout(merkletreePath, "bc4a11e")
 			if err != nil {
 				return errors.AddContext(err, "can't checkout specific merkletree commit")
 			}
@@ -131,22 +144,24 @@ func buildSiad(binariesDir string, versions ...string) error {
 			name: "go",
 			args: []string{"get", "-d", "./..."},
 		}
-		_, err = executeCommand(cmd)
+		_, err = cmd.execute()
 		if err != nil {
 			return errors.AddContext(err, "can't get dependencies")
 		}
 
 		// Compile siad-dev binaries
-		pkg := "./cmd/siad"
+		pkg := "gitlab.com/NebulousLabs/Sia/cmd/siad"
 		binaryName := "siad-dev"
 
 		// Set ldflags according to Sia/Makefile
-		buildTime, err := executeCommand(command{name: "date"})
+		cmd = command{name: "date"}
+		buildTime, err := cmd.execute()
 		if err != nil {
 			return errors.AddContext(err, "can't get build time")
 		}
 		buildTime = strings.TrimSpace(buildTime)
-		gitRevision, err := executeCommand(command{name: "git", args: []string{"rev-parse", "--short", "HEAD"}})
+		cmd = command{name: "git", args: []string{"rev-parse", "--short", "HEAD"}}
+		gitRevision, err := cmd.execute()
 		if err != nil {
 			return errors.AddContext(err, "can't get git revision")
 		}
@@ -175,7 +190,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 			name: "go",
 			args: args,
 		}
-		_, err = executeCommand(cmd)
+		_, err = cmd.execute()
 		if err != nil {
 			return errors.AddContext(err, "can't build siad binary")
 		}
@@ -192,32 +207,6 @@ func buildSiad(binariesDir string, versions ...string) error {
 	return nil
 }
 
-// executeCommand executes a given shell command defined by command argument.
-// Command struct is used instead of passing the whole command as a string and
-// parsing string arguments because parsing arguments containing spaces would
-// make the parsing much complex.
-func executeCommand(command command) (string, error) {
-	cmd := exec.Command(command.name, command.args...) //nolint:gosec
-	cmd.Env = os.Environ()
-	var envVars = []string{}
-	for k, v := range command.envVars {
-		ev := fmt.Sprintf("%v=%v", k, v)
-		envVars = append(envVars, ev)
-		cmd.Env = append(cmd.Env, ev)
-	}
-
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		readableEnvVars := strings.Join(envVars, " ")
-		readableArgs := strings.Join(command.args, " ")
-		readableCommand := fmt.Sprintf("%v %v %v", readableEnvVars, command.name, readableArgs)
-		log.Printf("[ERROR] [build-binaries] Error executing command: %v. See command output below:\n%v", readableCommand, string(out))
-		msg := fmt.Sprintf("can't execute comand: %v", readableCommand)
-		return "", errors.AddContext(err, msg)
-	}
-	return string(out), nil
-}
-
 // getReleases returns slice of git tags of Sia Gitlab releases greater than or
 // equal to the given minimal version in ascending semantic version order
 func getReleases(minVersion string) ([]string, error) {
@@ -229,10 +218,13 @@ func getReleases(minVersion string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	if resp.Status != "200 OK" {
+	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("response status from Gitlab is not '200 OK' but %v", resp.Status)
 	}
 	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't read response body")
+	}
 
 	// Decode response into slice of release data
 	var releases []map[string]interface{}
@@ -277,7 +269,7 @@ func gitCheckout(gitRepoPath, checkoutStr string) error {
 		name: "git",
 		args: []string{"reset", "--hard", "HEAD"},
 	}
-	_, err = executeCommand(cmd)
+	_, err = cmd.execute()
 	if err != nil {
 		return errors.AddContext(err, "can't reset git repository")
 	}
@@ -287,9 +279,41 @@ func gitCheckout(gitRepoPath, checkoutStr string) error {
 		name: "git",
 		args: []string{"checkout", checkoutStr},
 	}
-	_, err = executeCommand(cmd)
+	_, err = cmd.execute()
 	if err != nil {
 		return errors.AddContext(err, "can't perform git checkout")
+	}
+
+	return nil
+}
+
+// gitClone clones git repository by given URL to the given path.
+func gitClone(repoURL, repoPath string) error {
+	// Return if directory already exists
+	_, err := os.Stat(repoPath)
+	if err != nil && !os.IsNotExist(err) {
+		return errors.AddContext(err, "can't get directory info")
+	} else if err == nil {
+		return nil
+	}
+
+	// Directory doesn't exist
+	log.Printf("[INFO] [build-binaries] Cloning git repository %v to %v.\n", repoURL, repoPath)
+
+	// Create repository directory
+	err = os.MkdirAll(repoPath, 0700)
+	if err != nil {
+		return errors.AddContext(err, "can't create repository directory")
+	}
+
+	// Clone repository
+	cmd := command{
+		name: "git",
+		args: []string{"clone", repoURL, repoPath},
+	}
+	_, err = cmd.execute()
+	if err != nil {
+		return errors.AddContext(err, "can't clone repository")
 	}
 
 	return nil
@@ -308,4 +332,37 @@ func (s bySemanticVersion) Swap(i, j int) {
 // Less implements sort.Interface to sort by semantic version
 func (s bySemanticVersion) Less(i, j int) bool {
 	return build.VersionCmp(s[i], s[j]) < 0
+}
+
+// execute executes a given shell command defined by command receiver.
+// Command struct is used instead of passing the whole command as a string and
+// parsing string arguments because parsing arguments containing spaces would
+// make the parsing much complex.
+func (c command) execute() (string, error) {
+	cmd := exec.Command(c.name, c.args...) //nolint:gosec
+	cmd.Env = os.Environ()
+	var envVars = []string{}
+	for k, v := range c.envVars {
+		ev := fmt.Sprintf("%v=%v", k, v)
+		envVars = append(envVars, ev)
+		cmd.Env = append(cmd.Env, ev)
+	}
+
+	out, err := cmd.CombinedOutput()
+
+	if err != nil {
+		readableEnvVars := strings.Join(envVars, " ")
+		readableArgs := strings.Join(c.args, " ")
+		readableCommand := fmt.Sprintf("%v %v %v", readableEnvVars, c.name, readableArgs)
+		wd, err := os.Getwd()
+		if err != nil {
+			return "", errors.AddContext(err, "can't get working directory")
+		}
+
+		log.Printf("[ERROR] [build-binaries] Error executing bash command:\nWorking directory: %v\nCommand: %v\nOutput:\n%v\n", wd, readableCommand, string(out))
+
+		msg := fmt.Sprintf("can't execute comand: %v", readableCommand)
+		return "", errors.AddContext(err, msg)
+	}
+	return string(out), nil
 }

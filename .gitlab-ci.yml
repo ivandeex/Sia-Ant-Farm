@@ -6,6 +6,14 @@ variables:
   pkgs: >-
     ./ant
     ./antfarm
+    ./upnprouter
+    ./version-test
+  ant_pkgs: >-
+    ./ant
+  antfarm_pkgs: >-
+    ./antfarm
+  version_test_pkgs: >-
+    ./version-test
 
 default: &default_params
   ## Run tests with most recent golang version to take advantage of any perf
@@ -66,12 +74,29 @@ build:
       - cp "$GOPATH/bin/siad-dev" "$CI_PROJECT_DIR/artifacts/."
       - cp "$GOPATH/bin/sia-antfarm" "$CI_PROJECT_DIR/artifacts/."
 
-tests:
+ant-tests:
   <<: *default_test_params
   cache:
-    key: test-cache
+    key: ant-tests-cache
     paths:
       - .cache
   script:
-    - make test-long
+    - make test-long pkgs="$ant_pkgs"
 
+antfarm-tests:
+  <<: *default_test_params
+  cache:
+    key: antfarm-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-long pkgs="$antfarm_pkgs"
+
+version-test-tests:
+  <<: *default_test_params
+  cache:
+    key: version-test-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-long pkgs="$version_test_pkgs"
