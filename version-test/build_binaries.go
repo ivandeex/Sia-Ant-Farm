@@ -152,6 +152,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 		// Compile siad-dev binaries
 		pkg := "gitlab.com/NebulousLabs/Sia/cmd/siad"
 		binaryName := "siad-dev"
+		binaryPath := filepath.Join(binaryDir, binaryName)
 
 		// Set ldflags according to Sia/Makefile
 		cmd = command{name: "date"}
@@ -169,18 +170,18 @@ func buildSiad(binariesDir string, versions ...string) error {
 
 		var ldFlags string
 		ldFlags += fmt.Sprintf(" -X gitlab.com/NebulousLabs/Sia/build.GitRevision=%v", gitRevision)
-		ldFlags += fmt.Sprintf(" -X gitlab.com/NebulousLabs/Sia/build.BuildTime='%v'", buildTime)
+		ldFlags += fmt.Sprintf(" -X 'gitlab.com/NebulousLabs/Sia/build.BuildTime=%v'", buildTime)
 
 		var args []string
 		args = append(args, "build")
 		args = append(args, "-a")
 		args = append(args, "-tags")
-		args = append(args, "'dev debug profile netgo'")
+		args = append(args, "dev debug profile netgo")
 		args = append(args, "-trimpath")
 		args = append(args, "-ldflags")
-		args = append(args, "\""+ldFlags+"\"")
+		args = append(args, ldFlags)
 		args = append(args, "-o")
-		args = append(args, filepath.Join(binaryDir, binaryName))
+		args = append(args, binaryPath)
 		args = append(args, pkg)
 
 		cmd = command{
@@ -355,9 +356,9 @@ func (c command) execute() (string, error) {
 		readableEnvVars := strings.Join(envVars, " ")
 		readableArgs := strings.Join(c.args, " ")
 		readableCommand := fmt.Sprintf("%v %v %v", readableEnvVars, c.name, readableArgs)
-		wd, err := os.Getwd()
-		if err != nil {
-			return "", errors.AddContext(err, "can't get working directory")
+		wd, wdErr := os.Getwd()
+		if wdErr != nil {
+			return "", errors.AddContext(wdErr, "can't get working directory")
 		}
 
 		log.Printf("[ERROR] [build-binaries] Error executing bash command:\nWorking directory: %v\nCommand: %v\nOutput:\n%v\n", wd, readableCommand, string(out))

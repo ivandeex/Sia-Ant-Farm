@@ -94,10 +94,16 @@ func TestUpgrades(t *testing.T) {
 
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
-		buildSiad(binariesDir, upgradePathVersions...)
+		err := buildSiad(binariesDir, upgradePathVersions...)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if rebuildMaster {
-		buildSiad(binariesDir, "master")
+		err := buildSiad(binariesDir, "master")
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	// Add master to upgrade path
