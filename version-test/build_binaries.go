@@ -174,7 +174,8 @@ func buildSiad(binariesDir string, versions ...string) error {
 		var args []string
 		args = append(args, "build")
 		args = append(args, "-a")
-		args = append(args, "-tags='dev debug profile netgo'")
+		args = append(args, "-tags")
+		args = append(args, "'dev debug profile netgo'")
 		args = append(args, "-trimpath")
 		args = append(args, "-ldflags")
 		args = append(args, "\""+ldFlags+"\"")
