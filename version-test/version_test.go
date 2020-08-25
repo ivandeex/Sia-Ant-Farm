@@ -70,7 +70,7 @@ func siadBinaryPath(version string) string {
 // file and downloads and verifies all uploaded files from the current and all
 // previous versions.
 func TestUpgrades(t *testing.T) {
-	if testing.Short() || !build.VLONG {
+	if !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
