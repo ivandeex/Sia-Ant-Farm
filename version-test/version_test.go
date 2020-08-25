@@ -9,9 +9,8 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
-	"gitlab.com/NebulousLabs/Sia/modules"
-
 	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/modules"
 )
 
 const (
