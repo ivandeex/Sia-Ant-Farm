@@ -119,14 +119,11 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
-func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) ([]*ant.Ant, error) {
-	var ants []*ant.Ant
-	var err error
-
+func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
 	// Ensure that, if an error occurs, all the ants that have been started are
 	// closed before returning.
 	defer func() {
-		if err != nil {
+		if returnErr != nil {
 			for _, ant := range ants {
 				ant.Close()
 			}
@@ -148,28 +145,26 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) ([]*ant.Ant
 		// Create Ant
 		ant, err := ant.New(antsSyncWG, cfg)
 		if err != nil {
+			// Ant is nil, we can't close it in defer
 			return nil, errors.AddContext(err, "unable to create ant")
 		}
 		defer func() {
-			if err != nil {
+			if returnErr != nil {
 				ant.Close()
 			}
 		}()
 
-		// Set host netaddress if on local network
-		if config.AllowHostLocalNetAddress {
-			// Create Sia Client
-			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
-			if err != nil {
-				return nil, err
-			}
+		// Create Sia Client
+		c, err := getClient(cfg.APIAddr, cfg.APIPassword)
+		if err != nil {
+			return nil, err
+		}
 
-			// Set netAddress
-			netAddress := cfg.HostAddr
-			err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
-			if err != nil {
-				return nil, errors.AddContext(err, "couldn't set host's netAddress")
-			}
+		// Set netAddress
+		netAddress := cfg.HostAddr
+		err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
+		if err != nil {
+			return nil, errors.AddContext(err, "couldn't set host's netAddress")
 		}
 
 		// Allow renter to rent on hosts on the same IP subnets
