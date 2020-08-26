@@ -21,6 +21,11 @@ const (
 	// https://gitlab.com/NebulousLabs/Sia > Project Overview > Details.
 	siaRepoID = "7508674"
 
+	// antfarmTagSuffix is a git tag suffix given to updated Sia releases in
+	// Sia repository. E.g. Sia release v1.4.8 was updated for antfarm and the
+	// git commit was tagged v1.4.8-antfarm
+	antfarmTagSuffix = "-antfarm"
+
 	// Build constants
 	goos = "linux"
 	arch = "amd64"
@@ -87,10 +92,10 @@ func buildSiad(binariesDir string, versions ...string) error {
 		return errors.AddContext(err, "can't reset Sia git repository")
 	}
 
-	// Git pull to get latest state
+	// Git pull including tags to get latest state
 	cmd = command{
 		name: "git",
-		args: []string{"pull", "origin", "master"},
+		args: []string{"pull", "--tags", "--prune", "origin", "master"},
 	}
 	_, err = cmd.execute()
 	if err != nil {
@@ -213,25 +218,15 @@ func buildSiad(binariesDir string, versions ...string) error {
 // equal to the given minimal version in ascending semantic version order
 func getReleases(minVersion string) ([]string, error) {
 	// Get releases from Gitlab Sia repository
-	url := fmt.Sprintf("https://gitlab.com/api/v4/projects/%v/releases", siaRepoID)
-	resp, err := http.Get(url) //nolint:gosec
+	body, err := querySiaRepoAPI("releases")
 	if err != nil {
-		return nil, errors.AddContext(err, "can't get releases from Gitlab")
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response status from Gitlab is not '200 OK' but %v", resp.Status)
-	}
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.AddContext(err, "can't read response body")
+		return nil, errors.AddContext(err, "can't get Sia releases from Gitlab")
 	}
 
 	// Decode response into slice of release data
 	var releases []map[string]interface{}
 	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, errors.AddContext(err, "can't decode response from Gitlab")
+		return nil, errors.AddContext(err, "can't decode releases response from Gitlab")
 	}
 
 	// Collect release tags greater than or equal to minVersion
@@ -245,6 +240,37 @@ func getReleases(minVersion string) ([]string, error) {
 
 	// Sort releases in ascending order by semantic version
 	sort.Sort(bySemanticVersion(releaseTags))
+
+	// When git tag with suffix "-antfarm" exists, replace release version
+	// Get tags from Gitlab Sia repository
+	body, err = querySiaRepoAPI("repository/tags")
+	if err != nil {
+		return nil, errors.AddContext(err, "can't get Sia tags from Gitlab")
+	}
+
+	// Decode response into slice of tags data
+	var tags []map[string]interface{}
+	if err := json.Unmarshal(body, &tags); err != nil {
+		return nil, errors.AddContext(err, "can't decode tags response from Gitlab")
+	}
+
+	// Collect tags with antfarm tag suffix
+	antfarmTags := make(map[string]struct{})
+	for _, t := range tags {
+		tag := fmt.Sprintf("%v", t["name"])
+		if strings.HasSuffix(tag, antfarmTagSuffix) {
+			antfarmTags[tag] = struct{}{}
+		}
+	}
+
+	// If there is an antfarm patch for a release, replace release tag with a
+	// patch tag
+	for i, r := range releaseTags {
+		versionWithSuffix := r + antfarmTagSuffix
+		if _, ok := antfarmTags[versionWithSuffix]; ok {
+			releaseTags[i] = versionWithSuffix
+		}
+	}
 
 	return releaseTags, nil
 }
@@ -319,6 +345,27 @@ func gitClone(repoURL, repoPath string) error {
 	}
 
 	return nil
+}
+
+// querySiaRepoAPI queries Sia repository using Gitlab API with the given
+// endpoint and returns response body as a byte slice.
+func querySiaRepoAPI(siaRepoEndpoint string) (body []byte, err error) {
+	url := fmt.Sprintf("https://gitlab.com/api/v4/projects/%v/%v", siaRepoID, siaRepoEndpoint)
+	resp, err := http.Get(url) //nolint:gosec
+	if err != nil {
+		msg := fmt.Sprintf("can't get response from %v", url)
+		return nil, errors.AddContext(err, msg)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("response status from Gitlab is not '200 OK' but %v", resp.Status)
+	}
+	body, err = ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't read response body")
+	}
+	return
 }
 
 // Len implements sort.Interface to sort by semantic version
