@@ -15,7 +15,8 @@ pkgs = \
 	./ant \
 	./antfarm \
 	./cmd/sia-antfarm \
-	./upnprouter
+	./upnprouter \
+	./version-test
 
 release-pkgs = \
 	./cmd/sia-antfarm
@@ -59,6 +60,10 @@ test-long: clean fmt vet lint-ci install-siad-dev
 	@mkdir -p cover
 	go test --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=3600s $(pkgs) -run=$(run) -count=$(count)
 
+test-vlong: clean fmt vet lint-ci install-siad-dev
+	@mkdir -p cover
+	go test -v -failfast -tags='testing debug vlong netgo' -timeout=3600s $(pkgs) -run=$(run) -count=$(count)
+
 # lint runs golangci-lint (which includes golint, a spellcheck of the codebase,
 # and other linters), the custom analyzers, and also a markdown spellchecker.
 lint: lint-dependencies markdown-spellcheck lint-golangci lint-analyze staticcheck
@@ -93,6 +98,5 @@ staticcheck:
 # NOTE: go vet requires packages to be built in order to obtain type info.
 vet:
 	go vet $(pkgs)
-
 
 .PHONY: all dependencies pkgs fmt vet install test lint clean cover

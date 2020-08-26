@@ -2,7 +2,6 @@ package versiontest
 
 import (
 	"fmt"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -10,15 +9,29 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
+	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/errors"
 )
 
 const (
-	// skipBuildingBinaries controls whether siad-binaries should be built.
-	// Initially this should be set to false, if you want rerun the test and do
-	// not need to rebuild the binaries, you can set it to true.
-	skipBuildingBinaries = false
+	// binariesDir defines path where build binaries should be stored. If the
+	// path is set as relative, it is relative to Sia-Ant-Farm/version-test
+	// directory.
+	binariesDir = "../upgrade-binaries"
+
+	// minVersion defines minimum released Sia version to include in built and
+	// tested binaries.
+	minVersion = "v1.3.7"
+
+	// rebuildReleaseBinaries defines whether the release siad binaries should
+	// be rebuilt. It can be set to false when rerunning the test(s) on already
+	// built binaries.
+	rebuildReleaseBinaries = true
+
+	// rebuildMaster defines whether the newest Sia master siad binary should
+	// be rebuilt. It can be set to false when rerunning the test(s) on already
+	// build binary.
+	rebuildMaster = true
 
 	// allowLocalIPs defines whether we allow ants to use localhost IPs.
 	// Default is true. When set to true it is possible to test from Sia v1.5.0
@@ -41,45 +54,9 @@ type upgradeTestConfig struct {
 	upgradePath   []string
 }
 
-// buildSiadDevBinaries calls script to get Sia releases starting from v1.3.7,
-// adds master, and builds their siad-dev binaries. See scripts/README.md for
-// more details.
-func buildSiadDevBinaries() error {
-	// Call scripts/build-sia-dev-binaries.sh to build required siad-dev
-	// binaries.
-	err := exec.Command("../scripts/build-sia-dev-binaries.sh").Run()
-	if err != nil {
-		return errors.AddContext(err, "couldn't build siad-dev binaries")
-	}
-	return nil
-}
-
 // siadBinaryPath returns built siad-dev binary path from the given Sia version
 func siadBinaryPath(version string) string {
 	return fmt.Sprintf("../upgrade-binaries/Sia-%v-linux-amd64/siad-dev", version)
-}
-
-// siaVersions calls script to get Sia releases starting from v1.3.7, adds
-// master, and return them as a string slice
-func siaVersions() ([]string, error) {
-	// Call scripts/get-versions.sh to get Sia releases
-	out, err := exec.Command("../scripts/get-versions.sh").Output()
-	if err != nil {
-		return []string{}, errors.AddContext(err, "couldn't get Sia releases")
-	}
-	// Convert []byte output to string
-	str := string(out)
-
-	// Split output string by new line
-	versions := strings.Split(str, "\n")
-
-	// Remove last empty string
-	versions = versions[:len(versions)-1]
-
-	// Add master as a version
-	versions = append(versions, "master")
-
-	return versions, nil
 }
 
 // TestUpgrades is test group which contains two version upgrade subtests.
@@ -93,7 +70,7 @@ func siaVersions() ([]string, error) {
 // file and downloads and verifies all uploaded files from the current and all
 // previous versions.
 func TestUpgrades(t *testing.T) {
-	if testing.Short() {
+	if !build.VLONG {
 		t.SkipNow()
 	}
 	t.Parallel()
@@ -107,15 +84,29 @@ func TestUpgrades(t *testing.T) {
 	// if err != nil {
 	// 	t.Fatal(err)
 	// }
-	upgradePathVersions := []string{"v1.5.0", "master"}
+	// upgradePathVersions := []string{"v1.5.0", "master"}
+
+	upgradePathVersions, err := getReleases(minVersion)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Build binaries to test.
-	if !skipBuildingBinaries {
-		err := buildSiadDevBinaries()
+	if rebuildReleaseBinaries {
+		err := buildSiad(binariesDir, upgradePathVersions...)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
+	if rebuildMaster {
+		err := buildSiad(binariesDir, "master")
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Add master to upgrade path
+	upgradePathVersions = append(upgradePathVersions, "master")
 
 	// Configure tests
 	tests := []upgradeTestConfig{
