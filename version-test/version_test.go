@@ -21,6 +21,7 @@ const (
 
 	// minVersion defines minimum released Sia version to include in built and
 	// tested binaries.
+        // TODO: Bring minVersion to v1.3.7
 	minVersion = "v1.4.10"
 
 	// rebuildReleaseBinaries defines whether the release siad binaries should
