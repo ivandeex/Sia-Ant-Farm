@@ -21,9 +21,10 @@ func TestBuildBinaries(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Check returned releases from Gitlab API (the beginning of the releases
-	// slice, newer releases can be added and the test will still pass)
-	expectedReleases := []string{"v1.3.7", "v1.4.0", "v1.4.1", "v1.4.1.1", "v1.4.1.2", "v1.4.2.0", "v1.4.3", "v1.4.4", "v1.4.5", "v1.4.6", "v1.4.7", "v1.4.8", "v1.4.10", "v1.4.11", "v1.5.0"}
+	// Check returned releases from Gitlab API. The beginning of the releases
+	// slice is checked, newer releases can be added to Sia repo and the test
+	// still passes.
+	expectedReleases := []string{"v1.3.7", "v1.4.0", "v1.4.1", "v1.4.1.1", "v1.4.1.2", "v1.4.2.0", "v1.4.3", "v1.4.4-antfarm", "v1.4.5-antfarm", "v1.4.6-antfarm", "v1.4.7-antfarm", "v1.4.8-antfarm", "v1.4.10", "v1.4.11", "v1.5.0"}
 	for i := range expectedReleases {
 		if releases[i] != expectedReleases[i] {
 			t.Fatalf("Expected to get release %v, got release %v\n", expectedReleases[i], releases[i])
