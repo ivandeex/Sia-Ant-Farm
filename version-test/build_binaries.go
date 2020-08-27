@@ -215,59 +215,53 @@ func buildSiad(binariesDir string, versions ...string) error {
 }
 
 // getReleases returns slice of git tags of Sia Gitlab releases greater than or
-// equal to the given minimal version in ascending semantic version order
+// equal to the given minimal version in ascending semantic version order. If
+// there is a patch tagged with "-antfarm" suffix for a Sia release, patch tag
+// instead release tag is added to the return slice.
 func getReleases(minVersion string) ([]string, error) {
-	// Get releases from Gitlab Sia repository
-	body, err := querySiaRepoAPI("releases")
+	// Get tags from Gitlab Sia repository. It can be multiple pages.
+	bodies, err := querySiaRepoAPI("repository/tags")
 	if err != nil {
-		return nil, errors.AddContext(err, "can't get Sia releases from Gitlab")
+		return nil, errors.AddContext(err, "can't get Sia tags from Gitlab")
 	}
 
-	// Decode response into slice of release data
-	var releases []map[string]interface{}
-	if err := json.Unmarshal(body, &releases); err != nil {
-		return nil, errors.AddContext(err, "can't decode releases response from Gitlab")
-	}
-
-	// Collect release tags greater than or equal to minVersion
+	// Colect release tags and release patch tags
 	var releaseTags []string
-	for _, r := range releases {
-		tag := fmt.Sprintf("%v", r["tag_name"])
-		if build.VersionCmp(tag, minVersion) >= 0 {
-			releaseTags = append(releaseTags, tag)
+	patchTags := make(map[string]struct{})
+
+	// Process each returned page data
+	for _, body := range bodies {
+		// Decode response into slice of tags data
+		var tags []map[string]interface{}
+		if err := json.Unmarshal(body, &tags); err != nil {
+			return nil, errors.AddContext(err, "can't decode tags response from Gitlab")
+		}
+
+		for _, t := range tags {
+			tag := fmt.Sprintf("%v", t["name"])
+
+			// Collect releases from minimal version up
+			tagNums := strings.TrimLeft(tag, "v")
+			minVersionNums := strings.TrimLeft(minVersion, "v")
+			if t["release"] != nil && build.VersionCmp(tagNums, minVersionNums) >= 0 {
+				releaseTags = append(releaseTags, tag)
+			}
+
+			// Collect release patch tags
+			if strings.HasSuffix(tag, antfarmTagSuffix) {
+				patchTags[tag] = struct{}{}
+			}
 		}
 	}
 
 	// Sort releases in ascending order by semantic version
 	sort.Sort(bySemanticVersion(releaseTags))
 
-	// When git tag with suffix "-antfarm" exists, replace release version
-	// Get tags from Gitlab Sia repository
-	body, err = querySiaRepoAPI("repository/tags")
-	if err != nil {
-		return nil, errors.AddContext(err, "can't get Sia tags from Gitlab")
-	}
-
-	// Decode response into slice of tags data
-	var tags []map[string]interface{}
-	if err := json.Unmarshal(body, &tags); err != nil {
-		return nil, errors.AddContext(err, "can't decode tags response from Gitlab")
-	}
-
-	// Collect tags with antfarm tag suffix
-	antfarmTags := make(map[string]struct{})
-	for _, t := range tags {
-		tag := fmt.Sprintf("%v", t["name"])
-		if strings.HasSuffix(tag, antfarmTagSuffix) {
-			antfarmTags[tag] = struct{}{}
-		}
-	}
-
 	// If there is an antfarm patch for a release, replace release tag with a
 	// patch tag
 	for i, r := range releaseTags {
 		versionWithSuffix := r + antfarmTagSuffix
-		if _, ok := antfarmTags[versionWithSuffix]; ok {
+		if _, ok := patchTags[versionWithSuffix]; ok {
 			releaseTags[i] = versionWithSuffix
 		}
 	}
@@ -348,22 +342,38 @@ func gitClone(repoURL, repoPath string) error {
 }
 
 // querySiaRepoAPI queries Sia repository using Gitlab API with the given
-// endpoint and returns response body as a byte slice.
-func querySiaRepoAPI(siaRepoEndpoint string) (body []byte, err error) {
-	url := fmt.Sprintf("https://gitlab.com/api/v4/projects/%v/%v", siaRepoID, siaRepoEndpoint)
-	resp, err := http.Get(url) //nolint:gosec
-	if err != nil {
-		msg := fmt.Sprintf("can't get response from %v", url)
-		return nil, errors.AddContext(err, msg)
-	}
-	defer resp.Body.Close()
+// endpoint. The Gitlab API results are paginated, so it returns a slice of
+// response bodies from each page. Each response body contains a byte slice.
+func querySiaRepoAPI(siaRepoEndpoint string) (bodies [][]byte, err error) {
+	// perPage defines maximum number of items returned by Gitlab API. The API
+	// pagination allows max 100 items per page
+	const perPage = 100
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("response status from Gitlab is not '200 OK' but %v", resp.Status)
-	}
-	body, err = ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errors.AddContext(err, "can't read response body")
+	// Handle Gitlab API pagination
+	page := 1
+	for {
+		url := fmt.Sprintf("https://gitlab.com/api/v4/projects/%v/%v?per_page=%v&page=%v", siaRepoID, siaRepoEndpoint, perPage, page)
+		resp, err := http.Get(url) //nolint:gosec
+		if err != nil {
+			msg := fmt.Sprintf("can't get response from %v", url)
+			return nil, errors.AddContext(err, msg)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("response status from Gitlab is not '200 OK' but %v", resp.Status)
+		}
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return nil, errors.AddContext(err, "can't read response body")
+		}
+		bodies = append(bodies, body)
+
+		if resp.Header.Get("X-Next-Page") == "" {
+			break
+		}
+
+		page++
 	}
 	return
 }
