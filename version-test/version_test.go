@@ -21,7 +21,8 @@ const (
 
 	// minVersion defines minimum released Sia version to include in built and
 	// tested binaries.
-	minVersion = "v1.3.7"
+	// TODO: Bring minVersion to v1.3.7
+	minVersion = "v1.4.10"
 
 	// rebuildReleaseBinaries defines whether the release siad binaries should
 	// be rebuilt. It can be set to false when rerunning the test(s) on already
@@ -43,7 +44,7 @@ const (
 	// box) can be enabled when
 	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
 	// is done.
-	allowLocalIPs = true
+	allowLocalIPs = false
 )
 
 // upgradeTestConfig is a struct to create configs for TestUpgrades subtests

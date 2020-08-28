@@ -58,6 +58,8 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to create log file")
 	}
+
+	// Create siad config arguments
 	args := []string{
 		"--modules=cgthmrw",
 		"--no-bootstrap",
@@ -65,13 +67,30 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 		"--api-addr=" + config.APIAddr,
 		"--rpc-addr=" + config.RPCAddr,
 		"--host-addr=" + config.HostAddr,
-		"--siamux-addr=" + config.SiaMuxAddr,
-		"--siamux-addr-ws=" + config.SiaMuxWsAddr,
+	}
+
+	// Set siamux only if it is supported by given siad version
+	siamuxSupported, err := siadFlagSupported(config.SiadPath, "--siamux-addr string")
+	if err != nil {
+		return nil, errors.AddContext(err, "can't determine siamux support")
+	}
+	if siamuxSupported {
+		args = append(args, "--siamux-addr="+config.SiaMuxAddr)
+	}
+
+	// Set siamux WS only if it is supported by given siad version
+	siamuxWSSupported, err := siadFlagSupported(config.SiadPath, "--siamux-addr-ws string")
+	if err != nil {
+		return nil, errors.AddContext(err, "can't determine siamux WS support")
+	}
+	if siamuxWSSupported {
+		args = append(args, "--siamux-addr-ws="+config.SiaMuxWsAddr)
 	}
 
 	if config.APIPassword == "" {
 		args = append(args, "--authenticate-api=false")
 	}
+
 	// Start siad, allow absolute and relative paths in config.SiadPath
 	siadCommand := fmt.Sprintf("%v %v", config.SiadPath, strings.Join(args, " "))
 	cmd := exec.Command("sh", "-c", siadCommand) //nolint:gosec
@@ -107,6 +126,21 @@ func checkSiadConstants(siadPath string) error {
 	}
 
 	return nil
+}
+
+//siadFlagSupported determines if the given siad binary supports the given flag
+func siadFlagSupported(siadPath, flag string) (bool, error) {
+	siadHelpCommand := fmt.Sprintf("%v -h", siadPath)
+	helpCmd := exec.Command("sh", "-c", siadHelpCommand) //nolint:gosec
+	output, err := helpCmd.Output()
+	if err != nil {
+		return false, errors.AddContext(err, "unable to determine siad flag support")
+	}
+	outputStr := string(output)
+	if strings.Contains(outputStr, flag) {
+		return true, nil
+	}
+	return false, nil
 }
 
 // stopSiad tries to stop the siad running at `apiAddr`, issuing a kill to its
