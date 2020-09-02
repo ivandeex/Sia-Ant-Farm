@@ -148,18 +148,17 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 	// Define test cases data
 	testCases := []struct {
 		name                          string
-		dataDirPostfix                string
 		renterDisableIPViolationCheck bool
 	}{
-		{"TestDefaultIPViolationCheck", "-default", false},
-		{"TestDisabledIPViolationCheck", "-ip-check-disabled", true},
+		{"TestDefaultIPViolationCheck", false},
+		{"TestDisabledIPViolationCheck", true},
 	}
 
 	// Run test cases
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create minimum configs
-			dataDir := test.TestDir(t.Name() + tc.dataDirPostfix)
+			dataDir := test.TestDir(t.Name())
 			antDirs := test.AntDirs(dataDir, 1)
 			configs := []ant.AntConfig{
 				{
