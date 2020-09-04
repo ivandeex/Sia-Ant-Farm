@@ -270,9 +270,15 @@ func (af *AntFarm) Close() error {
 	if af.apiListener != nil {
 		af.apiListener.Close()
 	}
-	for _, ant := range af.Ants {
-		ant.Close()
+	var antCloseWG sync.WaitGroup
+	for _, a := range af.Ants {
+		antCloseWG.Add(1)
+		go func(a *ant.Ant) {
+			a.Close()
+			antCloseWG.Done()
+		}(a)
 	}
+	antCloseWG.Wait()
 	return nil
 }
 
