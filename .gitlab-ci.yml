@@ -92,10 +92,10 @@ antfarm-tests:
   script:
     - make test-long pkgs="$antfarm_pkgs"
 
-version-test-tests:
+version-tests:
   <<: *default_test_params
   cache:
-    key: version-test-tests-cache
+    key: version-tests-cache
     paths:
       - .cache
   script:
