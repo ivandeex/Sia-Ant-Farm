@@ -397,7 +397,7 @@ func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopContr
 		if unconfirmedTxsLen+confirmedTxsLen < lastTxsLen {
 			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was dropped, transaction was probably re-orged\n", j.staticSiaDirectory)
 			loopControl.toAnnounceAccept = true
-			return
+			return true, false
 		}
 		lastTxsLen = unconfirmedTxsLen + confirmedTxsLen
 
@@ -406,7 +406,7 @@ func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopContr
 			log.Printf("[INFO] [host] [%v] Announce host and accept contract transactions were confirmed\n", j.staticSiaDirectory)
 			loopControl.announcedTxID = confirmedTxs[confirmedTxsLen-2].TransactionID
 			loopControl.acceptedTxID = confirmedTxs[confirmedTxsLen-1].TransactionID
-			return true, false
+			return
 		}
 	}
 }
