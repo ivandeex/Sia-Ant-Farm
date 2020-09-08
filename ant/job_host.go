@@ -365,7 +365,7 @@ func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopContr
 		if bh > startBH+hostAnnounceAcceptBlockHeightDelay {
 			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was not confirmed within %v blocks, transaction was probably re-orged\n", j.staticSiaDirectory, hostAnnounceAcceptBlockHeightDelay)
 			loopControl.toAnnounceAccept = true
-			return
+			return true, false
 		}
 
 		// Get transactions
