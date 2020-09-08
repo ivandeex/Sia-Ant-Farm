@@ -59,7 +59,7 @@ type (
 )
 
 // New creates a new antFarm given the supplied AntfarmConfig
-func New(config AntfarmConfig) (*AntFarm, error) {
+func New(config AntfarmConfig) (farm *AntFarm, returnErr error) {
 	// clear old antfarm data before creating an antfarm
 	datadir := "./antfarm-data"
 	if config.DataDir != "" {
@@ -68,8 +68,6 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 
 	os.RemoveAll(datadir)
 	os.MkdirAll(datadir, 0700)
-
-	farm := &AntFarm{}
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
@@ -106,7 +104,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 
 	farm.Ants = ants
 	defer func() {
-		if err != nil {
+		if returnErr != nil {
 			log.Println("xxx antfarm.New() defer closing farm...")
 			farm.Close()
 			log.Println("xxx antfarm.New() defer closed farm")
