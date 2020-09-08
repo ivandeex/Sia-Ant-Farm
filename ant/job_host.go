@@ -41,6 +41,18 @@ const (
 	miningCheckFrequency = time.Second
 )
 
+// hostJobLoopParams defines parameters for main host job loop. Main reason for
+// use of this struct is that we can pass parameters by reference and we will
+// avoid linting errors or need for workarounds which we get when using and
+// updating multiple parameters not wrapped in the struct.
+// parameters passed by reference.
+type hostJobLoopParams struct {
+	toAnnounceAccept bool
+	announcedTxID    types.TransactionID
+	acceptedTxID     types.TransactionID
+	prevRevenue      types.Currency
+}
+
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
 // storage to the ant farm.
 func (j *JobRunner) jobHost() {
@@ -111,21 +123,21 @@ func (j *JobRunner) jobHost() {
 	// periodically that announcing and accepting transaction are not re-orged,
 	// otherwise repeat. Check periodically that storage revenue doesn't
 	// decrease.
-	toAnnounceAccept := true
-	var announcedTxID, acceptedTxID types.TransactionID
-	prevRevenue := types.ZeroCurrency
+	params := hostJobLoopParams{
+		toAnnounceAccept: true,
+	}
 	for {
 		// Announce host to the network and accept contracts, wait till the
 		// transactions are confirmed, record transaction IDs to check later
 		// that the transactions are not re-orged
-		if cont, ret := announceAndAccept(j, &toAnnounceAccept, &announcedTxID, &acceptedTxID); cont {
+		if cont, ret := announceAndAccept(j, &params); cont {
 			continue
 		} else if ret {
 			return
 		}
 
 		// Check announce host transaction is not re-orged
-		if cont, ret := transactionReorged(j, announcedTxID, &toAnnounceAccept); cont {
+		if cont, ret := transactionReorged(j, params.announcedTxID, &params); cont {
 			log.Printf("[INFO] [host] [%v] Announcing host transaction doesn't exist anymore, transaction was probably re-orged\n", j.staticSiaDirectory)
 			continue
 		} else if ret {
@@ -133,7 +145,7 @@ func (j *JobRunner) jobHost() {
 		}
 
 		// Check accept contracts transaction is not re-orged
-		if cont, ret := transactionReorged(j, announcedTxID, &toAnnounceAccept); cont {
+		if cont, ret := transactionReorged(j, params.acceptedTxID, &params); cont {
 			log.Printf("[INFO] [host] [%v] Accepting contracts transaction doesn't exist anymore, transaction was probably re-orged\n", j.staticSiaDirectory)
 			continue
 		} else if ret {
@@ -141,7 +153,7 @@ func (j *JobRunner) jobHost() {
 		}
 
 		// Check storage revenue didn't decreased
-		if cont, ret := storageRevenueDecreased(j, &prevRevenue); cont {
+		if cont, ret := storageRevenueDecreased(j, &params.prevRevenue); cont {
 			continue
 		} else if ret {
 			return
@@ -151,7 +163,6 @@ func (j *JobRunner) jobHost() {
 		case <-j.StaticTG.StopChan():
 			return
 		case <-time.After(hostLoopFrequency):
-			continue
 		}
 	}
 }
@@ -159,9 +170,9 @@ func (j *JobRunner) jobHost() {
 // announceAndAccept returns if there are unconfirmed transactions, otherwise
 // posts host announcement, posts accepting contracts, waits till the
 // transactions are confirmed and updates both transaction IDs.
-func announceAndAccept(j *JobRunner, announceAndAccept *bool, announcedTxID, acceptedTxID *types.TransactionID) (continueLoop, returnCaller bool) {
+func announceAndAccept(j *JobRunner, loopControl *hostJobLoopParams) (continueLoop, returnCaller bool) {
 	// Return if should not announce and accept
-	if !*announceAndAccept {
+	if !loopControl.toAnnounceAccept {
 		return
 	}
 
@@ -218,17 +229,10 @@ func announceAndAccept(j *JobRunner, announceAndAccept *bool, announcedTxID, acc
 		}
 	}
 
-	fals := false
-	announceAndAccept = &fals
+	loopControl.toAnnounceAccept = false
 
-	// Wait till the transactions get confirmed
-	if cont, ret := waitTransactionsConfirmed(j, announceAndAccept, startConfirmedTxsLen, announcedTxID, acceptedTxID); cont {
-		return true, false
-	} else if ret {
-		return false, true
-	}
-
-	return
+	// Wait till the transactions get confirmed or timed-out
+	return waitTransactionsConfirmed(j, startConfirmedTxsLen, loopControl)
 }
 
 // filteredTransactions returns a slice of unconfirmed and a slice of confirmed
@@ -287,6 +291,7 @@ func storageRevenueDecreased(j *JobRunner, prevRevenue *types.Currency) (continu
 
 	// Print an error if storage revenue has decreased
 	if hostInfo.FinancialMetrics.StorageRevenue.Cmp(*prevRevenue) >= 0 {
+		// Update previous revenue to new amount
 		*prevRevenue = hostInfo.FinancialMetrics.StorageRevenue
 	} else {
 		// Storage revenue has decreased!
@@ -313,7 +318,7 @@ func transactionxExists(c *client.Client, txID types.TransactionID) (bool, error
 
 // transactionReorged checks if the transactions is re-orged, if so, it sets
 // announce and accept flag to true.
-func transactionReorged(j *JobRunner, txID types.TransactionID, announceAndAccept *bool) (continueLoop, returnCaller bool) {
+func transactionReorged(j *JobRunner, txID types.TransactionID, params *hostJobLoopParams) (continueLoop, returnCaller bool) {
 	exists, err := transactionxExists(j.staticClient, txID)
 	if err != nil {
 		log.Printf("[ERROR] [host] [%v] Can't check if transaction exists: %v\n", j.staticSiaDirectory, err)
@@ -325,8 +330,7 @@ func transactionReorged(j *JobRunner, txID types.TransactionID, announceAndAccep
 		}
 	}
 	if !exists {
-		tru := true
-		announceAndAccept = &tru
+		params.toAnnounceAccept = true
 		return true, false
 	}
 
@@ -336,7 +340,7 @@ func transactionReorged(j *JobRunner, txID types.TransactionID, announceAndAccep
 // waitTransactionsConfirmed waits till announce host and accept contracts
 // transactions are confirmed with a timeout defined by a block height
 // interval.
-func waitTransactionsConfirmed(j *JobRunner, announceAndAccept *bool, startConfirmedTxsLen int, announcedTxID, acceptedTxID *types.TransactionID) (continueLoop, returnCaller bool) {
+func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopControl *hostJobLoopParams) (continueLoop, returnCaller bool) {
 	var startBH types.BlockHeight
 	var lastTxsLen int
 	for {
@@ -358,11 +362,10 @@ func waitTransactionsConfirmed(j *JobRunner, announceAndAccept *bool, startConfi
 		}
 
 		// Timeout waiting for confirmed transaction
-		tru := true
 		if bh > startBH+hostAnnounceAcceptBlockHeightDelay {
 			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was not confirmed within %v blocks, transaction was probably re-orged\n", j.staticSiaDirectory, hostAnnounceAcceptBlockHeightDelay)
-			announceAndAccept = &tru
-			return true, false
+			loopControl.toAnnounceAccept = true
+			return
 		}
 
 		// Get transactions
@@ -393,20 +396,16 @@ func waitTransactionsConfirmed(j *JobRunner, announceAndAccept *bool, startConfi
 		// and accept contracts again
 		if unconfirmedTxsLen+confirmedTxsLen < lastTxsLen {
 			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was dropped, transaction was probably re-orged\n", j.staticSiaDirectory)
-			announceAndAccept = &tru
-			return true, false
+			loopControl.toAnnounceAccept = true
+			return
 		}
 		lastTxsLen = unconfirmedTxsLen + confirmedTxsLen
 
 		// When transactions get confirmed get transaction IDs
 		if confirmedTxsLen >= startConfirmedTxsLen+2 {
 			log.Printf("[INFO] [host] [%v] Announce host and accept contract transactions were confirmed\n", j.staticSiaDirectory)
-			announcedTxID = &confirmedTxs[confirmedTxsLen-2].TransactionID
-			acceptedTxID = &confirmedTxs[confirmedTxsLen-1].TransactionID
-			// announcedTxID, acceptedTxID are not used in this function, but
-			// they update the parameters passed by reference. We discard them
-			// to satisfy lint checks.
-			_, _ = announcedTxID, acceptedTxID
+			loopControl.announcedTxID = confirmedTxs[confirmedTxsLen-2].TransactionID
+			loopControl.acceptedTxID = confirmedTxs[confirmedTxsLen-1].TransactionID
 			return true, false
 		}
 	}
