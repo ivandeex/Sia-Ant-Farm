@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -120,16 +121,6 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
 func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
-	// Ensure that, if an error occurs, all the ants that have been started are
-	// closed before returning.
-	defer func() {
-		if returnErr != nil {
-			for _, ant := range ants {
-				ant.Close()
-			}
-		}
-	}()
-
 	for i, config := range configs {
 		cfg, err := parseConfig(config)
 		if err != nil {
@@ -185,6 +176,18 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 		}
 
 		ants = append(ants, ant)
+
+		// Ensure that, if an error occurs, all the ants that have been started
+		// are closed before returning. Defer is placed right after ants are
+		// updated so it closes every added ant.
+		defer func() {
+			if returnErr != nil {
+				for _, ant := range ants {
+					log.Println("xxx antfarm.ant.startAnts() defer: closing ant", ant.Config.SiadPath)
+					ant.Close()
+				}
+			}
+		}()
 	}
 
 	return ants, nil
