@@ -112,193 +112,39 @@ func (j *JobRunner) jobHost() {
 	// otherwise repeat. Check periodically that storage revenue doesn't
 	// decrease.
 	toAnnounceAccept := true
-	var announcedTxID types.TransactionID
-	var acceptedTxID types.TransactionID
-	maxRevenue := types.NewCurrency64(0)
-hostLoop:
+	var announcedTxID, acceptedTxID types.TransactionID
+	prevRevenue := types.ZeroCurrency
 	for {
 		// Announce host to the network and accept contracts, wait till the
 		// transactions are confirmed, record transaction IDs to check later
 		// that the transactions are not re-orged
-		if toAnnounceAccept {
-			// Get starting transactions count so that later we know that new
-			// transactions were added or dropped
-			startUnconfirmedTxs, startConfirmedTxs, err := filteredTransactions(j.staticClient)
-			if err != nil {
-				log.Printf("[ERROR] [host] [%v] Can't get wallet transactions count: %v\n", j.staticSiaDirectory, err)
-				select {
-				case <-j.StaticTG.StopChan():
-					return
-				case <-time.After(hostAPIErrorFrequency):
-					continue
-				}
-			}
-			startUnconfirmedTxsLen := len(startUnconfirmedTxs)
-			startConfirmedTxsLen := len(startConfirmedTxs)
-
-			// If there are unconfirmed transactions wait till they are
-			// confirmed or dropped
-			if startUnconfirmedTxsLen > 0 {
-				log.Printf("[INFO] [host] [%v] Wait till there are no unconfirmed transactions\n", j.staticSiaDirectory)
-				select {
-				case <-j.StaticTG.StopChan():
-					return
-				case <-time.After(hostTransactionCheckFrequency):
-					continue
-				}
-			}
-
-			// Announce host to the network
-			log.Printf("[INFO] [host] [%v] Announce host\n", j.staticSiaDirectory)
-			err = j.staticClient.HostAnnouncePost()
-			if err != nil {
-				log.Printf("[ERROR] [host] [%v] Can't post host announcement: %v\n", j.staticSiaDirectory, err)
-				select {
-				case <-j.StaticTG.StopChan():
-					return
-				case <-time.After(hostAPIErrorFrequency):
-					continue
-				}
-			}
-
-			// Accept contracts
-			log.Printf("[INFO] [host] [%v] Accept contracts\n", j.staticSiaDirectory)
-			err = j.staticClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
-			if err != nil {
-				log.Printf("[ERROR] [host] [%v] Can't post to accept contracts: %v\n", j.staticSiaDirectory, err)
-				select {
-				case <-j.StaticTG.StopChan():
-					return
-				case <-time.After(hostAPIErrorFrequency):
-					continue
-				}
-			}
-
-			toAnnounceAccept = false
-
-			// Wait till the transactions get confirmed
-			var startBH types.BlockHeight
-			var lastTxsLen int
-			for {
-				// Get current block height for timeout and set starting block
-				// height in the first iteration
-				cg, err := j.staticClient.ConsensusGet()
-				if err != nil {
-					log.Printf("[ERROR] [host] [%v] Can't get consensus info: %v\n", j.staticSiaDirectory, err)
-					select {
-					case <-j.StaticTG.StopChan():
-						return
-					case <-time.After(hostAPIErrorFrequency):
-						continue
-					}
-				}
-				bh := cg.Height
-				if startBH == 0 {
-					startBH = bh
-				}
-
-				// Timeout waiting for confirmed transaction
-				if bh > startBH+hostAnnounceAcceptBlockHeightDelay {
-					log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was not confirmed within %v blocks, transaction was probably re-orged\n", j.staticSiaDirectory, hostAnnounceAcceptBlockHeightDelay)
-					toAnnounceAccept = true
-					continue hostLoop
-				}
-
-				// Get transactions
-				unconfirmedTxs, confirmedTxs, err := filteredTransactions(j.staticClient)
-				if err != nil {
-					log.Printf("[ERROR] [host] [%v] Can't get transactions: %v\n", j.staticSiaDirectory, err)
-					select {
-					case <-j.StaticTG.StopChan():
-						return
-					case <-time.After(hostAPIErrorFrequency):
-						continue
-					}
-				}
-				unconfirmedTxsLen := len(unconfirmedTxs)
-				confirmedTxsLen := len(confirmedTxs)
-
-				// If there is an unconfirmed transaction keep waiting
-				if unconfirmedTxsLen > 0 {
-					select {
-					case <-j.StaticTG.StopChan():
-						return
-					case <-time.After(hostTransactionCheckFrequency):
-						continue
-					}
-				}
-
-				// If a transaction was dropped (re-orged) then announce host
-				// and accept contracts again
-				if unconfirmedTxsLen+confirmedTxsLen < lastTxsLen {
-					log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was dropped, transaction was probably re-orged\n", j.staticSiaDirectory)
-					toAnnounceAccept = true
-					continue hostLoop
-				}
-				lastTxsLen = unconfirmedTxsLen + confirmedTxsLen
-
-				// When transactions get confirmed get transaction IDs
-				if confirmedTxsLen >= startConfirmedTxsLen+2 {
-					log.Printf("[INFO] [host] [%v] Announce host and accept contract transactions were confirmed\n", j.staticSiaDirectory)
-					announcedTxID = confirmedTxs[confirmedTxsLen-2].TransactionID
-					acceptedTxID = confirmedTxs[confirmedTxsLen-1].TransactionID
-					continue hostLoop
-				}
-			}
+		if cont, ret := announceAndAccept(j, &toAnnounceAccept, &announcedTxID, &acceptedTxID); cont {
+			continue
+		} else if ret {
+			return
 		}
 
 		// Check announce host transaction is not re-orged
-		exists, err := txExists(j.staticClient, announcedTxID)
-		if err != nil {
-			log.Printf("[ERROR] [host] [%v] Can't check if announcing host transaction exists: %v\n", j.staticSiaDirectory, err)
-			select {
-			case <-j.StaticTG.StopChan():
-				return
-			case <-time.After(hostAPIErrorFrequency):
-				continue
-			}
-		}
-		if !exists {
+		if cont, ret := transactionReorged(j, announcedTxID, &toAnnounceAccept); cont {
 			log.Printf("[INFO] [host] [%v] Announcing host transaction doesn't exist anymore, transaction was probably re-orged\n", j.staticSiaDirectory)
-			toAnnounceAccept = true
 			continue
+		} else if ret {
+			return
 		}
 
 		// Check accept contracts transaction is not re-orged
-		exists, err = txExists(j.staticClient, acceptedTxID)
-		if err != nil {
-			log.Printf("[ERROR] [host] [%v] Can't check if accepting contracts transaction exists: %v\n", j.staticSiaDirectory, err)
-			select {
-			case <-j.StaticTG.StopChan():
-				return
-			case <-time.After(hostAPIErrorFrequency):
-				continue
-			}
-		}
-		if !exists {
+		if cont, ret := transactionReorged(j, announcedTxID, &toAnnounceAccept); cont {
 			log.Printf("[INFO] [host] [%v] Accepting contracts transaction doesn't exist anymore, transaction was probably re-orged\n", j.staticSiaDirectory)
-			toAnnounceAccept = true
 			continue
+		} else if ret {
+			return
 		}
 
-		// Get storage revenue
-		hostInfo, err := j.staticClient.HostGet()
-		if err != nil {
-			log.Printf("[ERROR] [host] [%v] Can't get host info: %v\n", j.staticSiaDirectory, err)
-			select {
-			case <-j.StaticTG.StopChan():
-				return
-			case <-time.After(hostAPIErrorFrequency):
-				continue
-			}
-		}
-
-		// Print an error if storage revenue has decreased
-		if hostInfo.FinancialMetrics.StorageRevenue.Cmp(maxRevenue) >= 0 {
-			maxRevenue = hostInfo.FinancialMetrics.StorageRevenue
-		} else {
-			// Storage revenue has decreased!
-			log.Printf("[ERROR] [host] [%v] StorageRevenue decreased! Was %v, is now %v\n", j.staticSiaDirectory, maxRevenue, hostInfo.FinancialMetrics.StorageRevenue)
+		// Check storage revenue didn't decreased
+		if cont, ret := storageRevenueDecreased(j, &prevRevenue); cont {
+			continue
+		} else if ret {
+			return
 		}
 
 		select {
@@ -310,19 +156,79 @@ hostLoop:
 	}
 }
 
-// txExists returns true is a confirmed wallet transaction with the given ID
-// exists.
-func txExists(c *client.Client, txID types.TransactionID) (bool, error) {
-	_, cTxs, err := filteredTransactions(c)
-	if err != nil {
-		return false, errors.AddContext(err, "can't get filtered transactions")
+// announceAndAccept returns if there are unconfirmed transactions, otherwise
+// posts host announcement, posts accepting contracts, waits till the
+// transactions are confirmed and updates both transaction IDs.
+func announceAndAccept(j *JobRunner, announceAndAccept *bool, announcedTxID, acceptedTxID *types.TransactionID) (continueLoop, returnCaller bool) {
+	// Return if should not announce and accept
+	if !*announceAndAccept {
+		return
 	}
-	for _, tx := range cTxs {
-		if tx.TransactionID == txID {
-			return true, nil
+
+	// Get starting transactions count so that later we know that new
+	// transactions were added or dropped
+	startUnconfirmedTxs, startConfirmedTxs, err := filteredTransactions(j.staticClient)
+	if err != nil {
+		log.Printf("[ERROR] [host] [%v] Can't get wallet transactions count: %v\n", j.staticSiaDirectory, err)
+		select {
+		case <-j.StaticTG.StopChan():
+			return false, true
+		case <-time.After(hostAPIErrorFrequency):
+			return true, false
 		}
 	}
-	return false, nil
+	startUnconfirmedTxsLen := len(startUnconfirmedTxs)
+	startConfirmedTxsLen := len(startConfirmedTxs)
+
+	// If there are unconfirmed transactions wait till they are
+	// confirmed or dropped
+	if startUnconfirmedTxsLen > 0 {
+		log.Printf("[INFO] [host] [%v] Wait till there are no unconfirmed transactions\n", j.staticSiaDirectory)
+		select {
+		case <-j.StaticTG.StopChan():
+			return false, true
+		case <-time.After(hostTransactionCheckFrequency):
+			return true, false
+		}
+	}
+
+	// Announce host to the network
+	log.Printf("[INFO] [host] [%v] Announce host\n", j.staticSiaDirectory)
+	err = j.staticClient.HostAnnouncePost()
+	if err != nil {
+		log.Printf("[ERROR] [host] [%v] Can't post host announcement: %v\n", j.staticSiaDirectory, err)
+		select {
+		case <-j.StaticTG.StopChan():
+			return false, true
+		case <-time.After(hostAPIErrorFrequency):
+			return true, false
+		}
+	}
+
+	// Accept contracts
+	log.Printf("[INFO] [host] [%v] Accept contracts\n", j.staticSiaDirectory)
+	err = j.staticClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
+	if err != nil {
+		log.Printf("[ERROR] [host] [%v] Can't post to accept contracts: %v\n", j.staticSiaDirectory, err)
+		select {
+		case <-j.StaticTG.StopChan():
+			return false, true
+		case <-time.After(hostAPIErrorFrequency):
+			return true, false
+		}
+	}
+
+	fals := false
+	announceAndAccept = &fals
+
+	// Wait till the transactions get confirmed
+	if cont, ret := waitTransactionsConfirmed(j, announceAndAccept, startConfirmedTxsLen, announcedTxID, acceptedTxID); cont {
+		return true, false
+	} else if ret {
+		return false, true
+	}
+
+	return
 }
 
 // filteredTransactions returns a slice of unconfirmed and a slice of confirmed
@@ -363,4 +269,145 @@ func isAnnnouncementTypeTransaction(tx modules.ProcessedTransaction) bool {
 		return true
 	}
 	return false
+}
+
+// storageRevenueDecreased logs an error if the host's storage revenue
+// decreases.
+func storageRevenueDecreased(j *JobRunner, prevRevenue *types.Currency) (continueLoop, returnCaller bool) {
+	hostInfo, err := j.staticClient.HostGet()
+	if err != nil {
+		log.Printf("[ERROR] [host] [%v] Can't get host info: %v\n", j.staticSiaDirectory, err)
+		select {
+		case <-j.StaticTG.StopChan():
+			return false, true
+		case <-time.After(hostAPIErrorFrequency):
+			return true, false
+		}
+	}
+
+	// Print an error if storage revenue has decreased
+	if hostInfo.FinancialMetrics.StorageRevenue.Cmp(*prevRevenue) >= 0 {
+		*prevRevenue = hostInfo.FinancialMetrics.StorageRevenue
+	} else {
+		// Storage revenue has decreased!
+		log.Printf("[ERROR] [host] [%v] StorageRevenue decreased! Was %v, is now %v\n", j.staticSiaDirectory, &prevRevenue, hostInfo.FinancialMetrics.StorageRevenue)
+	}
+
+	return
+}
+
+// transactionxExists returns true is a confirmed wallet transaction with the
+// given ID exists.
+func transactionxExists(c *client.Client, txID types.TransactionID) (bool, error) {
+	_, cTxs, err := filteredTransactions(c)
+	if err != nil {
+		return false, errors.AddContext(err, "can't get filtered transactions")
+	}
+	for _, tx := range cTxs {
+		if tx.TransactionID == txID {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+// transactionReorged checks if the transactions is re-orged, if so, it sets
+// announce and accept flag to true.
+func transactionReorged(j *JobRunner, txID types.TransactionID, announceAndAccept *bool) (continueLoop, returnCaller bool) {
+	exists, err := transactionxExists(j.staticClient, txID)
+	if err != nil {
+		log.Printf("[ERROR] [host] [%v] Can't check if transaction exists: %v\n", j.staticSiaDirectory, err)
+		select {
+		case <-j.StaticTG.StopChan():
+			return false, true
+		case <-time.After(hostAPIErrorFrequency):
+			return true, false
+		}
+	}
+	if !exists {
+		tru := true
+		announceAndAccept = &tru
+		return true, false
+	}
+
+	return
+}
+
+// waitTransactionsConfirmed waits till announce host and accept contracts
+// transactions are confirmed with a timeout defined by a block height
+// interval.
+func waitTransactionsConfirmed(j *JobRunner, announceAndAccept *bool, startConfirmedTxsLen int, announcedTxID, acceptedTxID *types.TransactionID) (continueLoop, returnCaller bool) {
+	var startBH types.BlockHeight
+	var lastTxsLen int
+	for {
+		// Get current block height for timeout and set starting block
+		// height in the first iteration
+		cg, err := j.staticClient.ConsensusGet()
+		if err != nil {
+			log.Printf("[ERROR] [host] [%v] Can't get consensus info: %v\n", j.staticSiaDirectory, err)
+			select {
+			case <-j.StaticTG.StopChan():
+				return false, true
+			case <-time.After(hostAPIErrorFrequency):
+				continue
+			}
+		}
+		bh := cg.Height
+		if startBH == 0 {
+			startBH = bh
+		}
+
+		// Timeout waiting for confirmed transaction
+		tru := true
+		if bh > startBH+hostAnnounceAcceptBlockHeightDelay {
+			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was not confirmed within %v blocks, transaction was probably re-orged\n", j.staticSiaDirectory, hostAnnounceAcceptBlockHeightDelay)
+			announceAndAccept = &tru
+			return true, false
+		}
+
+		// Get transactions
+		unconfirmedTxs, confirmedTxs, err := filteredTransactions(j.staticClient)
+		if err != nil {
+			log.Printf("[ERROR] [host] [%v] Can't get transactions: %v\n", j.staticSiaDirectory, err)
+			select {
+			case <-j.StaticTG.StopChan():
+				return false, true
+			case <-time.After(hostAPIErrorFrequency):
+				continue
+			}
+		}
+		unconfirmedTxsLen := len(unconfirmedTxs)
+		confirmedTxsLen := len(confirmedTxs)
+
+		// If there is an unconfirmed transaction keep waiting
+		if unconfirmedTxsLen > 0 {
+			select {
+			case <-j.StaticTG.StopChan():
+				return false, true
+			case <-time.After(hostTransactionCheckFrequency):
+				continue
+			}
+		}
+
+		// If a transaction was dropped (re-orged) then announce host
+		// and accept contracts again
+		if unconfirmedTxsLen+confirmedTxsLen < lastTxsLen {
+			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was dropped, transaction was probably re-orged\n", j.staticSiaDirectory)
+			announceAndAccept = &tru
+			return true, false
+		}
+		lastTxsLen = unconfirmedTxsLen + confirmedTxsLen
+
+		// When transactions get confirmed get transaction IDs
+		if confirmedTxsLen >= startConfirmedTxsLen+2 {
+			log.Printf("[INFO] [host] [%v] Announce host and accept contract transactions were confirmed\n", j.staticSiaDirectory)
+			announcedTxID = &confirmedTxs[confirmedTxsLen-2].TransactionID
+			acceptedTxID = &confirmedTxs[confirmedTxsLen-1].TransactionID
+			// announcedTxID, acceptedTxID are not used in this function, but
+			// they update the parameters passed by reference. We discard them
+			// to satisfy lint checks.
+			_, _ = announcedTxID, acceptedTxID
+			return true, false
+		}
+	}
 }
