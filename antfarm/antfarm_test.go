@@ -3,6 +3,7 @@ package antfarm
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"testing"
@@ -255,4 +256,6 @@ func TestUpdateRenter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	log.Println("xxx test finished")
 }
