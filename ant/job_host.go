@@ -127,6 +127,13 @@ func (j *JobRunner) jobHost() {
 		toAnnounceAccept: true,
 	}
 	for {
+		// Return immediately when closing ant
+		select {
+		case <-j.StaticTG.StopChan():
+			return
+		default:
+		}
+
 		// Announce host to the network and accept contracts, wait till the
 		// transactions are confirmed, record transaction IDs to check later
 		// that the transactions are not re-orged
@@ -344,6 +351,13 @@ func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopContr
 	var startBH types.BlockHeight
 	var lastTxsLen int
 	for {
+		// Return immediately when closing ant
+		select {
+		case <-j.StaticTG.StopChan():
+			return false, true
+		default:
+		}
+
 		// Get current block height for timeout and set starting block
 		// height in the first iteration
 		cg, err := j.staticClient.ConsensusGet()
