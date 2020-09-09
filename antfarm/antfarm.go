@@ -69,6 +69,8 @@ func New(config AntfarmConfig) (farm *AntFarm, returnErr error) {
 	os.RemoveAll(datadir)
 	os.MkdirAll(datadir, 0700)
 
+	farm = &AntFarm{}
+
 	// Set ants sync waitgroup
 	if config.WaitForSync {
 		farm.antsSyncWG.Add(1)
