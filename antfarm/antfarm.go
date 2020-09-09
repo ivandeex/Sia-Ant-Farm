@@ -107,9 +107,7 @@ func New(config AntfarmConfig) (farm *AntFarm, returnErr error) {
 	farm.Ants = ants
 	defer func() {
 		if returnErr != nil {
-			log.Println("xxx antfarm.New() defer closing farm...")
 			farm.Close()
-			log.Println("xxx antfarm.New() defer closed farm")
 		}
 	}()
 

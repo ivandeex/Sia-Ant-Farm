@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -183,7 +182,6 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 		defer func() {
 			if returnErr != nil {
 				for _, ant := range ants {
-					log.Println("xxx antfarm.ant.startAnts() defer: closing ant", ant.Config.SiadPath)
 					ant.Close()
 				}
 			}
