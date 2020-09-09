@@ -120,16 +120,7 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
 func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
-	// Ensure that, if an error occurs, all the ants that have been started are
-	// closed before returning.
-	defer func() {
-		if returnErr != nil {
-			for _, ant := range ants {
-				ant.Close()
-			}
-		}
-	}()
-
+	// Start an ant for each config
 	for i, config := range configs {
 		cfg, err := parseConfig(config)
 		if err != nil {
@@ -143,16 +134,19 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 		}
 
 		// Create Ant
-		ant, err := ant.New(antsSyncWG, cfg)
+		a, err := ant.New(antsSyncWG, cfg)
 		if err != nil {
 			// Ant is nil, we can't close it in defer
 			return nil, errors.AddContext(err, "unable to create ant")
 		}
-		defer func() {
+		// If there is a return error, close each ant. Ant must be passed to
+		// defer by parameter, otherwise close is called multiple times on the
+		// last ant only.
+		defer func(a *ant.Ant) {
 			if returnErr != nil {
-				ant.Close()
+				a.Close()
 			}
-		}()
+		}(a)
 
 		// Create Sia Client
 		c, err := getClient(cfg.APIAddr, cfg.APIPassword)
@@ -168,7 +162,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 		}
 
 		// Allow renter to rent on hosts on the same IP subnets
-		if ant.HasRenterTypeJob() && config.RenterDisableIPViolationCheck {
+		if a.HasRenterTypeJob() && config.RenterDisableIPViolationCheck {
 			// Create Sia Client
 			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
 			if err != nil {
@@ -184,7 +178,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 			}
 		}
 
-		ants = append(ants, ant)
+		ants = append(ants, a)
 	}
 
 	return ants, nil

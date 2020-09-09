@@ -59,7 +59,7 @@ type (
 )
 
 // New creates a new antFarm given the supplied AntfarmConfig
-func New(config AntfarmConfig) (*AntFarm, error) {
+func New(config AntfarmConfig) (farm *AntFarm, returnErr error) {
 	// clear old antfarm data before creating an antfarm
 	datadir := "./antfarm-data"
 	if config.DataDir != "" {
@@ -69,7 +69,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	os.RemoveAll(datadir)
 	os.MkdirAll(datadir, 0700)
 
-	farm := &AntFarm{}
+	farm = &AntFarm{}
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
@@ -106,7 +106,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 
 	farm.Ants = ants
 	defer func() {
-		if err != nil {
+		if returnErr != nil {
 			farm.Close()
 		}
 	}()
@@ -270,9 +270,18 @@ func (af *AntFarm) Close() error {
 	if af.apiListener != nil {
 		af.apiListener.Close()
 	}
-	for _, ant := range af.Ants {
-		ant.Close()
+
+	// Speed up closing ants by calling concurrent goroutines
+	var antCloseWG sync.WaitGroup
+	for _, a := range af.Ants {
+		antCloseWG.Add(1)
+		go func(a *ant.Ant) {
+			a.Close()
+			antCloseWG.Done()
+		}(a)
 	}
+	antCloseWG.Wait()
+
 	return nil
 }
 
