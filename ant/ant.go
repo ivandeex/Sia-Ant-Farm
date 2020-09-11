@@ -9,10 +9,17 @@ import (
 	"os/exec"
 	"strings"
 	"sync"
+	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
+)
+
+const (
+	// updateSiadWarmUpTime defines initial warm-up sleep time for an ant after
+	// siad update
+	updateSiadWarmUpTime = time.Second * 10
 )
 
 // AntConfig represents a configuration object passed to New(), used to
@@ -225,7 +232,7 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	if err != nil {
 		return errors.AddContext(err, "unable to create new siad process")
 	}
-	log.Printf("[INFO] [ant] [%v] Siad update done\n", a.Config.SiadConfig.DataDir)
+	log.Printf("[INFO] [ant] [%v] Siad process started\n", a.Config.SiadConfig.DataDir)
 
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
@@ -243,6 +250,15 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 		return errors.AddContext(err, "can't update jobrunner after siad update")
 	}
 	a.Jr = jr
+
+	// Give a new siad process some warm-up time
+	log.Printf("[INFO] [ant] [%v] Siad warm-up...\n", a.Config.SiadConfig.DataDir)
+	select {
+	case <-a.Jr.StaticTG.StopChan():
+		return nil
+	case <-time.After(updateSiadWarmUpTime):
+	}
+	log.Printf("[INFO] [ant] [%v] Siad warm-up finished\n", a.Config.SiadConfig.DataDir)
 
 	// Restart jobs
 	log.Printf("[INFO] [ant] [%v] Restarting ant's jobs\n", a.Config.SiadConfig.DataDir)
