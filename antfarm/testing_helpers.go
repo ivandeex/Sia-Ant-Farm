@@ -126,7 +126,7 @@ func DownloadAndVerifyFiles(t *testing.T, renterAnt *ant.Ant, files []ant.Renter
 			return fmt.Errorf("can't download Sia file %v: %v", siaPath, err)
 		}
 
-		t.Logf("Comparing source file %v with file downloaded %v using %v\n", f.SourceFile, destPath, renterAnt.Config.SiadPath)
+		t.Logf("Comparing source file with downloaded file:\n\t%v\n\t%v\n\tusing binary: %v\n", f.SourceFile, destPath, renterAnt.Config.SiadPath)
 
 		// Compare file hashes
 		uploadedFileHash := f.MerkleRoot
