@@ -1,6 +1,7 @@
 package ant
 
 import (
+	"fmt"
 	"log"
 	"math"
 	"os"
@@ -41,16 +42,21 @@ const (
 	miningCheckFrequency = time.Second
 )
 
-// hostJobLoopParams defines parameters for main host job loop. Main reason for
+var (
+	// errAntStopped defines a reusable error when ant was stopped
+	errAntStopped = errors.New("ant was stopped")
+
+	// errAPIError defines a reusable error when API call is not successful
+	errAPIError = errors.New("error getting info through API")
+)
+
+// transactions stores transaction IDs for main host job loop. Main reason for
 // use of this struct is that we can pass parameters by reference and we will
 // avoid linting errors or need for workarounds which we get when using and
 // updating multiple parameters not wrapped in the struct.
-// parameters passed by reference.
-type hostJobLoopParams struct {
-	toAnnounceAccept bool
-	announcedTxID    types.TransactionID
-	acceptedTxID     types.TransactionID
-	prevRevenue      types.Currency
+type transactions struct {
+	announcedTxID types.TransactionID
+	acceptedTxID  types.TransactionID
 }
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
@@ -123,9 +129,9 @@ func (j *JobRunner) jobHost() {
 	// periodically that announcing and accepting transaction are not re-orged,
 	// otherwise repeat. Check periodically that storage revenue doesn't
 	// decrease.
-	params := hostJobLoopParams{
-		toAnnounceAccept: true,
-	}
+	var announced bool
+	var storedTransactions transactions
+	prevRevenue := types.ZeroCurrency
 	for {
 		// Return immediately when closing ant
 		select {
@@ -134,36 +140,74 @@ func (j *JobRunner) jobHost() {
 		default:
 		}
 
-		// Announce host to the network and accept contracts, wait till the
-		// transactions are confirmed, record transaction IDs to check later
-		// that the transactions are not re-orged
-		if cont, ret := announceAndAccept(j, &params); cont {
-			continue
-		} else if ret {
-			return
+		// Announce host to the network
+		if !announced {
+			// Wait till there are no unconfirmed transactions
+			err := waitForNoUnconfirmedTransactions(j)
+			if err != nil {
+				continue
+			}
+
+			// Announce host and accept contracts
+			startConfirmedTxsLen, err := announceAndAccept(j)
+			if err != nil {
+				select {
+				case <-j.StaticTG.StopChan():
+					return
+				case <-time.After(hostAPIErrorFrequency):
+					continue
+				}
+			}
+			announced = true
+
+			// Wait till the announcing host and accepting contracts are
+			// confirmed
+			err = waitTransactionsConfirmed(j, startConfirmedTxsLen, &storedTransactions)
+			if err != nil {
+				announced = false
+				continue
+			}
 		}
 
 		// Check announce host transaction is not re-orged
-		if cont, ret := transactionReorged(j, params.announcedTxID, &params); cont {
-			log.Printf("[INFO] [host] [%v] Announcing host transaction doesn't exist anymore, transaction was probably re-orged\n", j.staticSiaDirectory)
+		reorged, err := transactionReorged(j, storedTransactions.announcedTxID, &storedTransactions)
+		if err != nil {
+			select {
+			case <-j.StaticTG.StopChan():
+				return
+			case <-time.After(hostAPIErrorFrequency):
+				continue
+			}
+		}
+		if reorged {
+			announced = false
 			continue
-		} else if ret {
-			return
 		}
 
 		// Check accept contracts transaction is not re-orged
-		if cont, ret := transactionReorged(j, params.acceptedTxID, &params); cont {
-			log.Printf("[INFO] [host] [%v] Accepting contracts transaction doesn't exist anymore, transaction was probably re-orged\n", j.staticSiaDirectory)
+		reorged, err = transactionReorged(j, storedTransactions.acceptedTxID, &storedTransactions)
+		if err != nil {
+			select {
+			case <-j.StaticTG.StopChan():
+				return
+			case <-time.After(hostAPIErrorFrequency):
+				continue
+			}
+		}
+		if reorged {
+			announced = false
 			continue
-		} else if ret {
-			return
 		}
 
 		// Check storage revenue didn't decreased
-		if cont, ret := storageRevenueDecreased(j, &params.prevRevenue); cont {
-			continue
-		} else if ret {
-			return
+		err = storageRevenueDecreased(j, &prevRevenue)
+		if err != nil {
+			select {
+			case <-j.StaticTG.StopChan():
+				return
+			case <-time.After(hostAPIErrorFrequency):
+				continue
+			}
 		}
 
 		select {
@@ -174,40 +218,15 @@ func (j *JobRunner) jobHost() {
 	}
 }
 
-// announceAndAccept returns if there are unconfirmed transactions, otherwise
-// posts host announcement, posts accepting contracts, waits till the
-// transactions are confirmed and updates both transaction IDs.
-func announceAndAccept(j *JobRunner, loopControl *hostJobLoopParams) (continueLoop, returnCaller bool) {
-	// Return if should not announce and accept
-	if !loopControl.toAnnounceAccept {
-		return
-	}
-
+// announceAndAccept announces host to the network, posts host accepting
+// contracts and returns the number of confirmed transactions at the start
+func announceAndAccept(j *JobRunner) (startConfirmedTxsLen int, err error) {
 	// Get starting transactions count so that later we know that new
 	// transactions were added or dropped
-	startUnconfirmedTxs, startConfirmedTxs, err := filteredTransactions(j.staticClient)
+	_, startConfirmedTxs, err := filteredTransactions(j.staticClient)
 	if err != nil {
 		log.Printf("[ERROR] [host] [%v] Can't get wallet transactions count: %v\n", j.staticSiaDirectory, err)
-		select {
-		case <-j.StaticTG.StopChan():
-			return false, true
-		case <-time.After(hostAPIErrorFrequency):
-			return true, false
-		}
-	}
-	startUnconfirmedTxsLen := len(startUnconfirmedTxs)
-	startConfirmedTxsLen := len(startConfirmedTxs)
-
-	// If there are unconfirmed transactions wait till they are
-	// confirmed or dropped
-	if startUnconfirmedTxsLen > 0 {
-		log.Printf("[INFO] [host] [%v] Wait till there are no unconfirmed transactions\n", j.staticSiaDirectory)
-		select {
-		case <-j.StaticTG.StopChan():
-			return false, true
-		case <-time.After(hostTransactionCheckFrequency):
-			return true, false
-		}
+		return 0, errAPIError
 	}
 
 	// Announce host to the network
@@ -215,12 +234,7 @@ func announceAndAccept(j *JobRunner, loopControl *hostJobLoopParams) (continueLo
 	err = j.staticClient.HostAnnouncePost()
 	if err != nil {
 		log.Printf("[ERROR] [host] [%v] Can't post host announcement: %v\n", j.staticSiaDirectory, err)
-		select {
-		case <-j.StaticTG.StopChan():
-			return false, true
-		case <-time.After(hostAPIErrorFrequency):
-			return true, false
-		}
+		return 0, errAPIError
 	}
 
 	// Accept contracts
@@ -228,18 +242,10 @@ func announceAndAccept(j *JobRunner, loopControl *hostJobLoopParams) (continueLo
 	err = j.staticClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
 	if err != nil {
 		log.Printf("[ERROR] [host] [%v] Can't post to accept contracts: %v\n", j.staticSiaDirectory, err)
-		select {
-		case <-j.StaticTG.StopChan():
-			return false, true
-		case <-time.After(hostAPIErrorFrequency):
-			return true, false
-		}
+		return 0, errAPIError
 	}
 
-	loopControl.toAnnounceAccept = false
-
-	// Wait till the transactions get confirmed or timed-out
-	return waitTransactionsConfirmed(j, startConfirmedTxsLen, loopControl)
+	return len(startConfirmedTxs), nil
 }
 
 // filteredTransactions returns a slice of unconfirmed and a slice of confirmed
@@ -284,16 +290,11 @@ func isAnnnouncementTypeTransaction(tx modules.ProcessedTransaction) bool {
 
 // storageRevenueDecreased logs an error if the host's storage revenue
 // decreases.
-func storageRevenueDecreased(j *JobRunner, prevRevenue *types.Currency) (continueLoop, returnCaller bool) {
+func storageRevenueDecreased(j *JobRunner, prevRevenue *types.Currency) error {
 	hostInfo, err := j.staticClient.HostGet()
 	if err != nil {
 		log.Printf("[ERROR] [host] [%v] Can't get host info: %v\n", j.staticSiaDirectory, err)
-		select {
-		case <-j.StaticTG.StopChan():
-			return false, true
-		case <-time.After(hostAPIErrorFrequency):
-			return true, false
-		}
+		return errAPIError
 	}
 
 	// Print an error if storage revenue has decreased
@@ -305,7 +306,7 @@ func storageRevenueDecreased(j *JobRunner, prevRevenue *types.Currency) (continu
 		log.Printf("[ERROR] [host] [%v] StorageRevenue decreased! Was %v, is now %v\n", j.staticSiaDirectory, &prevRevenue, hostInfo.FinancialMetrics.StorageRevenue)
 	}
 
-	return
+	return nil
 }
 
 // transactionxExists returns true is a confirmed wallet transaction with the
@@ -323,49 +324,64 @@ func transactionxExists(c *client.Client, txID types.TransactionID) (bool, error
 	return false, nil
 }
 
-// transactionReorged checks if the transactions is re-orged, if so, it sets
-// announce and accept flag to true.
-func transactionReorged(j *JobRunner, txID types.TransactionID, params *hostJobLoopParams) (continueLoop, returnCaller bool) {
+// transactionReorged return true if the transaction was re-orged.
+func transactionReorged(j *JobRunner, txID types.TransactionID, storedTransactions *transactions) (transactionReorged bool, err error) {
 	exists, err := transactionxExists(j.staticClient, txID)
 	if err != nil {
 		log.Printf("[ERROR] [host] [%v] Can't check if transaction exists: %v\n", j.staticSiaDirectory, err)
+		return false, errAPIError
+	}
+	return !exists, nil
+}
+
+// waitForNoUnconfirmedTransactions blocks until there are no unconfirmed
+// transactions
+func waitForNoUnconfirmedTransactions(j *JobRunner) error {
+	for {
+		unconfirmedTxs, _, err := filteredTransactions(j.staticClient)
+		if err != nil {
+			log.Printf("[ERROR] [host] [%v] Can't get wallet transactions count: %v\n", j.staticSiaDirectory, err)
+			select {
+			case <-j.StaticTG.StopChan():
+				return errAntStopped
+			case <-time.After(hostAPIErrorFrequency):
+				return errors.AddContext(err, "can't get wallet transactions count")
+			}
+		}
+		if len(unconfirmedTxs) == 0 {
+			return nil
+		}
+		log.Printf("[INFO] [host] [%v] Wait till there are no unconfirmed transactions\n", j.staticSiaDirectory)
 		select {
 		case <-j.StaticTG.StopChan():
-			return false, true
-		case <-time.After(hostAPIErrorFrequency):
-			return true, false
+			return errAntStopped
+		case <-time.After(hostTransactionCheckFrequency):
 		}
 	}
-	if !exists {
-		params.toAnnounceAccept = true
-		return true, false
-	}
-
-	return
 }
 
 // waitTransactionsConfirmed waits till announce host and accept contracts
 // transactions are confirmed with a timeout defined by a block height
 // interval.
-func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopControl *hostJobLoopParams) (continueLoop, returnCaller bool) {
+func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, storedTransactions *transactions) error {
 	var startBH types.BlockHeight
 	var lastTxsLen int
 	for {
 		// Return immediately when closing ant
 		select {
 		case <-j.StaticTG.StopChan():
-			return false, true
+			return errAntStopped
 		default:
 		}
 
-		// Get current block height for timeout and set starting block
-		// height in the first iteration
+		// Get current block height for timeout and set starting block height
+		// in the first iteration
 		cg, err := j.staticClient.ConsensusGet()
 		if err != nil {
 			log.Printf("[ERROR] [host] [%v] Can't get consensus info: %v\n", j.staticSiaDirectory, err)
 			select {
 			case <-j.StaticTG.StopChan():
-				return false, true
+				return errAntStopped
 			case <-time.After(hostAPIErrorFrequency):
 				continue
 			}
@@ -378,8 +394,8 @@ func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopContr
 		// Timeout waiting for confirmed transaction
 		if bh > startBH+hostAnnounceAcceptBlockHeightDelay {
 			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was not confirmed within %v blocks, transaction was probably re-orged\n", j.staticSiaDirectory, hostAnnounceAcceptBlockHeightDelay)
-			loopControl.toAnnounceAccept = true
-			return true, false
+			msg := fmt.Sprintf("announce host or accept contracts transaction was not confirmed within %v blocks, transaction was probably re-orged", hostAnnounceAcceptBlockHeightDelay)
+			return errors.AddContext(err, msg)
 		}
 
 		// Get transactions
@@ -388,7 +404,7 @@ func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopContr
 			log.Printf("[ERROR] [host] [%v] Can't get transactions: %v\n", j.staticSiaDirectory, err)
 			select {
 			case <-j.StaticTG.StopChan():
-				return false, true
+				return errAntStopped
 			case <-time.After(hostAPIErrorFrequency):
 				continue
 			}
@@ -400,27 +416,25 @@ func waitTransactionsConfirmed(j *JobRunner, startConfirmedTxsLen int, loopContr
 		if unconfirmedTxsLen > 0 {
 			select {
 			case <-j.StaticTG.StopChan():
-				return false, true
+				return errAntStopped
 			case <-time.After(hostTransactionCheckFrequency):
 				continue
 			}
 		}
 
-		// If a transaction was dropped (re-orged) then announce host
-		// and accept contracts again
+		// If a transaction was dropped (re-orged) return error
 		if unconfirmedTxsLen+confirmedTxsLen < lastTxsLen {
 			log.Printf("[INFO] [host] [%v] Announce host or accept contracts transaction was dropped, transaction was probably re-orged\n", j.staticSiaDirectory)
-			loopControl.toAnnounceAccept = true
-			return true, false
+			return errors.New("announce host or accept contracts transaction was dropped, transaction was probably re-orged")
 		}
 		lastTxsLen = unconfirmedTxsLen + confirmedTxsLen
 
 		// When transactions get confirmed get transaction IDs
 		if confirmedTxsLen >= startConfirmedTxsLen+2 {
 			log.Printf("[INFO] [host] [%v] Announce host and accept contract transactions were confirmed\n", j.staticSiaDirectory)
-			loopControl.announcedTxID = confirmedTxs[confirmedTxsLen-2].TransactionID
-			loopControl.acceptedTxID = confirmedTxs[confirmedTxsLen-1].TransactionID
-			return
+			storedTransactions.announcedTxID = confirmedTxs[confirmedTxsLen-2].TransactionID
+			storedTransactions.acceptedTxID = confirmedTxs[confirmedTxsLen-1].TransactionID
+			return nil
 		}
 	}
 }
