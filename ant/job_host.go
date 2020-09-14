@@ -264,7 +264,7 @@ func filteredTransactions(c *client.Client) (unconfirmedTransactions []modules.P
 		}
 	}
 
-	return unconfirmedTransactions, confirmedTransactions, nil
+	return 
 }
 
 // isAnnnouncementTypeTransaction returns true if the format of the transaction
