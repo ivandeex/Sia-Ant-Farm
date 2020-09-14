@@ -173,16 +173,14 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			newFarm, err := antfarm.New(antfarmConfig)
 			farm = newFarm
 			if err != nil {
-				t.Error(err)
-				return
+				t.Fatal(err)
 			}
 			defer farm.Close()
 
 			// Get renter ant
 			renterAnt, err = farm.GetAntByName(test.RenterAntName)
 			if err != nil {
-				t.Error(err)
-				return
+				t.Fatal(err)
 			}
 		} else {
 			// Upgrade step on the following interations
@@ -192,8 +190,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 				t.Logf("Upgrading renter to siad-dev version %v\n", version)
 				err = renterAnt.UpdateSiad(siadBinaryPath(version))
 				if err != nil {
-					t.Error(err)
-					return
+					t.Fatal(err)
 				}
 			}
 
@@ -203,8 +200,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 				for _, hostIndex := range hostIndices {
 					err := farm.Ants[hostIndex].UpdateSiad(siadBinaryPath(version))
 					if err != nil {
-						t.Error(err)
-						return
+						t.Fatal(err)
 					}
 				}
 			}
