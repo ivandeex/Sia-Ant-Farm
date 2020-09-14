@@ -254,7 +254,8 @@ func filteredTransactions(c *client.Client) (unconfirmedTransactions []modules.P
 	// Get all transactions
 	wtg, err := c.WalletTransactionsGet(0, math.MaxInt64)
 	if err != nil {
-		return unconfirmedTransactions, confirmedTransactions, errors.AddContext(err, "can't get wallet transactions")
+		err = errors.AddContext(err, "can't get wallet transactions")
+		return
 	}
 
 	// Filter transactions
@@ -269,7 +270,7 @@ func filteredTransactions(c *client.Client) (unconfirmedTransactions []modules.P
 		}
 	}
 
-	return unconfirmedTransactions, confirmedTransactions, nil
+	return 
 }
 
 // isAnnnouncementTypeTransaction returns true if the format of the transaction
