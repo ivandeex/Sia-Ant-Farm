@@ -54,7 +54,7 @@ const (
 
 	// uploadTimeout defines the maximum time allowed for an upload operation to
 	// complete, ie for an upload to reach 100%.
-	maxUploadTime = time.Minute * 10
+	uploadTimeout = time.Minute * 10
 
 	// uploadFileCheckFrequency defines how frequently the renter job checks if
 	// file upload has reached 100%
@@ -91,7 +91,7 @@ const (
 	fileApearInDownloadListFrequency = time.Second
 
 	// downloadFileTimeout defines timeout for file to be downloaded
-	downloadFileTimeout = time.Minute * 15
+	downloadFileTimeout = time.Minute * 5
 
 	// downloadFileFrequency defines how frequently the renter job checks if a
 	// file is downloaded
@@ -175,7 +175,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 	if err != nil {
 		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
 	}
-	log.Printf("[INFO] [renter] [%v] downloading %v to %v", r.staticJR.staticSiaDirectory, siaPath, destPath)
+	log.Printf("[INFO] [renter] [%v] Downloading\n\tsiaFile: %v\n\tto local file: %v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
 	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
 	if err != nil {
 		return errors.AddContext(err, "failed in call to /renter/download")
@@ -218,15 +218,16 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		if hasFile && info.Received == info.Filesize {
 			break
 		} else if !hasFile {
-			log.Printf("[INFO] [renter] [%v] file unexpectedly missing from download list\n", r.staticJR.staticSiaDirectory)
+			log.Printf("[INFO] [renter] [%v] File unexpectedly missing from download list\n", r.staticJR.staticSiaDirectory)
 		} else {
-			log.Printf("[INFO] [renter] [%v] currently downloading %v, received %v bytes\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, info.Received)
+			log.Printf("[INFO] [renter] [%v] Currently downloading %v, received %v bytes\n", r.staticJR.staticSiaDirectory, fileToDownload.SiaPath, info.Received)
 		}
 		if time.Since(start) > downloadFileTimeout {
+			log.Printf("[ERROR] [renter] [%v] File %v hasn't been downloaded within %v timeout\n", r.staticJR.staticSiaDirectory, siaPath, downloadFileTimeout)
 			return fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
 		}
 	}
-	log.Printf("[INFO] [renter] [%v]: successfully downloaded %v to %v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
+	log.Printf("[INFO] [renter] [%v] Successfully downloaded\n\tsiaFile: %v\n\tto local file:%v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
 	return nil
 }
 
@@ -540,6 +541,7 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 
 	// Block until the upload has reached 100%
 	start := time.Now()
+	var lastUploadProgress float64
 	for {
 		select {
 		case <-r.staticJR.StaticTG.StopChan():
@@ -566,9 +568,40 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 			break
 		}
 
+		// If there is no progress in the upload log number of active hosts and
+		// contracts
+		if uploadProgress == lastUploadProgress {
+			// Log number of hostdb active hosts
+			hdag, err := r.staticJR.staticClient.HostDbActiveGet()
+			if err != nil {
+				log.Printf("[ERROR] [renter] [%v] Can't get hostdb active hosts: %v\n", r.staticJR.staticSiaDirectory, err)
+			} else {
+				log.Printf("[DEBUG] [renter] [%v] Number of HostDB Active Hosts: %v\n", r.staticJR.staticSiaDirectory, len(hdag.Hosts))
+			}
+
+			// Log number of each type of contract
+			rc, err := r.staticJR.staticClient.RenterAllContractsGet()
+			if err != nil {
+				log.Printf("[ERROR] [renter] [%v] Can't get renter contracts: %v\n", r.staticJR.staticSiaDirectory, err)
+			} else {
+				log.Printf("[DEBUG] [renter] [%v] Number of Contracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.Contracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of ActiveContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.ActiveContracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of DisabledContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.DisabledContracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of ExpiredContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.ExpiredContracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of ExpiredRefreshedContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.ExpiredRefreshedContracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of InactiveContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.InactiveContracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of PassiveContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.PassiveContracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of RecoverableContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.RecoverableContracts))
+				log.Printf("[DEBUG] [renter] [%v] Number of RefreshedContracts: %v\n", r.staticJR.staticSiaDirectory, len(rc.RefreshedContracts))
+			}
+		}
+		lastUploadProgress = uploadProgress
+
 		// Check timeout
-		if time.Since(start) > maxUploadTime {
-			return modules.SiaPath{}, fmt.Errorf("file with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v", siaPath, maxUploadTime, uploadProgress)
+		if time.Since(start) > uploadTimeout {
+			// Log error
+			log.Printf("[ERROR] [renter] [%v] File with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v%%", r.staticJR.staticSiaDirectory, siaPath, uploadTimeout, uploadProgress)
+			return modules.SiaPath{}, fmt.Errorf("file with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v%%", siaPath, uploadTimeout, uploadProgress)
 		}
 	}
 	log.Printf("[INFO] [renter] [%v] file has been successfully uploaded to 100%%.\n", r.staticJR.staticSiaDirectory)

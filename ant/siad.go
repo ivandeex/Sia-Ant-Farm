@@ -7,6 +7,8 @@ package ant
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,12 +23,13 @@ const (
 	// stopSiadTimeout defines timeout for stopping siad process gracefully
 	stopSiadTimeout = 120 * time.Second
 
-	// waitForAPITimeout defines timeout for waiting for Sia API to become available
-	waitForAPITimeout = time.Minute * 5
+	// waitForFullSetupFrequency defines how frequently to check if Sia daemon
+	// finished full setup
+	waitForFullSetupFrequency = time.Millisecond * 100
 
-	// waitForAPIFrequency defines how frequently to check for new siad to be
-	// accessible via API
-	waitForAPIFrequency = time.Millisecond * 100
+	// waitForFullSetupTimeout defines timeout for waiting for Sia daemon to
+	// finish full setup
+	waitForFullSetupTimeout = time.Second * 20
 )
 
 // SiadConfig contains the necessary config information to create a new siad
@@ -53,8 +56,10 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	if err := checkSiadConstants(config.SiadPath); err != nil {
 		return nil, errors.AddContext(err, "error with siad constants")
 	}
-	// create a logfile for Sia's stderr and stdout.
-	logfile, err := os.Create(filepath.Join(config.DataDir, "sia-output.log"))
+	// Create a logfile for Sia's stderr and stdout.
+	logFilename := "sia-output.log"
+	logFilePath := filepath.Join(config.DataDir, logFilename)
+	logfile, err := os.Create(logFilePath)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to create log file")
 	}
@@ -104,8 +109,10 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 		return nil, errors.AddContext(err, "unable to start process")
 	}
 
-	if err := waitForAPI(config, cmd); err != nil {
-		return nil, errors.AddContext(err, "error with API")
+	// Wait until siad full setup is finished
+	err = waitForFullSetup(config, cmd, logFilePath)
+	if err != nil {
+		return nil, errors.AddContext(err, "wait for siad full setup failed")
 	}
 
 	return cmd, nil
@@ -168,29 +175,19 @@ func stopSiad(apiAddr string, process *os.Process) {
 	}
 }
 
-// waitForAPI blocks until the Sia API at apiAddr becomes available.
-// if siad returns while waiting for the api, return an error.
-func waitForAPI(config SiadConfig, siad *exec.Cmd) error {
-	opts, err := client.DefaultOptions()
-	if err != nil {
-		return errors.AddContext(err, "unable to get client options")
-	}
-	opts.Address = config.APIAddr
-	opts.Password = config.APIPassword
-	c := client.New(opts)
-
+// waitForFullSetup blocks until the Sia daemon finishes full setup. If siad
+// returns while waiting for the api, return an error.
+func waitForFullSetup(config SiadConfig, siad *exec.Cmd, logFilePath string) error {
 	exitchan := make(chan error)
 	go func() {
 		_, err := siad.Process.Wait()
 		exitchan <- err
 	}()
 
-	// Wait for the Sia API to become available.
+	// Wait for siad full setup finished
 	success := false
-	for start := time.Now(); time.Since(start) < waitForAPITimeout; time.Sleep(waitForAPIFrequency) {
-		if success {
-			break
-		}
+waitLoop:
+	for start := time.Now(); time.Since(start) < waitForFullSetupTimeout; time.Sleep(waitForFullSetupFrequency) {
 		select {
 		case err := <-exitchan:
 			msg := "siad exited unexpectedly while waiting for api"
@@ -199,14 +196,19 @@ func waitForAPI(config SiadConfig, siad *exec.Cmd) error {
 			}
 			return fmt.Errorf(msg)
 		default:
-			if _, err := c.ConsensusGet(); err == nil {
+			logContent, err := ioutil.ReadFile(logFilePath)
+			if err != nil {
+				log.Printf("[ERROR] [ant] [%v] Can't read %v: %v\n", config.DataDir, logFilePath, err)
+			}
+			if strings.Contains(string(logContent), "Finished full setup in") {
 				success = true
+				break waitLoop
 			}
 		}
 	}
 	if !success {
 		stopSiad(config.APIAddr, siad.Process)
-		return errors.New("timeout: couldnt reach api after 5 minutes")
+		return fmt.Errorf("siad hasn't finished full setup within %v timeout", waitForFullSetupTimeout)
 	}
 	return nil
 }
