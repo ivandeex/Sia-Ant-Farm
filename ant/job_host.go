@@ -25,7 +25,7 @@ const (
 
 	// hostTransactionCheckFrequency defines frequency at which we check
 	// announce host transaction.
-	hostTransactionCheckFrequency = time.Millisecond * 500
+	hostTransactionCheckFrequency = time.Second * 4
 
 	// hostLoopFrequency defines frequency at which we execute main host job
 	// loop.
@@ -42,9 +42,6 @@ const (
 var (
 	// errAntStopped defines a reusable error when ant was stopped
 	errAntStopped = errors.New("ant was stopped")
-
-	// errAPIError defines a reusable error when API call is not successful
-	errAPIError = errors.New("error getting info through API")
 )
 
 // hostJobRunner extends generic jobRunner with host specific fields.
@@ -144,8 +141,10 @@ func (j *JobRunner) jobHost() {
 		// Announce host to the network
 		if !hjr.announced {
 			// Announce host
+			log.Printf("[INFO] [host] [%v] Announce host\n", hjr.staticSiaDirectory)
 			err := hjr.announce()
 			if err != nil {
+				log.Printf("[ERROR] [host] [%v] Host announcement failed: %v\n", hjr.staticSiaDirectory, err)
 				select {
 				case <-j.StaticTG.StopChan():
 					return
@@ -158,14 +157,16 @@ func (j *JobRunner) jobHost() {
 			// Wait till host announcement transaction is in blockchain
 			err = hjr.waitAnnounceTransactionInBlockchain()
 			if err != nil {
+				log.Printf("[ERROR] [host] [%v] Waiting for host announcement transaction failed: %v\n", hjr.staticSiaDirectory, err)
 				hjr.announced = false
 				continue
 			}
 		}
 
 		// Check announce host transaction is not re-orged
-		reorged, err := hjr.checkTransactionReorged()
+		found, err := hjr.announcementTransactionInBlock(hjr.announcedBlockHeight)
 		if err != nil {
+			log.Printf("[ERROR] [host] [%v] Checking host announcement transaction failed: %v\n", hjr.staticSiaDirectory, err)
 			select {
 			case <-j.StaticTG.StopChan():
 				return
@@ -173,7 +174,8 @@ func (j *JobRunner) jobHost() {
 				continue
 			}
 		}
-		if reorged {
+		if !found {
+			log.Printf("[INFO] [host] [%v] Host announcement transaction was not found, it was probably re-orged\n", hjr.staticSiaDirectory)
 			hjr.announced = false
 			continue
 		}
@@ -181,6 +183,7 @@ func (j *JobRunner) jobHost() {
 		// Check storage revenue didn't decreased
 		err = hjr.checkStorageRevenueNotDecreased()
 		if err != nil {
+			log.Printf("[ERROR] [host] [%v] Checking storage revenue failed: %v\n", hjr.staticSiaDirectory, err)
 			select {
 			case <-j.StaticTG.StopChan():
 				return
@@ -203,15 +206,12 @@ func (j *JobRunner) newHostJobRunner() hostJobRunner {
 	return hostJobRunner{JobRunner: j}
 }
 
-// announce sets the number of confirmed transactions at the start and
-// announces host to the network.
+// announce announces host to the network.
 func (hjr *hostJobRunner) announce() error {
 	// Announce host to the network
-	log.Printf("[INFO] [host] [%v] Announce host\n", hjr.staticSiaDirectory)
 	err := hjr.staticClient.HostAnnouncePost()
 	if err != nil {
-		log.Printf("[ERROR] [host] [%v] Can't post host announcement: %v\n", hjr.staticSiaDirectory, err)
-		return errAPIError
+		return err
 	}
 
 	return nil
@@ -223,8 +223,7 @@ func (hjr *hostJobRunner) announcementTransactionInBlock(blockHeight types.Block
 	// Get blocks consensus with transactions
 	cbg, err := hjr.staticClient.ConsensusBlocksHeightGet(blockHeight)
 	if err != nil {
-		log.Printf("[ERROR] [host] [%v] Can't get consensus info: %v\n", hjr.staticSiaDirectory, err)
-		return false, errAntStopped
+		return false, err
 	}
 
 	// Check if transactions contain host announcement of this host
@@ -248,44 +247,36 @@ func (hjr *hostJobRunner) announcementTransactionInBlock(blockHeight types.Block
 func (hjr *hostJobRunner) checkStorageRevenueNotDecreased() error {
 	hostInfo, err := hjr.staticClient.HostGet()
 	if err != nil {
-		log.Printf("[ERROR] [host] [%v] Can't get host info: %v\n", hjr.staticSiaDirectory, err)
-		return errAPIError
+		return err
 	}
 
 	// Print an error if storage revenue has decreased
-	if hostInfo.FinancialMetrics.StorageRevenue.Cmp(hjr.lastStorageRevenue) >= 0 {
-		// Update previous revenue to new amount
-		hjr.lastStorageRevenue = hostInfo.FinancialMetrics.StorageRevenue
-	} else {
+	if hostInfo.FinancialMetrics.StorageRevenue.Cmp(hjr.lastStorageRevenue) < 0 {
 		// Storage revenue has decreased!
 		log.Printf("[ERROR] [host] [%v] StorageRevenue decreased! Was %v, is now %v\n", hjr.staticSiaDirectory, hjr.lastStorageRevenue, hostInfo.FinancialMetrics.StorageRevenue)
 	}
 
+	// Update previous revenue to new amount
+	hjr.lastStorageRevenue = hostInfo.FinancialMetrics.StorageRevenue
+
 	return nil
 }
 
-// checkTransactionReorged return true when transaction was reorged and can't
-// be found in the blockchain anymore.
-func (hjr *hostJobRunner) checkTransactionReorged() (transactionReorged bool, err error) {
-	found, err := hjr.announcementTransactionInBlock(hjr.announcedBlockHeight)
-	if err != nil {
-		log.Printf("[ERROR] [host] [%v] Can't get block transactions: %v\n", hjr.staticSiaDirectory, err)
-		return false, errAPIError
+// announcementTransactionInBlockRange updates announcedBlockHeight and returns
+// true if a host announceent transaction was found in the given block range.
+func (hjr *hostJobRunner) announcementTransactionInBlockRange(start, end types.BlockHeight) (found bool, err error) {
+	// Iterate through the blockchain
+	for bh := start; bh <= end; bh++ {
+		found, err = hjr.announcementTransactionInBlock(bh)
+		if err != nil {
+			return
+		}
+		if found {
+			hjr.announcedBlockHeight = bh
+			break
+		}
 	}
-	if !found {
-		log.Printf("[INFO] [host] [%v] Host announcement transaction was not found, it was probably re-orged\n", hjr.staticSiaDirectory)
-	}
-	return !found, nil
-}
-
-// currentBlockHeight returns current block height
-func (hjr *hostJobRunner) currentBlockHeight() (types.BlockHeight, error) {
-	cg, err := hjr.staticClient.ConsensusGet()
-	if err != nil {
-		log.Printf("[ERROR] [host] [%v] Can't get consensus info: %v\n", hjr.staticSiaDirectory, err)
-		return 0, errAPIError
-	}
-	return cg.Height, nil
+	return
 }
 
 // waitAnnounceTransactionInBlockchain blocks till host announcement
@@ -294,39 +285,37 @@ func (hjr *hostJobRunner) waitAnnounceTransactionInBlockchain() error {
 	var startBH types.BlockHeight
 	for {
 		// Get latest block height
-		latestBH, err := hjr.currentBlockHeight()
+		cg, err := hjr.staticClient.ConsensusGet()
 		if err != nil {
-			return errAPIError
+			return err
 		}
+		currentBH := cg.Height
 
 		// Set start block height for timeout
 		if startBH == 0 {
-			startBH = latestBH
+			startBH = currentBH
 		}
 
 		// Iterate through the blockchain
-		for bh := types.BlockHeight(0); bh <= latestBH; bh++ {
-			found, err := hjr.announcementTransactionInBlock(bh)
-			if err != nil {
-				select {
-				case <-hjr.StaticTG.StopChan():
-					return errAntStopped
-				case <-time.After(hostAPIErrorFrequency):
-					continue
-				}
+		found, err := hjr.announcementTransactionInBlockRange(types.BlockHeight(0), currentBH)
+		if err != nil {
+			select {
+			case <-hjr.StaticTG.StopChan():
+				return errAntStopped
+			case <-time.After(hostAPIErrorFrequency):
+				continue
 			}
-			if found {
-				log.Printf("[INFO] [host] [%v] Host announcement transaction is in block chain\n", hjr.staticSiaDirectory)
-				hjr.announcedBlockHeight = bh
-				return nil
-			}
+		}
+		if found {
+			log.Printf("[INFO] [host] [%v] Host announcement transaction is in blockchain\n", hjr.staticSiaDirectory)
+			return nil
 		}
 
 		// Timeout waiting for host announcement transaction
-		if latestBH > startBH+hostAnnounceBlockHeightDelay {
-			log.Printf("[INFO] [host] [%v] Host announcement transaction was not found in blockchain within %v blocks, transaction was probably re-orged\n", hjr.staticSiaDirectory, hostAnnounceBlockHeightDelay)
+		if currentBH > startBH+hostAnnounceBlockHeightDelay {
 			msg := fmt.Sprintf("host announcement transaction was not found in blockchain within %v blocks, transaction was probably re-orged", hostAnnounceBlockHeightDelay)
-			return errors.AddContext(err, msg)
+			log.Printf("[INFO] [host] [%v] %v\n", hjr.staticSiaDirectory, capitalize(msg))
+			return errors.New(msg)
 		}
 
 		// Wait for next iteration

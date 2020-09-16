@@ -36,9 +36,11 @@ func TestAnnounceHost(t *testing.T) {
 	}
 	defer j.Stop()
 
-	// Mine at least 50,000 SC
-	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)
-	go j.balanceMaintainer(desiredbalance)
+	// Mine at least 50,000 SC for host announcement.
+	// Keep mining so that host announcement gets to blockchain.
+	initialbalance := types.NewCurrency64(50e3).Mul(types.SiacoinPrecision)
+	desidedBalance := types.NewCurrency64(5e9).Mul(types.SiacoinPrecision)
+	go j.balanceMaintainer(desidedBalance)
 	start := time.Now()
 	for {
 		select {
@@ -51,7 +53,7 @@ func TestAnnounceHost(t *testing.T) {
 			log.Printf("[ERROR] [host] [%v] Error getting wallet info: %v\n", j.staticSiaDirectory, err)
 			continue
 		}
-		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {
+		if walletInfo.ConfirmedSiacoinBalance.Cmp(initialbalance) > 0 {
 			break
 		}
 		if time.Since(start) > miningTimeout {
@@ -66,9 +68,14 @@ func TestAnnounceHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create hostJobRunner, check no announcement transaction in blockchain
+	// Create hostJobRunner, check no host announcement transaction in blockchain
 	hjr := j.newHostJobRunner()
-	found, err := hjr.announcementTransactionInBlock(1)
+	cg, err := j.staticClient.ConsensusGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	blockHeightBeforeAnnouncement := cg.Height
+	found, err := hjr.announcementTransactionInBlockRange(types.BlockHeight(0), blockHeightBeforeAnnouncement)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,5 +87,33 @@ func TestAnnounceHost(t *testing.T) {
 	err = hjr.announce()
 	if err != nil {
 		t.Fatal(err)
+	}
+
+	// Wait for host announcement transaction in blockchain
+	err = hjr.waitAnnounceTransactionInBlockchain()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Check host announcement transaction in block range
+	cg, err = j.staticClient.ConsensusGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found, err = hjr.announcementTransactionInBlockRange(blockHeightBeforeAnnouncement+1, cg.Height)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("host announcement was not found in the block range")
+	}
+
+	// Check host announcement transaction in a specific block
+	found, err = hjr.announcementTransactionInBlock(hjr.announcedBlockHeight)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !found {
+		t.Fatal("host announcement was not found in the specific block")
 	}
 }
