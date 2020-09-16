@@ -11,7 +11,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia/types"
 )
 
-// TestAnnounceHost tests creating a new host job runner and announces host
+// TestAnnounceHost tests host announcement, host job runner and its methods.
 func TestAnnounceHost(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
