@@ -69,7 +69,7 @@ func (j *JobRunner) Stop() {
 // antsSyncWG
 func (j *JobRunner) waitForAntsSync() bool {
 	// Send antsSyncWG wait done to channel
-	var c chan struct{}
+	c := make(chan struct{})
 	go func() {
 		j.staticAntsSyncWG.Wait()
 		c <- struct{}{}
