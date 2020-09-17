@@ -68,14 +68,19 @@ func TestAnnounceHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create hostJobRunner, check no host announcement transaction in blockchain
-	hjr := j.newHostJobRunner()
+	// Create hostJobRunner
+	hjr, err := j.newHostJobRunner()
+	if err != nil {
+		t.Fatal()
+	}
+
+	// Check no host announcement transaction in blockchain
 	cg, err := j.staticClient.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}
 	blockHeightBeforeAnnouncement := cg.Height
-	found, err := hjr.announcementTransactionInBlockRange(types.BlockHeight(0), blockHeightBeforeAnnouncement)
+	found, err := hjr.managedAnnouncementTransactionInBlockRange(types.BlockHeight(0), blockHeightBeforeAnnouncement)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,18 +94,20 @@ func TestAnnounceHost(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Wait for host announcement transaction in blockchain
-	err = hjr.waitAnnounceTransactionInBlockchain()
+	// Wait for host announcement transaction in blockchain.
+	// Test waitAnnounceTransactionInBlockchain().
+	err = hjr.managedWaitAnnounceTransactionInBlockchain()
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Check host announcement transaction in block range
+	// Check host announcement transaction in block range.
+	// Test announcementTransactionInBlockRange().
 	cg, err = j.staticClient.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}
-	found, err = hjr.announcementTransactionInBlockRange(blockHeightBeforeAnnouncement+1, cg.Height)
+	found, err = hjr.managedAnnouncementTransactionInBlockRange(blockHeightBeforeAnnouncement+1, cg.Height)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -108,8 +115,9 @@ func TestAnnounceHost(t *testing.T) {
 		t.Fatal("host announcement was not found in the block range")
 	}
 
-	// Check host announcement transaction in a specific block
-	found, err = hjr.announcementTransactionInBlock(hjr.announcedBlockHeight)
+	// Check host announcement transaction in the specific block.
+	// Test announcementTransactionInBlock().
+	found, err = hjr.announcementTransactionInBlock(hjr.managedGetAnnouncedBlockHeight())
 	if err != nil {
 		t.Fatal(err)
 	}

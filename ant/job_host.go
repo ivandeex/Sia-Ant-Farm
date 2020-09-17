@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/modules"
@@ -50,6 +51,8 @@ type hostJobRunner struct {
 	announced            bool
 	announcedBlockHeight types.BlockHeight
 	lastStorageRevenue   types.Currency
+	mu                   sync.Mutex
+	staticHostNetAddress modules.NetAddress
 }
 
 // jobHost unlocks the wallet, mines some currency, and starts a host offering
@@ -129,7 +132,11 @@ func (j *JobRunner) jobHost() {
 	// Announce host to the network, check periodically that host announcement
 	// transaction is not re-orged, otherwise repeat. Check periodically that
 	// storage revenue doesn't decrease.
-	hjr := j.newHostJobRunner()
+	hjr, err := j.newHostJobRunner()
+	if err != nil {
+		log.Printf("[ERROR] [host] [%v] Can't create host job runner: %v\n", j.staticSiaDirectory, err)
+		return
+	}
 	for {
 		// Return immediately when closing ant
 		select {
@@ -139,7 +146,7 @@ func (j *JobRunner) jobHost() {
 		}
 
 		// Announce host to the network
-		if !hjr.announced {
+		if !hjr.managedGetAnnounced() {
 			// Announce host
 			log.Printf("[INFO] [host] [%v] Announce host\n", hjr.staticSiaDirectory)
 			err := hjr.announce()
@@ -152,19 +159,19 @@ func (j *JobRunner) jobHost() {
 					continue
 				}
 			}
-			hjr.announced = true
+			hjr.managedSetAnnounced(true)
 
 			// Wait till host announcement transaction is in blockchain
-			err = hjr.waitAnnounceTransactionInBlockchain()
+			err = hjr.managedWaitAnnounceTransactionInBlockchain()
 			if err != nil {
 				log.Printf("[ERROR] [host] [%v] Waiting for host announcement transaction failed: %v\n", hjr.staticSiaDirectory, err)
-				hjr.announced = false
+				hjr.managedSetAnnounced(false)
 				continue
 			}
 		}
 
 		// Check announce host transaction is not re-orged
-		found, err := hjr.announcementTransactionInBlock(hjr.announcedBlockHeight)
+		found, err := hjr.announcementTransactionInBlock(hjr.managedGetAnnouncedBlockHeight())
 		if err != nil {
 			log.Printf("[ERROR] [host] [%v] Checking host announcement transaction failed: %v\n", hjr.staticSiaDirectory, err)
 			select {
@@ -176,12 +183,12 @@ func (j *JobRunner) jobHost() {
 		}
 		if !found {
 			log.Printf("[INFO] [host] [%v] Host announcement transaction was not found, it was probably re-orged\n", hjr.staticSiaDirectory)
-			hjr.announced = false
+			hjr.managedSetAnnounced(false)
 			continue
 		}
 
 		// Check storage revenue didn't decreased
-		err = hjr.checkStorageRevenueNotDecreased()
+		err = hjr.managedCheckStorageRevenueNotDecreased()
 		if err != nil {
 			log.Printf("[ERROR] [host] [%v] Checking storage revenue failed: %v\n", hjr.staticSiaDirectory, err)
 			select {
@@ -201,9 +208,15 @@ func (j *JobRunner) jobHost() {
 }
 
 // newHostJobRunner creates a new host specific hostJobRunner from generic
-// jobRunner.
-func (j *JobRunner) newHostJobRunner() hostJobRunner {
-	return hostJobRunner{JobRunner: j}
+// jobRunner. hostJobRunner should be createad after host netAddress is
+// possibly set for the host.
+func (j *JobRunner) newHostJobRunner() (hostJobRunner, error) {
+	hg, err := j.staticClient.HostGet()
+	if err != nil {
+		return hostJobRunner{}, errors.AddContext(err, "can't get host info")
+	}
+	na := hg.ExternalSettings.NetAddress
+	return hostJobRunner{JobRunner: j, staticHostNetAddress: na}, nil
 }
 
 // announce announces host to the network.
@@ -223,7 +236,7 @@ func (hjr *hostJobRunner) announcementTransactionInBlock(blockHeight types.Block
 	// Get blocks consensus with transactions
 	cbg, err := hjr.staticClient.ConsensusBlocksHeightGet(blockHeight)
 	if err != nil {
-		return false, err
+		return
 	}
 
 	// Check if transactions contain host announcement of this host
@@ -233,56 +246,90 @@ func (hjr *hostJobRunner) announcementTransactionInBlock(blockHeight types.Block
 			if err != nil {
 				continue
 			}
-			addrStr := fmt.Sprintf("%v:%v", addr.Host(), addr.Port())
-			if addrStr == hjr.staticAnt.Config.HostAddr {
+			if addr == hjr.staticHostNetAddress {
 				return true, nil
 			}
 		}
 	}
-	return false, nil
+	return
 }
 
-// storageRevenueDecreased logs an error if the host's storage revenue
-// decreases.
-func (hjr *hostJobRunner) checkStorageRevenueNotDecreased() error {
-	hostInfo, err := hjr.staticClient.HostGet()
-	if err != nil {
-		return err
-	}
-
-	// Print an error if storage revenue has decreased
-	if hostInfo.FinancialMetrics.StorageRevenue.Cmp(hjr.lastStorageRevenue) < 0 {
-		// Storage revenue has decreased!
-		log.Printf("[ERROR] [host] [%v] StorageRevenue decreased! Was %v, is now %v\n", hjr.staticSiaDirectory, hjr.lastStorageRevenue, hostInfo.FinancialMetrics.StorageRevenue)
-	}
-
-	// Update previous revenue to new amount
-	hjr.lastStorageRevenue = hostInfo.FinancialMetrics.StorageRevenue
-
-	return nil
-}
-
-// announcementTransactionInBlockRange updates announcedBlockHeight and returns
-// true if a host announceent transaction was found in the given block range.
-func (hjr *hostJobRunner) announcementTransactionInBlockRange(start, end types.BlockHeight) (found bool, err error) {
+// managedAnnouncementTransactionInBlockRange managed updates
+// announcedBlockHeight and returns true if a host announceent transaction was
+// found in the given block range.
+func (hjr *hostJobRunner) managedAnnouncementTransactionInBlockRange(start, end types.BlockHeight) (found bool, err error) {
 	// Iterate through the blockchain
 	for bh := start; bh <= end; bh++ {
+		hjr.mu.Lock()
 		found, err = hjr.announcementTransactionInBlock(bh)
+		hjr.mu.Unlock()
 		if err != nil {
 			return
 		}
 		if found {
+			hjr.mu.Lock()
 			hjr.announcedBlockHeight = bh
+			hjr.mu.Unlock()
 			break
 		}
 	}
 	return
 }
 
-// waitAnnounceTransactionInBlockchain blocks till host announcement
+// managedCheckStorageRevenueNotDecreased logs an error if the host's storage
+// revenue decreases and managed updates host's last storage revenue.
+func (hjr *hostJobRunner) managedCheckStorageRevenueNotDecreased() error {
+	hostInfo, err := hjr.staticClient.HostGet()
+	if err != nil {
+		return err
+	}
+
+	// Print an error if storage revenue has decreased
+	hjr.mu.Lock()
+	r := hjr.lastStorageRevenue
+	hjr.mu.Unlock()
+
+	if hostInfo.FinancialMetrics.StorageRevenue.Cmp(r) < 0 {
+		// Storage revenue has decreased!
+		log.Printf("[ERROR] [host] [%v] StorageRevenue decreased! Was %v, is now %v\n", hjr.staticSiaDirectory, hjr.lastStorageRevenue, hostInfo.FinancialMetrics.StorageRevenue)
+	}
+
+	// Update previous revenue to new amount
+	hjr.mu.Lock()
+	hjr.lastStorageRevenue = hostInfo.FinancialMetrics.StorageRevenue
+	hjr.mu.Unlock()
+
+	return nil
+}
+
+// managedGetAnnounced managed gets announced flag
+func (hjr *hostJobRunner) managedGetAnnounced() bool {
+	hjr.mu.Lock()
+	defer hjr.mu.Unlock()
+	return hjr.announced
+}
+
+// managedGetAnnouncedBlockHeight managed gets announcedBlockHeight
+func (hjr *hostJobRunner) managedGetAnnouncedBlockHeight() types.BlockHeight {
+	hjr.mu.Lock()
+	defer hjr.mu.Unlock()
+	return hjr.announcedBlockHeight
+}
+
+// managedSetAnnounced managed sets announced flag
+func (hjr *hostJobRunner) managedSetAnnounced(announced bool) {
+	hjr.mu.Lock()
+	defer hjr.mu.Unlock()
+	hjr.announced = announced
+}
+
+// managedWaitAnnounceTransactionInBlockchain blocks till host announcement
 // transaction appears in the blockchain
-func (hjr *hostJobRunner) waitAnnounceTransactionInBlockchain() error {
+func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 	var startBH types.BlockHeight
+	hjr.mu.Lock()
+	stopChan := hjr.StaticTG.StopChan()
+	hjr.mu.Unlock()
 	for {
 		// Get latest block height
 		cg, err := hjr.staticClient.ConsensusGet()
@@ -297,10 +344,10 @@ func (hjr *hostJobRunner) waitAnnounceTransactionInBlockchain() error {
 		}
 
 		// Iterate through the blockchain
-		found, err := hjr.announcementTransactionInBlockRange(types.BlockHeight(0), currentBH)
+		found, err := hjr.managedAnnouncementTransactionInBlockRange(types.BlockHeight(0), currentBH)
 		if err != nil {
 			select {
-			case <-hjr.StaticTG.StopChan():
+			case <-stopChan:
 				return errAntStopped
 			case <-time.After(hostAPIErrorFrequency):
 				continue
@@ -320,7 +367,7 @@ func (hjr *hostJobRunner) waitAnnounceTransactionInBlockchain() error {
 
 		// Wait for next iteration
 		select {
-		case <-hjr.StaticTG.StopChan():
+		case <-stopChan:
 			return errAntStopped
 		case <-time.After(hostTransactionCheckFrequency):
 			continue
