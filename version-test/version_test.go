@@ -142,7 +142,8 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 	var farm *antfarm.AntFarm
 	renterIndex, err := antfarmConfig.GetAntConfigIndexByName(test.RenterAntName)
 	if err != nil {
-		t.Fatal(err)
+		t.Error(err)
+		return
 	}
 	hostIndices := antfarmConfig.GetHostAntConfigIndices()
 	var renterAnt *ant.Ant
