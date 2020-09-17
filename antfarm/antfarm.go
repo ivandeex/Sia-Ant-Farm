@@ -276,7 +276,10 @@ func (af *AntFarm) Close() error {
 	for _, a := range af.Ants {
 		antCloseWG.Add(1)
 		go func(a *ant.Ant) {
-			a.Close()
+			err := a.Close()
+			if err != nil {
+				log.Printf("[ERROR] [ant] [%v] Error closing ant: %v\n", a.Config.SiadConfig.DataDir, err)
+			}
 			antCloseWG.Done()
 		}(a)
 	}

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -120,45 +121,52 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
 func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
+	// Ensure that, if an error occurs, all the ants that have been started are
+	// closed before returning.
+	defer func() {
+		if returnErr != nil {
+			for _, ant := range ants {
+				err := ant.Close()
+				if err != nil {
+					log.Printf("[ERROR] [ant] [%v] Error closing ant: %v\n", ant.Config.SiadConfig.DataDir, err)
+				}
+			}
+			ants = nil
+		}
+	}()
+
 	// Start an ant for each config
 	for i, config := range configs {
 		cfg, err := parseConfig(config)
 		if err != nil {
-			return nil, errors.AddContext(err, "unable to parse config")
+			return ants, errors.AddContext(err, "unable to parse config")
 		}
 		// Log config information about the Ant
 		fmt.Printf("[INFO] starting ant %v with config: \n", i)
 		err = ant.PrintJSON(cfg)
 		if err != nil {
-			return nil, err
+			return ants, err
 		}
 
 		// Create Ant
 		a, err := ant.New(antsSyncWG, cfg)
 		if err != nil {
 			// Ant is nil, we can't close it in defer
-			return nil, errors.AddContext(err, "unable to create ant")
+			return ants, errors.AddContext(err, "unable to create ant")
 		}
-		// If there is a return error, close each ant. Ant must be passed to
-		// defer by parameter, otherwise close is called multiple times on the
-		// last ant only.
-		defer func(a *ant.Ant) {
-			if returnErr != nil {
-				a.Close()
-			}
-		}(a)
+		ants = append(ants, a)
 
 		// Create Sia Client
 		c, err := getClient(cfg.APIAddr, cfg.APIPassword)
 		if err != nil {
-			return nil, err
+			return ants, err
 		}
 
 		// Set netAddress
 		netAddress := cfg.HostAddr
 		err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
 		if err != nil {
-			return nil, errors.AddContext(err, "couldn't set host's netAddress")
+			return ants, errors.AddContext(err, "couldn't set host's netAddress")
 		}
 
 		// Allow renter to rent on hosts on the same IP subnets
@@ -166,7 +174,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 			// Create Sia Client
 			c, err := getClient(cfg.APIAddr, cfg.APIPassword)
 			if err != nil {
-				return nil, err
+				return ants, err
 			}
 
 			// Set checkforipviolation=false
@@ -174,14 +182,12 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 			values.Set("checkforipviolation", "false")
 			err = c.RenterPost(values)
 			if err != nil {
-				return nil, errors.AddContext(err, "couldn't set checkforipviolation")
+				return ants, errors.AddContext(err, "couldn't set checkforipviolation")
 			}
 		}
-
-		ants = append(ants, a)
 	}
 
-	return ants, nil
+	return
 }
 
 // getClient returns http client

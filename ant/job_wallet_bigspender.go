@@ -20,7 +20,10 @@ func (j *JobRunner) bigSpender() {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	j.staticAntsSyncWG.Wait()
+	stopped := j.waitForAntsSync()
+	if stopped {
+		return
+	}
 
 	for {
 		select {

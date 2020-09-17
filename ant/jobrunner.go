@@ -65,6 +65,25 @@ func (j *JobRunner) Stop() {
 	j.StaticTG.Stop()
 }
 
+// waitForAntsSync returns true if jobRunner was stopped, otherwise waits for
+// antsSyncWG
+func (j *JobRunner) waitForAntsSync() bool {
+	// Send antsSyncWG wait done to channel
+	var c chan struct{}
+	go func() {
+		j.staticAntsSyncWG.Wait()
+		c <- struct{}{}
+	}()
+
+	// Wait for antsSyncWG or stop channel
+	select {
+	case <-c:
+		return false
+	case <-j.StaticTG.StopChan():
+		return true
+	}
+}
+
 // recreateJobRunner creates a newly initialized job runner according to the
 // given job runner
 func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
