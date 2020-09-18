@@ -146,10 +146,10 @@ func (j *JobRunner) jobHost() {
 		}
 
 		// Announce host to the network
-		if !hjr.managedGetAnnounced() {
+		if !hjr.managedAnnounced() {
 			// Announce host
 			log.Printf("[INFO] [host] [%v] Announce host\n", hjr.staticSiaDirectory)
-			err := hjr.announce()
+			err := hjr.staticClient.HostAnnouncePost()
 			if err != nil {
 				log.Printf("[ERROR] [host] [%v] Host announcement failed: %v\n", hjr.staticSiaDirectory, err)
 				select {
@@ -171,7 +171,7 @@ func (j *JobRunner) jobHost() {
 		}
 
 		// Check announce host transaction is not re-orged
-		found, err := hjr.announcementTransactionInBlock(hjr.managedGetAnnouncedBlockHeight())
+		found, err := hjr.announcementTransactionInBlock(hjr.managedAnnouncedBlockHeight())
 		if err != nil {
 			log.Printf("[ERROR] [host] [%v] Checking host announcement transaction failed: %v\n", hjr.staticSiaDirectory, err)
 			select {
@@ -219,17 +219,6 @@ func (j *JobRunner) newHostJobRunner() (hostJobRunner, error) {
 	return hostJobRunner{JobRunner: j, staticHostNetAddress: na}, nil
 }
 
-// announce announces host to the network.
-func (hjr *hostJobRunner) announce() error {
-	// Announce host to the network
-	err := hjr.staticClient.HostAnnouncePost()
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // announcementTransactionInBlock returns true if this host's host announcement
 // transaction can be found in the given block.
 func (hjr *hostJobRunner) announcementTransactionInBlock(blockHeight types.BlockHeight) (found bool, err error) {
@@ -252,6 +241,20 @@ func (hjr *hostJobRunner) announcementTransactionInBlock(blockHeight types.Block
 		}
 	}
 	return
+}
+
+// managedAnnounced managed gets announced flag
+func (hjr *hostJobRunner) managedAnnounced() bool {
+	hjr.mu.Lock()
+	defer hjr.mu.Unlock()
+	return hjr.announced
+}
+
+// managedAnnouncedBlockHeight managed gets announcedBlockHeight
+func (hjr *hostJobRunner) managedAnnouncedBlockHeight() types.BlockHeight {
+	hjr.mu.Lock()
+	defer hjr.mu.Unlock()
+	return hjr.announcedBlockHeight
 }
 
 // managedAnnouncementTransactionInBlockRange managed updates
@@ -300,20 +303,6 @@ func (hjr *hostJobRunner) managedCheckStorageRevenueNotDecreased() error {
 	hjr.mu.Unlock()
 
 	return nil
-}
-
-// managedGetAnnounced managed gets announced flag
-func (hjr *hostJobRunner) managedGetAnnounced() bool {
-	hjr.mu.Lock()
-	defer hjr.mu.Unlock()
-	return hjr.announced
-}
-
-// managedGetAnnouncedBlockHeight managed gets announcedBlockHeight
-func (hjr *hostJobRunner) managedGetAnnouncedBlockHeight() types.BlockHeight {
-	hjr.mu.Lock()
-	defer hjr.mu.Unlock()
-	return hjr.announcedBlockHeight
 }
 
 // managedSetAnnounced managed sets announced flag

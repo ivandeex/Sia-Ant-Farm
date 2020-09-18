@@ -89,7 +89,7 @@ func TestAnnounceHost(t *testing.T) {
 	}
 
 	// Announce host
-	err = hjr.announce()
+	err = hjr.staticClient.HostAnnouncePost()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestAnnounceHost(t *testing.T) {
 
 	// Check host announcement transaction in the specific block.
 	// Test announcementTransactionInBlock().
-	found, err = hjr.announcementTransactionInBlock(hjr.managedGetAnnouncedBlockHeight())
+	found, err = hjr.announcementTransactionInBlock(hjr.managedAnnouncedBlockHeight())
 	if err != nil {
 		t.Fatal(err)
 	}
