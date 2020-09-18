@@ -316,9 +316,6 @@ func (hjr *hostJobRunner) managedSetAnnounced(announced bool) {
 // transaction appears in the blockchain
 func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 	var startBH types.BlockHeight
-	hjr.mu.Lock()
-	stopChan := hjr.StaticTG.StopChan()
-	hjr.mu.Unlock()
 	for {
 		// Get latest block height
 		cg, err := hjr.staticClient.ConsensusGet()
@@ -336,7 +333,7 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 		found, err := hjr.managedAnnouncementTransactionInBlockRange(types.BlockHeight(0), currentBH)
 		if err != nil {
 			select {
-			case <-stopChan:
+			case <-hjr.StaticTG.StopChan():
 				return errAntStopped
 			case <-time.After(hostAPIErrorFrequency):
 				continue
@@ -356,7 +353,7 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 
 		// Wait for next iteration
 		select {
-		case <-stopChan:
+		case <-hjr.StaticTG.StopChan():
 			return errAntStopped
 		case <-time.After(hostTransactionCheckFrequency):
 			continue

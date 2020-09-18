@@ -10,6 +10,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // NewDefaultRenterAntfarmTestingConfig creates default basic antfarm config
@@ -134,7 +135,9 @@ func DownloadAndVerifyFiles(t *testing.T, renterAnt *ant.Ant, files []ant.Renter
 		if err != nil {
 			return fmt.Errorf("can't open downloaded file %v", destPath)
 		}
-		defer downloadedFile.Close()
+		defer func() {
+			err = errors.Compose(err, downloadedFile.Close())
+		}()
 		downloadedFileHash, err := ant.MerkleRoot(downloadedFile)
 		if err != nil {
 			return fmt.Errorf("can't get hash for downloaded file %v", destPath)
