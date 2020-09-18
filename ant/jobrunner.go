@@ -65,8 +65,8 @@ func (j *JobRunner) Stop() {
 	j.StaticTG.Stop()
 }
 
-// waitForAntsSync returns true if jobRunner was stopped, otherwise waits for
-// antsSyncWG
+// waitForAntsSync returns true if wait has finished, false if jobRunner was
+// stopped.
 func (j *JobRunner) waitForAntsSync() bool {
 	// Send antsSyncWG wait done to channel
 	c := make(chan struct{})
@@ -78,9 +78,9 @@ func (j *JobRunner) waitForAntsSync() bool {
 	// Wait for antsSyncWG or stop channel
 	select {
 	case <-c:
-		return false
-	case <-j.StaticTG.StopChan():
 		return true
+	case <-j.StaticTG.StopChan():
+		return false
 	}
 }
 
