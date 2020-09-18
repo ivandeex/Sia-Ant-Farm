@@ -107,7 +107,10 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	farm.Ants = ants
 	defer func() {
 		if err != nil {
-			farm.Close()
+			closeErr := farm.Close()
+			if closeErr != nil {
+				log.Printf("[ERROR] [ant-farm] Error closing antfarm: %v\n", err)
+			}
 		}
 	}()
 
@@ -270,9 +273,21 @@ func (af *AntFarm) Close() error {
 	if af.apiListener != nil {
 		af.apiListener.Close()
 	}
-	for _, ant := range af.Ants {
-		ant.Close()
+
+	// Speed up closing ants by calling concurrent goroutines
+	var antCloseWG sync.WaitGroup
+	for _, a := range af.Ants {
+		antCloseWG.Add(1)
+		go func(a *ant.Ant) {
+			err := a.Close()
+			if err != nil {
+				log.Printf("[ERROR] [ant] [%v] Error closing ant: %v\n", a.Config.SiadConfig.DataDir, err)
+			}
+			antCloseWG.Done()
+		}(a)
 	}
+	antCloseWG.Wait()
+
 	return nil
 }
 

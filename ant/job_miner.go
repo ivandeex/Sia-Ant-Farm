@@ -22,7 +22,10 @@ func (j *JobRunner) blockMining() {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	j.staticAntsSyncWG.Wait()
+	synced := j.waitForAntsSync()
+	if !synced {
+		return
+	}
 
 	err = j.staticClient.MinerStartGet()
 	if err != nil {

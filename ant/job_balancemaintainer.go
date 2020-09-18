@@ -27,7 +27,10 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	j.staticAntsSyncWG.Wait()
+	synced := j.waitForAntsSync()
+	if !synced {
+		return
+	}
 
 	minerRunning := true
 	err = j.staticClient.MinerStartGet()

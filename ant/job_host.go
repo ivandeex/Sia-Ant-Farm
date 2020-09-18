@@ -39,7 +39,10 @@ func (j *JobRunner) jobHost() {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced if the wait group was set
-	j.staticAntsSyncWG.Wait()
+	synced := j.waitForAntsSync()
+	if !synced {
+		return
+	}
 
 	// Mine at least 50,000 SC
 	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)

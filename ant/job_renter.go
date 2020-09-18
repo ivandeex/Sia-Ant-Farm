@@ -285,7 +285,10 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 	defer j.StaticTG.Done()
 
 	// Wait for ants to be synced
-	j.staticAntsSyncWG.Wait()
+	synced := j.waitForAntsSync()
+	if !synced {
+		return
+	}
 
 	// Start basic renter
 	rj := j.NewRenterJob()
