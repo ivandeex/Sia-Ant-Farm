@@ -347,7 +347,7 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 		// Timeout waiting for host announcement transaction
 		if currentBH > startBH+hostAnnounceBlockHeightDelay {
 			msg := fmt.Sprintf("host announcement transaction was not found in blockchain within %v blocks, transaction was probably re-orged", hostAnnounceBlockHeightDelay)
-			log.Printf("[INFO] [host] [%v] %v\n", hjr.staticSiaDirectory, capitalize(msg))
+			log.Printf("[INFO] [host] [%v] %v\n", hjr.staticSiaDirectory, msg)
 			return errors.New(msg)
 		}
 
