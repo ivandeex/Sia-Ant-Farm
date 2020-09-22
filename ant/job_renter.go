@@ -151,7 +151,9 @@ func createTempFile(dir, fileNamePattern string, fileSize uint64) (absFilePath s
 	if err != nil {
 		return "", crypto.Hash{}, fmt.Errorf("error creating temp file: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		err = errors.Compose(err, f.Close())
+	}()
 
 	absFilePath, err = filepath.Abs(f.Name())
 	if err != nil {
@@ -493,7 +495,9 @@ func (r *RenterJob) managedDownloadRandomFile() error {
 	if err != nil {
 		return fmt.Errorf("failed to create temporary file for download: %v", err)
 	}
-	defer f.Close()
+	defer func() {
+		err = errors.Compose(err, f.Close())
+	}()
 	destPath, _ := filepath.Abs(f.Name())
 	os.Remove(destPath)
 

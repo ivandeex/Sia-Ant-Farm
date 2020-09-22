@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
-	siasync "gitlab.com/NebulousLabs/Sia/sync"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/threadgroup"
 )
 
 // A JobRunner is used to start up jobs on the running Sia node.
@@ -17,7 +17,7 @@ type JobRunner struct {
 	staticClient        *client.Client
 	staticWalletSeed    string
 	staticSiaDirectory  string
-	StaticTG            siasync.ThreadGroup
+	StaticTG            threadgroup.ThreadGroup
 	renterUploadReadyWG sync.WaitGroup
 }
 

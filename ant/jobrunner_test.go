@@ -7,7 +7,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 )
 
-// TeTestNewJobRunner test creating a new Job Runner
+// TestNewJobRunner test creating a new Job Runner
 func TestNewJobRunner(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
