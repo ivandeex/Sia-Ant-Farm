@@ -125,6 +125,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 	// closed before returning.
 	defer func() {
 		if returnErr != nil {
+			log.Println("[ERROR] [antfarm] Error starting ants")
 			for _, ant := range ants {
 				err := ant.Close()
 				if err != nil {
@@ -152,7 +153,9 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 		a, err := ant.New(antsSyncWG, cfg)
 		if err != nil {
 			// Ant is nil, we can't close it in defer
-			return ants, errors.AddContext(err, "unable to create ant")
+			er := errors.AddContext(err, "can't create an ant")
+			log.Printf("[ERROR] [ant] [%v] ant: %v\n", cfg.DataDir, er)
+			return ants, er
 		}
 		ants = append(ants, a)
 
@@ -166,7 +169,9 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 		netAddress := cfg.HostAddr
 		err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
 		if err != nil {
-			return ants, errors.AddContext(err, "couldn't set host's netAddress")
+			er := errors.AddContext(err, "couldn't set host's netAddress")
+			log.Printf("[ERROR] [ant] [%v] ant: %v\n", cfg.DataDir, er)
+			return ants, er
 		}
 
 		// Allow renter to rent on hosts on the same IP subnets
