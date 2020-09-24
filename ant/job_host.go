@@ -119,7 +119,7 @@ func (j *JobRunner) jobHost() {
 		size := modules.SectorSize * 4096
 		err = j.staticClient.HostStorageFoldersAddPost(hostdir, size)
 		if err != nil {
-			log.Printf("[%v jobHost ERROR]: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[ERROR] [jobHost] [%v] Can't add storage folder: %v\n", j.staticSiaDirectory, err)
 			return
 		}
 	}

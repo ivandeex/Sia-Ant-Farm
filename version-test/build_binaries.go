@@ -52,8 +52,7 @@ type (
 // Sia-Ant-Farm/version-test directory.
 func buildSiad(binariesDir string, versions ...string) error {
 	vs := strings.Join(versions, ", ")
-	msg := fmt.Sprintf("[INFO] [build-binaries] Preparing to build siad versions: %v", vs)
-	log.Println(msg)
+	log.Printf("[INFO] [build-binaries] Preparing to build siad versions: %v\n", vs)
 
 	// Get current working directory and change back to it when done
 	startDir, err := os.Getwd()
@@ -103,8 +102,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 	}
 
 	for _, version := range versions {
-		msg := fmt.Sprintf("[INFO] [build-binaries] Building a siad version: %v", version)
-		log.Println(msg)
+		log.Printf("[INFO] [build-binaries] Building a siad version: %v\n", version)
 
 		// Create directory to store each version siad binary
 		binarySubDir := fmt.Sprintf("Sia-%v-%v-%v", version, goos, arch)

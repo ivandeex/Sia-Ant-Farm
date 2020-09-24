@@ -415,7 +415,7 @@ func (r *RenterJob) managedDeleteRandom() error {
 		return err
 	}
 
-	log.Printf("[%v jobStorageRenter INFO]: successfully deleted file\n", r.staticJR.staticSiaDirectory)
+	log.Printf("[INFO] [renter] [%v] Successfully deleted file.\n", r.staticJR.staticSiaDirectory)
 	os.Remove(r.Files[randindex].SourceFile)
 	r.Files = append(r.Files[:randindex], r.Files[randindex+1:]...)
 

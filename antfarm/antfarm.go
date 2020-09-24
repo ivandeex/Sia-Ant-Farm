@@ -109,7 +109,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 		if err != nil {
 			closeErr := farm.Close()
 			if closeErr != nil {
-				log.Printf("[ERROR] [ant-farm] Error closing antfarm: %v\n", err)
+				log.Printf("[ERROR] [ant-farm] [%v] Error closing antfarm: %v\n", config.DataDir, err)
 			}
 		}
 	}()
@@ -235,18 +235,18 @@ func (af *AntFarm) PermanentSyncMonitor() {
 		// Grab consensus groups
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
-			log.Println("error checking sync status of antfarm: ", err)
+			log.Printf("[ERROR] [ant-farm] Error checking sync status of antfarm: %v\n", err)
 			continue
 		}
 
 		// Check if ants are synced
 		if len(groups) == 1 {
-			log.Println("Ants are synchronized. Block Height: ", af.Ants[0].BlockHeight())
+			log.Printf("[INFO] [ant-farm] Ants are synchronized. Block Height: %v\n", af.Ants[0].BlockHeight())
 			continue
 		}
 
 		// Log out information about the unsync ants
-		log.Println("Ants split into multiple groups.")
+		log.Println("[INFO] [ant-farm] Ants split into multiple groups.")
 		for i, group := range groups {
 			if i != 0 {
 				log.Println()

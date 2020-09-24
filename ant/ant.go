@@ -93,7 +93,7 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	if upnprouter.UPnPEnabled {
 		err := clearPorts(config)
 		if err != nil {
-			log.Printf("error clearing upnp ports for ant: %v\n", err)
+			log.Printf("[DEBUG] [ant] [%v] Can't clear upnp ports for ant: %v\n", config.SiadConfig.DataDir, err)
 		}
 	}
 
