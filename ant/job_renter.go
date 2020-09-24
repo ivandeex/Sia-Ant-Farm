@@ -607,8 +607,9 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 		// Check timeout
 		if time.Since(start) > uploadTimeout {
 			// Log error
-			log.Printf("[ERROR] [renter] [%v] File with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v%%", r.staticJR.staticSiaDirectory, siaPath, uploadTimeout, uploadProgress)
-			return modules.SiaPath{}, fmt.Errorf("file with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v%%", siaPath, uploadTimeout, uploadProgress)
+			err := fmt.Errorf("file with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v%%", siaPath, uploadTimeout, uploadProgress)
+			log.Printf("[ERROR] [renter] [%v] %v", r.staticJR.staticSiaDirectory, err)
+			return modules.SiaPath{}, err
 		}
 	}
 	log.Printf("[INFO] [renter] [%v] file has been successfully uploaded to 100%%.\n", r.staticJR.staticSiaDirectory)
