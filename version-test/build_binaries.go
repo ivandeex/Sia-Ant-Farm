@@ -94,7 +94,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 	// Git pull including tags to get latest state
 	cmd = command{
 		name: "git",
-		args: []string{"pull", "--tags", "--prune", "origin", "master"},
+		args: []string{"pull", "--tags", "--prune", "--force", "origin", "master"},
 	}
 	_, err = cmd.execute()
 	if err != nil {
@@ -418,7 +418,7 @@ func (c command) execute() (string, error) {
 
 		log.Printf("[ERROR] [build-binaries] Error executing bash command:\nWorking directory: %v\nCommand: %v\nOutput:\n%v\n", wd, readableCommand, string(out))
 
-		msg := fmt.Sprintf("can't execute comand: %v", readableCommand)
+		msg := fmt.Sprintf("can't execute command: %v", readableCommand)
 		return "", errors.AddContext(err, msg)
 	}
 	return string(out), nil
