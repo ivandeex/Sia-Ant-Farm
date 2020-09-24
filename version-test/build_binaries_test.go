@@ -50,6 +50,8 @@ func TestBuildBinaries(t *testing.T) {
 // repository. Some official Sia releases need patches to work with Sia Antfarm
 // so we need to build and test on patched version having '-antfarm' git tag
 // suffix.
+// NOTE: These patches are ONLY to enable the Sia Antfarm to run and are not
+// intended to address any underlying bugs in siad.
 func TestGetReleases(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()

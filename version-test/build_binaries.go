@@ -216,6 +216,8 @@ func buildSiad(binariesDir string, versions ...string) error {
 // equal to the given minimal version in ascending semantic version order. If
 // there is a patch tagged with "-antfarm" suffix for a Sia release, patch tag
 // instead release tag is added to the return slice.
+// NOTE: These patches are ONLY to enable the Sia Antfarm to run and are not
+// intended to address any underlying bugs in siad.
 func getReleases(minVersion string) ([]string, error) {
 	// Get tags from Gitlab Sia repository. It can be multiple pages.
 	bodies, err := querySiaRepoAPI("repository/tags")
