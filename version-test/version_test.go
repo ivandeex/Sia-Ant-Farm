@@ -22,7 +22,7 @@ const (
 	// minVersion defines minimum released Sia version to include in built and
 	// tested binaries.
 	// TODO: Bring minVersion to v1.3.7
-	minVersion = "v1.4.10"
+	minVersion = "v1.4.8"
 
 	// rebuildReleaseBinaries defines whether the release siad binaries should
 	// be rebuilt. It can be set to false when rerunning the test(s) on already
@@ -53,6 +53,7 @@ type upgradeTestConfig struct {
 	upgradeRenter bool
 	upgradeHosts  bool
 	upgradePath   []string
+	latestVersion string
 }
 
 // siadBinaryPath returns built siad-dev binary path from the given Sia version
@@ -81,16 +82,11 @@ func TestUpgrades(t *testing.T) {
 	// v1.3.7 and on can be enabled on the Hetzner box when
 	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
 	// is done
-	// upgradePathVersions, err := siaVersions()
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-	// upgradePathVersions := []string{"v1.5.0", "master"}
-
 	upgradePathVersions, err := getReleases(minVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
+	latestVersion := upgradePathVersions[len(upgradePathVersions)-1]
 
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
@@ -111,8 +107,8 @@ func TestUpgrades(t *testing.T) {
 
 	// Configure tests
 	tests := []upgradeTestConfig{
-		{testName: "TestRenterUpgrades", upgradeRenter: true, upgradePath: upgradePathVersions},
-		{testName: "TestHostsUpgrades", upgradeHosts: true, upgradePath: upgradePathVersions},
+		{testName: "TestRenterUpgrades", upgradeRenter: true, upgradePath: upgradePathVersions, latestVersion: latestVersion},
+		{testName: "TestHostsUpgrades", upgradeHosts: true, upgradePath: upgradePathVersions, latestVersion: latestVersion},
 	}
 
 	// Check UPnP enabled router to spped up subtests
@@ -156,17 +152,25 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		if i == 0 {
 			// Initial antfarm setup on the first iteration
 
-			// Initial renter setup
+			// Set all ants siad-dev to use the latest release, below we set
+			// the renter or hosts to initial tested version
+			for aci := range antfarmConfig.AntConfigs {
+				antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = siadBinaryPath(testConfig.latestVersion)
+			}
+
+			// Initial upgrade renter setup
 			if testConfig.upgradeRenter {
-				t.Logf("Starting antfarm with renter's siad-dev version %v\n", version)
+				// Set renter to initial tested version
 				antfarmConfig.AntConfigs[renterIndex].SiadConfig.SiadPath = siadBinaryPath(version)
+				t.Logf("Starting antfarm with renter's siad-dev version %v, hosts' siad-dev version: %v\n", version, testConfig.latestVersion)
 			}
 			// Initial hosts setup
 			if testConfig.upgradeHosts {
-				t.Logf("Starting antfarm with hosts' siad-dev version %v\n", version)
+				// Set hosts to initial tested version
 				for _, hostIndex := range hostIndices {
 					antfarmConfig.AntConfigs[hostIndex].SiadConfig.SiadPath = siadBinaryPath(version)
 				}
+				t.Logf("Starting antfarm with renter's siad-dev version %v, hosts' siad-dev version: %v\n", testConfig.latestVersion, version)
 			}
 
 			// Start antfarm
