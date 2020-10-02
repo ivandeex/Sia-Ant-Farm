@@ -78,25 +78,25 @@ func TestUpgrades(t *testing.T) {
 	t.Parallel()
 
 	// Get versions to test.
-	// TODO:
-	// v1.3.7 and on can be enabled on the Hetzner box when
-	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
-	// is done
 	upgradePathVersions, err := getReleases(minVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
 	latestVersion := upgradePathVersions[len(upgradePathVersions)-1]
 
+	// Prepare logger
+	testLogger := test.NewTestLogger(t)
+	defer testLogger.Close()
+
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
-		err := buildSiad(binariesDir, upgradePathVersions...)
+		err := buildSiad(testLogger, binariesDir, upgradePathVersions...)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if rebuildMaster {
-		err := buildSiad(binariesDir, "master")
+		err := buildSiad(testLogger, binariesDir, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -112,7 +112,7 @@ func TestUpgrades(t *testing.T) {
 	}
 
 	// Check UPnP enabled router to spped up subtests
-	upnprouter.CheckUPnPEnabled()
+	upnprouter.CheckUPnPEnabled(testLogger)
 
 	// Execute tests
 	for _, tt := range tests {

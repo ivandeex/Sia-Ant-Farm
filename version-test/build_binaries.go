@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,6 +11,7 @@ import (
 	"sort"
 	"strings"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -29,6 +29,10 @@ const (
 	// Build constants
 	goos = "linux"
 	arch = "amd64"
+
+	// build binaries log formats
+	buildBinariesInfoLogFormat  = "INFO build-binaries: %v"
+	buildBinariesErrorLogFormat = "ERROR build-binaries: %v"
 )
 
 type (
@@ -50,9 +54,9 @@ type (
 // buildSiad builds specified siad-dev versions defined by git tags into the
 // given directory. If the given directory is relative path, it is relative to
 // Sia-Ant-Farm/version-test directory.
-func buildSiad(binariesDir string, versions ...string) error {
+func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) error {
 	vs := strings.Join(versions, ", ")
-	log.Printf("[INFO] [build-binaries] Preparing to build siad versions: %v\n", vs)
+	buildBinariesLogInfoPrintf(logger, "Preparing to build siad versions: %v\n", vs)
 
 	// Get current working directory and change back to it when done
 	startDir, err := os.Getwd()
@@ -70,7 +74,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 	gitlabSia := fmt.Sprintf("%v/Sia", gitlabNebulous)
 	siaPath := fmt.Sprintf("%v/src/%v", goPath, gitlabSia)
 	siaRepoURL := fmt.Sprintf("https://%v.git", gitlabSia)
-	err = gitClone(siaRepoURL, siaPath)
+	err = gitClone(logger, siaRepoURL, siaPath)
 	if err != nil {
 		return errors.AddContext(err, "can't clone Sia repository")
 	}
@@ -86,7 +90,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 		name: "git",
 		args: []string{"reset", "--hard", "HEAD"},
 	}
-	_, err = cmd.execute()
+	_, err = cmd.execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't reset Sia git repository")
 	}
@@ -96,13 +100,13 @@ func buildSiad(binariesDir string, versions ...string) error {
 		name: "git",
 		args: []string{"pull", "--tags", "--prune", "--force", "origin", "master"},
 	}
-	_, err = cmd.execute()
+	_, err = cmd.execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't pull Sia git repository")
 	}
 
 	for _, version := range versions {
-		log.Printf("[INFO] [build-binaries] Building a siad version: %v\n", version)
+		buildBinariesLogInfoPrintf(logger, "Building a siad version: %v", version)
 
 		// Create directory to store each version siad binary
 		binarySubDir := fmt.Sprintf("Sia-%v-%v-%v", version, goos, arch)
@@ -124,20 +128,20 @@ func buildSiad(binariesDir string, versions ...string) error {
 			// Clone merkletree repo if not yet available
 			gitlabMerkletree := fmt.Sprintf("%v/merkletree", gitlabNebulous)
 			merkletreeRepoURL := fmt.Sprintf("https://%v.git", gitlabMerkletree)
-			err := gitClone(merkletreeRepoURL, merkletreePath)
+			err := gitClone(logger, merkletreeRepoURL, merkletreePath)
 			if err != nil {
 				return errors.AddContext(err, "can't clone merkletree repository")
 			}
 
 			// Checkout the specific merkletree commit
-			err = gitCheckout(merkletreePath, "bc4a11e")
+			err = gitCheckout(logger, merkletreePath, "bc4a11e")
 			if err != nil {
 				return errors.AddContext(err, "can't checkout specific merkletree commit")
 			}
 		}
 
 		// Checkout the version
-		err = gitCheckout(siaPath, version)
+		err = gitCheckout(logger, siaPath, version)
 		if err != nil {
 			return errors.AddContext(err, "can't checkout specific Sia version")
 		}
@@ -147,7 +151,7 @@ func buildSiad(binariesDir string, versions ...string) error {
 			name: "go",
 			args: []string{"get", "-d", "./..."},
 		}
-		_, err = cmd.execute()
+		_, err = cmd.execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't get dependencies")
 		}
@@ -158,14 +162,19 @@ func buildSiad(binariesDir string, versions ...string) error {
 		binaryPath := filepath.Join(binaryDir, binaryName)
 
 		// Set ldflags according to Sia/Makefile
-		cmd = command{name: "date"}
-		buildTime, err := cmd.execute()
+		cmd = command{
+			name: "date",
+		}
+		buildTime, err := cmd.execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't get build time")
 		}
 		buildTime = strings.TrimSpace(buildTime)
-		cmd = command{name: "git", args: []string{"rev-parse", "--short", "HEAD"}}
-		gitRevision, err := cmd.execute()
+		cmd = command{
+			name: "git",
+			args: []string{"rev-parse", "--short", "HEAD"},
+		}
+		gitRevision, err := cmd.execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't get git revision")
 		}
@@ -195,14 +204,14 @@ func buildSiad(binariesDir string, versions ...string) error {
 			name: "go",
 			args: args,
 		}
-		_, err = cmd.execute()
+		_, err = cmd.execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't build siad binary")
 		}
 
 		// Checkout merkletree repository back to master after Sia v1.4.0
 		if version == "v1.4.0" {
-			err := gitCheckout(merkletreePath, "master")
+			err := gitCheckout(logger, merkletreePath, "master")
 			if err != nil {
 				return errors.AddContext(err, "can't checkout merkletree master")
 			}
@@ -272,7 +281,7 @@ func getReleases(minVersion string) ([]string, error) {
 // gitCheckout changes working directory to the git repository, performs git
 // reset and git checkout by branch, tag or commit id specified in checkoutStr
 // and changes working directory back to original directory.
-func gitCheckout(gitRepoPath, checkoutStr string) error {
+func gitCheckout(logger *persist.Logger, gitRepoPath, checkoutStr string) error {
 	// Get current working directory and change back to it when done
 	startDir, err := os.Getwd()
 	if err != nil {
@@ -291,7 +300,7 @@ func gitCheckout(gitRepoPath, checkoutStr string) error {
 		name: "git",
 		args: []string{"reset", "--hard", "HEAD"},
 	}
-	_, err = cmd.execute()
+	_, err = cmd.execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't reset git repository")
 	}
@@ -301,7 +310,7 @@ func gitCheckout(gitRepoPath, checkoutStr string) error {
 		name: "git",
 		args: []string{"checkout", checkoutStr},
 	}
-	_, err = cmd.execute()
+	_, err = cmd.execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't perform git checkout")
 	}
@@ -310,7 +319,7 @@ func gitCheckout(gitRepoPath, checkoutStr string) error {
 }
 
 // gitClone clones git repository by given URL to the given path.
-func gitClone(repoURL, repoPath string) error {
+func gitClone(logger *persist.Logger, repoURL, repoPath string) error {
 	// Return if directory already exists
 	_, err := os.Stat(repoPath)
 	if err != nil && !os.IsNotExist(err) {
@@ -320,7 +329,7 @@ func gitClone(repoURL, repoPath string) error {
 	}
 
 	// Directory doesn't exist
-	log.Printf("[INFO] [build-binaries] Cloning git repository %v to %v.\n", repoURL, repoPath)
+	buildBinariesLogInfoPrintf(logger, "Cloning git repository %v to %v.", repoURL, repoPath)
 
 	// Create repository directory
 	err = os.MkdirAll(repoPath, 0700)
@@ -333,12 +342,28 @@ func gitClone(repoURL, repoPath string) error {
 		name: "git",
 		args: []string{"clone", repoURL, repoPath},
 	}
-	_, err = cmd.execute()
+	_, err = cmd.execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't clone repository")
 	}
 
 	return nil
+}
+
+// buildBinariesLogErrorPrintf is a logger wrapper to printf build binaries
+// error log. Parameters follow fmt.Printf convention, but msgFormat should not
+// end with a new line character.
+func buildBinariesLogErrorPrintf(logger *persist.Logger, msgFormat string, a ...interface{}) {
+	format := fmt.Sprintf(buildBinariesErrorLogFormat, msgFormat)
+	logger.Printf(format, a...)
+}
+
+// buildBinariesLogInfoPrintf is a logger wrapper to printf build binaries info
+// log. Parameters follow fmt.Printf convention, but msgFormat should not end
+// with a new line character.
+func buildBinariesLogInfoPrintf(logger *persist.Logger, msgFormat string, a ...interface{}) {
+	format := fmt.Sprintf(buildBinariesInfoLogFormat, msgFormat)
+	logger.Printf(format, a...)
 }
 
 // querySiaRepoAPI queries Sia repository using Gitlab API with the given
@@ -397,7 +422,7 @@ func (s bySemanticVersion) Less(i, j int) bool {
 // Command struct is used instead of passing the whole command as a string and
 // parsing string arguments because parsing arguments containing spaces would
 // make the parsing much complex.
-func (c command) execute() (string, error) {
+func (c command) execute(logger *persist.Logger) (string, error) {
 	cmd := exec.Command(c.name, c.args...) //nolint:gosec
 	cmd.Env = os.Environ()
 	var envVars = []string{}
@@ -418,7 +443,7 @@ func (c command) execute() (string, error) {
 			return "", errors.AddContext(wdErr, "can't get working directory")
 		}
 
-		log.Printf("[ERROR] [build-binaries] Error executing bash command:\nWorking directory: %v\nCommand: %v\nOutput:\n%v\n", wd, readableCommand, string(out))
+		buildBinariesLogErrorPrintf(logger, "Error executing bash command:\nWorking directory: %v\nCommand: %v\nOutput:\n%v", wd, readableCommand, string(out))
 
 		msg := fmt.Sprintf("can't execute command: %v", readableCommand)
 		return "", errors.AddContext(err, msg)

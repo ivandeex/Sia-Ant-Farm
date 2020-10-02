@@ -1,7 +1,6 @@
 package ant
 
 import (
-	"log"
 	"time"
 )
 
@@ -29,13 +28,13 @@ func (j *JobRunner) blockMining() {
 
 	err = j.staticClient.MinerStartGet()
 	if err != nil {
-		log.Printf("[ERROR] [blockMining] [%v] Can't start miner: %v\n", j.staticSiaDirectory, err)
+		j.staticAnt.logErrorPrintf("[blockMining] Can't start miner: %v", err)
 		return
 	}
 
 	walletInfo, err := j.staticClient.WalletGet()
 	if err != nil {
-		log.Printf("[ERROR] [blockMining] [%v] Can't get wallet info: %v\n", j.staticSiaDirectory, err)
+		j.staticAnt.logErrorPrintf("[blockMining] Can't get wallet info: %v", err)
 		return
 	}
 	lastBalance := walletInfo.ConfirmedSiacoinBalance
@@ -50,14 +49,14 @@ func (j *JobRunner) blockMining() {
 
 		walletInfo, err = j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[ERROR] [blockMining] [%v] Can't get wallet info: %v\n", j.staticSiaDirectory, err)
+			j.staticAnt.logErrorPrintf("[blockMining] Can't get wallet info: %v", err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(lastBalance) > 0 {
-			log.Printf("[INFO] [blockMining] [%v] Blockmining job succeeded\n", j.staticSiaDirectory)
+			j.staticAnt.logInfoPrintln("[blockMining] Blockmining job succeeded")
 			lastBalance = walletInfo.ConfirmedSiacoinBalance
 		} else {
-			log.Printf("[ERROR] [blockMining] [%v] It took too long to receive new funds in miner job\n", j.staticSiaDirectory)
+			j.staticAnt.logErrorPrintln("[blockMining] It took too long to receive new funds in miner job")
 		}
 	}
 }

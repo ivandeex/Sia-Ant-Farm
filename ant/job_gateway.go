@@ -1,7 +1,6 @@
 package ant
 
 import (
-	"log"
 	"time"
 )
 
@@ -41,11 +40,11 @@ func (j *JobRunner) gatewayConnectability() {
 		// itself.
 		gatewayInfo, err := j.staticClient.GatewayGet()
 		if err != nil {
-			log.Printf("[ERROR] [gateway] [%v] error when calling /gateway: %v\n", j.staticSiaDirectory, err)
+			j.staticAnt.logErrorPrintf("[gateway] Error when calling /gateway: %v\n", err)
 			continue
 		}
 		if len(gatewayInfo.Peers) < 2 {
-			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.staticSiaDirectory, gatewayInfo.Peers)
+			j.staticAnt.logErrorPrintf("[gateway] Ant has less than two peers: %v\n", gatewayInfo.Peers)
 			continue
 		}
 	}

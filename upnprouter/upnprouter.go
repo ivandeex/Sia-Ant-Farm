@@ -1,9 +1,9 @@
 package upnprouter
 
 import (
-	"log"
 	"net"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/go-upnp"
 )
@@ -16,17 +16,21 @@ var (
 
 // CheckUPnPEnabled checks wheteher there is UPnP enabled router connected and
 // sets the flag accordingly
-func CheckUPnPEnabled() {
+func CheckUPnPEnabled(logger *persist.Logger) {
+	const logInfoPrefix = "INFO upnp-router-check"
+
 	// If we already know that UPnP is not enabled, do not check again
 	if !UPnPEnabled {
+		logger.Printf("%v: UPnP enabled router was already disabled", logInfoPrefix)
 		return
 	}
+
 	_, err := upnp.Discover()
 	if err != nil {
 		UPnPEnabled = false
-		log.Printf("[INFO] [ant-farm] UPnP enabled router is not available: %v", err)
+		logger.Printf("%v: UPnP enabled router is not available and was just disabled: %v", logInfoPrefix, err)
 	} else {
-		log.Println("[INFO] [ant-farm] UPnP enabled router is available")
+		logger.Printf("%v: UPnP enabled router is available", logInfoPrefix)
 	}
 }
 

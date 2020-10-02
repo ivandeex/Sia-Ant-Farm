@@ -6,15 +6,16 @@ their behavior and report their successfullness at each user store.
 package ant
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
-	"log"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -56,10 +57,11 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	if err := checkSiadConstants(config.SiadPath); err != nil {
 		return nil, errors.AddContext(err, "error with siad constants")
 	}
-	// Create a logfile for Sia's stderr and stdout.
+
+	// Open a logfile for appending Sia's stderr and stdout.
 	logFilename := "sia-output.log"
 	logFilePath := filepath.Join(config.DataDir, logFilename)
-	logfile, err := os.Create(logFilePath)
+	logfile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, modules.DefaultFilePerm)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to create log file")
 	}
@@ -96,11 +98,24 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 		args = append(args, "--authenticate-api=false")
 	}
 
+	// Create multiwriter to append to log file and to buffer. In buffer we
+	// don't see old logs and we check if current full setup finished.
+	var buf bytes.Buffer
+	mw := io.MultiWriter(logfile, &buf)
+
 	// Start siad, allow absolute and relative paths in config.SiadPath
 	siadCommand := fmt.Sprintf("%v %v", config.SiadPath, strings.Join(args, " "))
 	cmd := exec.Command("sh", "-c", siadCommand) //nolint:gosec
-	cmd.Stderr = logfile
-	cmd.Stdout = logfile
+	cmd.Stderr = mw
+	cmd.Stdout = mw
+
+	// After we are done waiting for full setup finished or an error
+	// occurred, we don't need to write to the buffer anymore.
+	defer func() {
+		cmd.Stderr = logfile
+		cmd.Stdin = logfile
+	}()
+
 	if config.APIPassword != "" {
 		cmd.Env = append(os.Environ(), "SIA_API_PASSWORD="+config.APIPassword)
 	}
@@ -110,7 +125,7 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	}
 
 	// Wait until siad full setup is finished
-	err = waitForFullSetup(config, cmd, logFilePath)
+	err = waitForFullSetup(config, cmd, &buf)
 	if err != nil {
 		return nil, errors.AddContext(err, "wait for siad full setup failed")
 	}
@@ -135,7 +150,7 @@ func checkSiadConstants(siadPath string) error {
 	return nil
 }
 
-//siadFlagSupported determines if the given siad binary supports the given flag
+// siadFlagSupported determines if the given siad binary supports the given flag
 func siadFlagSupported(siadPath, flag string) (bool, error) {
 	siadHelpCommand := fmt.Sprintf("%v -h", siadPath)
 	helpCmd := exec.Command("sh", "-c", siadHelpCommand) //nolint:gosec
@@ -176,39 +191,41 @@ func stopSiad(apiAddr string, process *os.Process) {
 }
 
 // waitForFullSetup blocks until the Sia daemon finishes full setup. If siad
-// returns while waiting for the api, return an error.
-func waitForFullSetup(config SiadConfig, siad *exec.Cmd, logFilePath string) error {
-	exitchan := make(chan error)
+// terminates while waiting for full setup or a timeout occurs, returns an
+// error. siadOutput expects to receive combined siad stdin and stderr output.
+func waitForFullSetup(config SiadConfig, siad *exec.Cmd, siadOutput *bytes.Buffer) error {
+	// Prepare channel if siad process terminates
+	exitChan := make(chan error)
 	go func() {
 		_, err := siad.Process.Wait()
-		exitchan <- err
+		exitChan <- err
 	}()
 
 	// Wait for siad full setup finished
-	success := false
-waitLoop:
-	for start := time.Now(); time.Since(start) < waitForFullSetupTimeout; time.Sleep(waitForFullSetupFrequency) {
+	start := time.Now()
+	var logContent string
+	for {
 		select {
-		case err := <-exitchan:
-			msg := "siad exited unexpectedly while waiting for api"
+		case err := <-exitChan:
+			// Siad process terminated
+			msg := "siad exited unexpectedly while waiting for full setup"
 			if err != nil {
-				return fmt.Errorf(msg+", exited with error: %v", err)
+				return errors.AddContext(err, msg)
 			}
-			return fmt.Errorf(msg)
-		default:
-			logContent, err := ioutil.ReadFile(logFilePath)
-			if err != nil {
-				log.Printf("[ERROR] [ant] [%v] Can't read %v: %v\n", config.DataDir, logFilePath, err)
-			}
-			if strings.Contains(string(logContent), "Finished full setup in") {
-				success = true
-				break waitLoop
-			}
+			return errors.New(msg)
+		case <-time.After(waitForFullSetupFrequency):
+		}
+
+		// Timeout
+		if time.Since(start) > waitForFullSetupTimeout {
+			stopSiad(config.APIAddr, siad.Process)
+			return fmt.Errorf("siad hasn't finished full setup within %v timeout", waitForFullSetupTimeout)
+		}
+
+		// Read siad output
+		logContent += siadOutput.String()
+		if strings.Contains(logContent, "Finished full setup in") {
+			return nil
 		}
 	}
-	if !success {
-		stopSiad(config.APIAddr, siad.Process)
-		return fmt.Errorf("siad hasn't finished full setup within %v timeout", waitForFullSetupTimeout)
-	}
-	return nil
 }

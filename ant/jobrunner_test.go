@@ -1,7 +1,6 @@
 package ant
 
 import (
-	"sync"
 	"testing"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
@@ -15,8 +14,8 @@ func TestNewJobRunner(t *testing.T) {
 	t.Parallel()
 
 	// Create testing config
-	datadir := test.TestDir(t.Name())
-	config := newTestingSiadConfig(datadir)
+	dataDir := test.TestDir(t.Name())
+	config := newTestingSiadConfig(dataDir)
 
 	// Create siad process
 	siad, err := newSiad(config)
@@ -25,8 +24,13 @@ func TestNewJobRunner(t *testing.T) {
 	}
 	defer stopSiad(config.APIAddr, siad.Process)
 
+	// Prepare antsCommon and ant
+	antsCommon := NewAntsCommon(t, dataDir)
+	defer antsCommon.Logger.Close()
+	ant := &Ant{StaticAntsCommon: &antsCommon}
+
 	// Create jobRunnner on same APIAddr as the siad process
-	j, err := newJobRunner(&sync.WaitGroup{}, &Ant{}, config.APIAddr, config.APIPassword, config.DataDir, "")
+	j, err := newJobRunner(ant, config.APIAddr, config.APIPassword, config.DataDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}

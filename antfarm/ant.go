@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -28,6 +27,10 @@ const (
 	// waitForAntsToSyncFrequency defines how frequently to check if ants are
 	// synced
 	waitForAntsToSyncFrequency = time.Second
+
+	// startAnts log formats
+	startAntsInfoLogFormat  = "INFO %v: %v"
+	startAntsErrorLogFormat = "ERROR %v: %v"
 )
 
 // getAddrs returns n free listening ports by leveraging the behaviour of
@@ -120,16 +123,16 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
-func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
+func startAnts(antsCommon *ant.AntsCommon, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
 	// Ensure that, if an error occurs, all the ants that have been started are
 	// closed before returning.
 	defer func() {
 		if returnErr != nil {
-			log.Println("[ERROR] [antfarm] Error starting ants")
+			startAntsLogErrorPrintln(antsCommon, "Error starting ants")
 			for _, ant := range ants {
 				err := ant.Close()
 				if err != nil {
-					log.Printf("[ERROR] [ant] [%v] Error closing ant: %v\n", ant.Config.SiadConfig.DataDir, err)
+					startAntsLogErrorPrintf(antsCommon, "Error closing ant %v: %v", ant.Config.SiadConfig.DataDir, err)
 				}
 			}
 			ants = nil
@@ -143,19 +146,19 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 			return ants, errors.AddContext(err, "unable to parse config")
 		}
 		// Log config information about the Ant
-		fmt.Printf("[INFO] starting ant %v with config: \n", i)
-		err = ant.PrintJSON(cfg)
+		antConfigStr, err := ant.SprintJSON(cfg)
 		if err != nil {
 			return ants, err
 		}
+		startAntsLogInfoPrintf(antsCommon, "Starting ant %v with config:\n%v", i, antConfigStr)
 
 		// Create Ant
-		a, err := ant.New(antsSyncWG, cfg)
+		a, err := ant.New(antsCommon, cfg)
 		if err != nil {
 			// Ant is nil, we can't close it in defer
-			er := errors.AddContext(err, "can't create an ant")
-			log.Printf("[ERROR] [ant] [%v] ant: %v\n", cfg.DataDir, er)
-			return ants, er
+			msg := "can't create an ant"
+			startAntsLogErrorPrintf(antsCommon, msg+" %v: %v", cfg.DataDir, err)
+			return ants, errors.AddContext(err, msg)
 		}
 		ants = append(ants, a)
 
@@ -169,9 +172,9 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 		netAddress := cfg.HostAddr
 		err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
 		if err != nil {
-			er := errors.AddContext(err, "couldn't set host's netAddress")
-			log.Printf("[ERROR] [ant] [%v] ant: %v\n", cfg.DataDir, er)
-			return ants, er
+			msg := "couldn't set host's netAddress"
+			startAntsLogErrorPrintf(antsCommon, msg+" for ant %v: %v", cfg.DataDir, err)
+			return ants, errors.AddContext(err, msg)
 		}
 
 		// Allow renter to rent on hosts on the same IP subnets
@@ -193,6 +196,27 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 	}
 
 	return
+}
+
+// startAntsLogErrorPrintf is a logger wrapper to printf startAnts error log.
+// Parameters follow fmt.Printf convention, but msgFormat should not end with a
+// new line character.
+func startAntsLogErrorPrintf(antsCommon *ant.AntsCommon, msgFormat string, a ...interface{}) {
+	format := fmt.Sprintf(startAntsErrorLogFormat, antsCommon.CallerLogStr, msgFormat)
+	antsCommon.Logger.Printf(format, a...)
+}
+
+// startAntsLogErrorPrintln is a logger wrapper to println startAnts error log.
+func startAntsLogErrorPrintln(antsCommon *ant.AntsCommon, msg string) {
+	antsCommon.Logger.Printf(startAntsErrorLogFormat, antsCommon.CallerLogStr, msg)
+}
+
+// startAntsLogErrorPrintf is a logger wrapper to printf startAnts info log.
+// Parameters follow fmt.Printf convention, but msgFormat should not end with a
+// new line character.
+func startAntsLogInfoPrintf(antsCommon *ant.AntsCommon, msgFormat string, a ...interface{}) {
+	format := fmt.Sprintf(startAntsInfoLogFormat, antsCommon.CallerLogStr, msgFormat)
+	antsCommon.Logger.Printf(format, a...)
 }
 
 // getClient returns http client

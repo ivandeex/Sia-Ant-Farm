@@ -1,7 +1,6 @@
 package ant
 
 import (
-	"log"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -34,7 +33,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 
 		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[ERROR] [littleSupplier] [%v] Can't get wallet info: %v\n", j.staticSiaDirectory, err)
+			j.staticAnt.logErrorPrintf("[littleSupplier] Can't get wallet info: %v", err)
 			return
 		}
 
@@ -44,7 +43,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 
 		_, err = j.staticClient.WalletSiacoinsPost(sendAmount, sendAddress, false)
 		if err != nil {
-			log.Printf("[ERROR] [littleSupplier] [%v] Can't send Siacoins: %v\n", j.staticSiaDirectory, err)
+			j.staticAnt.logErrorPrintf("[littleSupplier] Can't send Siacoins: %v", err)
 		}
 	}
 }

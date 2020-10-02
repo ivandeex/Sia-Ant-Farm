@@ -7,12 +7,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -23,6 +25,13 @@ const (
 
 	// antsSyncTimeout is a timeout for all ants to sync
 	antsSyncTimeout = time.Minute * 5
+
+	// antfarmLog defines antfarm log filename
+	antfarmLog = "antfarm.log"
+
+	// antfarm log formats
+	infoLogFormat  = "INFO antfarm %v: %v"
+	errorLogFormat = "ERROR antfarm %v: %v"
 )
 
 type (
@@ -34,8 +43,8 @@ type (
 		AutoConnect   bool
 		WaitForSync   bool
 
-		// ExternalFarms is a slice of net addresses representing the API addresses
-		// of other antFarms to connect to.
+		// ExternalFarms is a slice of net addresses representing the API
+		// addresses of other antFarms to connect to.
 		ExternalFarms []string
 	}
 
@@ -43,33 +52,49 @@ type (
 	// ants and provides an API server to interact with them.
 	AntFarm struct {
 		apiListener net.Listener
+		dataDir     string
 
 		// Ants is a slice of Ants in this antfarm.
 		Ants []*ant.Ant
 
-		// externalAnts is a slice of externally connected ants, that is, ants that
-		// are connected to this antfarm but managed by another antfarm.
+		// externalAnts is a slice of externally connected ants, that is, ants
+		// that are connected to this antfarm but managed by another antfarm.
 		externalAnts []*ant.Ant
 		router       *httprouter.Router
 
-		// antsSyncWG is a waitgroup to wait for all ants to be in sync and then
-		// start ant jobs
+		// antsSyncWG is a waitgroup to wait for all ants to be in sync and
+		// then start ant jobs
 		antsSyncWG sync.WaitGroup
+
+		// logger is an antfarm logger. It is passed to ants to log to the same
+		// logger.
+		logger *persist.Logger
 	}
 )
 
 // New creates a new antFarm given the supplied AntfarmConfig
 func New(config AntfarmConfig) (*AntFarm, error) {
 	// clear old antfarm data before creating an antfarm
-	datadir := "./antfarm-data"
+	dataDir := "./antfarm-data"
 	if config.DataDir != "" {
-		datadir = config.DataDir
+		dataDir = config.DataDir
 	}
 
-	os.RemoveAll(datadir)
-	os.MkdirAll(datadir, 0700)
+	os.RemoveAll(dataDir)
+	os.MkdirAll(dataDir, 0700)
 
-	farm := &AntFarm{}
+	// Initialize logger
+	logPath := filepath.Join(dataDir, antfarmLog)
+	logger, err := persist.NewFileLogger(logPath)
+	if err != nil {
+		return nil, err
+	}
+	log.Printf("INFO antfarm %v: This Antfarm logs to: %v", dataDir, logPath)
+
+	farm := &AntFarm{
+		dataDir: dataDir,
+		logger:  logger,
+	}
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
@@ -78,7 +103,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Check whether UPnP is enabled on router
-	upnprouter.CheckUPnPEnabled()
+	upnprouter.CheckUPnPEnabled(farm.logger)
 
 	// Check ant names are unique
 	antNames := make(map[string]struct{})
@@ -94,7 +119,12 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Start up each ant process with its jobs
-	ants, err := startAnts(&farm.antsSyncWG, config.AntConfigs...)
+	antsCommon := ant.AntsCommon{
+		AntsSyncWG:   &farm.antsSyncWG,
+		Logger:       logger,
+		CallerLogStr: fmt.Sprintf("%v %v", "antfarm", farm.dataDir),
+	}
+	ants, err := startAnts(&antsCommon, config.AntConfigs...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start ants")
 	}
@@ -109,7 +139,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 		if err != nil {
 			closeErr := farm.Close()
 			if closeErr != nil {
-				log.Printf("[ERROR] [ant-farm] [%v] Error closing antfarm: %v\n", config.DataDir, err)
+				farm.logErrorPrintf("Error closing antfarm: %v", closeErr)
 			}
 		}
 	}()
@@ -129,7 +159,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 
 	// Wait for all ants to sync
 	if config.WaitForSync {
-		err = waitForAntsToSync(antsSyncTimeout, ants...)
+		err = farm.waitForAntsToSync(antsSyncTimeout)
 		if err != nil {
 			return nil, errors.AddContext(err, "wait for ants to sync failed")
 		}
@@ -146,40 +176,6 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	farm.router.GET("/ants", farm.getAnts)
 
 	return farm, nil
-}
-
-// waitForAntsToSync waits for all ants to be synced with a given tmeout
-func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
-	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
-	start := time.Now()
-	for {
-		// Check sync status
-		groups, err := antConsensusGroups(ants...)
-		if err != nil {
-			return errors.AddContext(err, "unable to get consensus groups")
-		}
-
-		// We have reached ants sync
-		if len(groups) == 1 {
-			break
-		}
-
-		// We have reached timeout
-		if time.Since(start) > timeout {
-			return fmt.Errorf("ants didn't synced within %v timeout", timeout)
-		}
-
-		// Wait for jobs stop, timout or sleep
-		select {
-		case <-ants[0].Jr.StaticTG.StopChan():
-			// Jobs were stopped, do not wait anymore
-			return errors.New("jobs were stopped")
-		case <-time.After(waitForAntsToSyncFrequency):
-			// Continue waiting for sync after sleep
-		}
-	}
-	log.Println("[INFO] [ant-farm] all ants are now synced")
-	return nil
 }
 
 // allAnts returns all ants, external and internal, associated with this
@@ -204,6 +200,27 @@ func (af *AntFarm) connectExternalAntfarm(externalAddress string) error {
 	}
 	af.externalAnts = append(af.externalAnts, externalAnts...)
 	return connectAnts(af.allAnts()...)
+}
+
+// logErrorPrintf is a logger wrapper to printf antfarm error log. Parameters
+// follow fmt.Printf convention, but msgFormat should not end with a new line
+// character.
+func (af *AntFarm) logErrorPrintf(msgFormat string, v ...interface{}) {
+	format := fmt.Sprintf(errorLogFormat, af.dataDir, msgFormat)
+	af.logger.Printf(format, v...)
+}
+
+// logInfoPrintf is a logger wrapper to printf antfarm info log. Parameters
+// follow fmt.Printf convention, but msgFormat should not end with a new line
+// character.
+func (af *AntFarm) logInfoPrintf(msgFormat string, a ...interface{}) {
+	format := fmt.Sprintf(infoLogFormat, af.dataDir, msgFormat)
+	af.logger.Printf(format, a...)
+}
+
+// logInfoPrintln is a logger wrapper to println antfarm info log
+func (af *AntFarm) logInfoPrintln(msg string) {
+	af.logger.Println(fmt.Sprintf(infoLogFormat, af.dataDir, msg))
 }
 
 // ServeAPI serves the antFarm's http API.
@@ -235,27 +252,28 @@ func (af *AntFarm) PermanentSyncMonitor() {
 		// Grab consensus groups
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
-			log.Printf("[ERROR] [ant-farm] Error checking sync status of antfarm: %v\n", err)
+			af.logErrorPrintf("Error checking sync status of antfarm: %v", err)
 			continue
 		}
 
 		// Check if ants are synced
 		if len(groups) == 1 {
-			log.Printf("[INFO] [ant-farm] Ants are synchronized. Block Height: %v\n", af.Ants[0].BlockHeight())
+			af.logInfoPrintf("Ants are synchronized. Block Height: %v", af.Ants[0].BlockHeight())
 			continue
 		}
 
 		// Log out information about the unsync ants
-		log.Println("[INFO] [ant-farm] Ants split into multiple groups.")
+		msg := "Ants split into multiple groups.\n"
 		for i, group := range groups {
 			if i != 0 {
-				log.Println()
+				msg += "\n"
 			}
-			log.Println("Group ", i+1)
+			msg += fmt.Sprintf("\tGroup %d:\n", i+1)
 			for _, a := range group {
-				log.Println(a.APIAddr)
+				msg += fmt.Sprintf("\t\t%s\n", a.APIAddr)
 			}
 		}
+		af.logInfoPrintln(msg)
 	}
 }
 
@@ -270,6 +288,8 @@ func (af *AntFarm) getAnts(w http.ResponseWriter, r *http.Request, _ httprouter.
 
 // Close signals all the ants to stop and waits for them to return.
 func (af *AntFarm) Close() error {
+	defer af.logger.Close()
+
 	if af.apiListener != nil {
 		af.apiListener.Close()
 	}
@@ -281,13 +301,47 @@ func (af *AntFarm) Close() error {
 		go func(a *ant.Ant) {
 			err := a.Close()
 			if err != nil {
-				log.Printf("[ERROR] [ant] [%v] Error closing ant: %v\n", a.Config.SiadConfig.DataDir, err)
+				af.logErrorPrintf("Error closing ant: %v", a.Config.SiadConfig.DataDir, err)
 			}
 			antCloseWG.Done()
 		}(a)
 	}
 	antCloseWG.Wait()
 
+	return nil
+}
+
+// waitForAntsToSync waits for all ants to be synced with a given tmeout
+func (af *AntFarm) waitForAntsToSync(timeout time.Duration) error {
+	af.logInfoPrintln("Waiting for all ants to sync")
+	start := time.Now()
+	for {
+		// Check sync status
+		groups, err := antConsensusGroups(af.Ants...)
+		if err != nil {
+			return errors.AddContext(err, "unable to get consensus groups")
+		}
+
+		// We have reached ants sync
+		if len(groups) == 1 {
+			break
+		}
+
+		// We have reached timeout
+		if time.Since(start) > timeout {
+			return fmt.Errorf("ants didn't synced within %v timeout", timeout)
+		}
+
+		// Wait for jobs stop, timout or sleep
+		select {
+		case <-af.Ants[0].Jr.StaticTG.StopChan():
+			// Jobs were stopped, do not wait anymore
+			return errors.New("jobs were stopped")
+		case <-time.After(waitForAntsToSyncFrequency):
+			// Continue waiting for sync after sleep
+		}
+	}
+	af.logInfoPrintln("All ants are now synced")
 	return nil
 }
 

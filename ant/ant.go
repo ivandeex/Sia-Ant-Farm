@@ -3,7 +3,6 @@ package ant
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -11,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
@@ -20,6 +20,11 @@ const (
 	// updateSiadWarmUpTime defines initial warm-up sleep time for an ant after
 	// siad update
 	updateSiadWarmUpTime = time.Second * 10
+
+	// ant log formats
+	infoLogFormat  = "INFO ant %v: %v"
+	debugLogFormat = "DEBUG ant %v: %v"
+	errorLogFormat = "ERROR ant %v: %v"
 )
 
 // AntConfig represents a configuration object passed to New(), used to
@@ -35,6 +40,8 @@ type AntConfig struct {
 // An Ant is a Sia Client programmed with network user stories. It executes
 // these user stories and reports on their successfulness.
 type Ant struct {
+	StaticAntsCommon *AntsCommon
+
 	APIAddr string
 	RPCAddr string
 
@@ -47,6 +54,17 @@ type Ant struct {
 	// for this ant. The map will just keep growing, but it shouldn't take up a
 	// prohibitive amount of space.
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
+}
+
+// AntsCommon are common variables shared between ants
+type AntsCommon struct {
+	AntsSyncWG *sync.WaitGroup
+	Logger     *persist.Logger
+
+	// CallerLogStr is used by startAnts logs to identify which caller starts
+	// ants. If the caller is antfarm, it is set to "antfarm <antfarmDataDir>",
+	// if the caller is a test, it is set to "antfarm-test <testName>".
+	CallerLogStr string
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -82,18 +100,26 @@ func clearPorts(config AntConfig) error {
 }
 
 // New creates a new Ant using the configuration passed through `config`.
-func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
+func New(antsCommon *AntsCommon, config AntConfig) (ant *Ant, returnErr error) {
 	// Create ant working dir if it doesn't exist
 	// (e.g. ant farm deleted the whole farm dir)
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
 		os.MkdirAll(config.DataDir, 0700)
 	}
 
+	ant = &Ant{
+		APIAddr:          config.APIAddr,
+		RPCAddr:          config.RPCAddr,
+		Config:           config,
+		SeenBlocks:       make(map[types.BlockHeight]types.BlockID),
+		StaticAntsCommon: antsCommon,
+	}
+
 	// Unforward the ports required for this ant
 	if upnprouter.UPnPEnabled {
 		err := clearPorts(config)
 		if err != nil {
-			log.Printf("[DEBUG] [ant] [%v] Can't clear upnp ports for ant: %v\n", config.SiadConfig.DataDir, err)
+			ant.logInfoPrintf("Can't clear upnp ports for ant: %v", err)
 		}
 	}
 
@@ -110,22 +136,16 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 		}
 	}()
 
-	ant := &Ant{
-		APIAddr:    config.APIAddr,
-		RPCAddr:    config.RPCAddr,
-		Config:     config,
-		siad:       siad,
-		SeenBlocks: make(map[types.BlockHeight]types.BlockID),
-	}
+	ant.siad = siad
 
-	j, err := newJobRunner(antsSyncWG, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
+	j, err := newJobRunner(ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
 	ant.Jr = j
 
 	for _, job := range config.Jobs {
-		ant.StartJob(antsSyncWG, job)
+		ant.StartJob(antsCommon.AntsSyncWG, job)
 	}
 
 	if config.DesiredCurrency != 0 {
@@ -135,14 +155,13 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	return ant, nil
 }
 
-// PrintJSON is a wrapper for json.MarshalIndent
-func PrintJSON(v interface{}) error {
+// SprintJSON is a wrapper for json.MarshalIndent
+func SprintJSON(v interface{}) (string, error) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return err
+		return "", err
 	}
-	fmt.Println(string(data))
-	return nil
+	return fmt.Sprintln(string(data)), nil
 }
 
 // BlockHeight returns the highest block height seen by the ant.
@@ -174,6 +193,40 @@ func (a *Ant) HasRenterTypeJob() bool {
 		}
 	}
 	return false
+}
+
+// logDebugPrintf is a logger wrapper to printf ant debug log. Parameters
+// follow fmt.Printf convention, but msgFormat should not end with a new line
+// character.
+func (a *Ant) logDebugPrintf(msgFormat string, v ...interface{}) {
+	format := fmt.Sprintf(debugLogFormat, a.Config.DataDir, msgFormat)
+	a.StaticAntsCommon.Logger.Println(fmt.Sprintf(format, v...))
+}
+
+// logErrorPrintf is a logger wrapper to printf ant error log. Parameters
+// follow fmt.Printf convention, but msgFormat should not end with a new line
+// character.
+func (a *Ant) logErrorPrintf(msgFormat string, v ...interface{}) {
+	format := fmt.Sprintf(errorLogFormat, a.Config.DataDir, msgFormat)
+	a.StaticAntsCommon.Logger.Println(fmt.Sprintf(format, v...))
+}
+
+// logErrorPrintln is a logger wrapper to println ant error log
+func (a *Ant) logErrorPrintln(msg string) {
+	a.StaticAntsCommon.Logger.Println(fmt.Sprintf(errorLogFormat, a.Config.DataDir, msg))
+}
+
+// logInfoPrintf is a logger wrapper to printf ant info log. Parameters follow
+// fmt.Printf convention, but msgFormat should not end with a new line
+// character.
+func (a *Ant) logInfoPrintf(msgFormat string, v ...interface{}) {
+	format := fmt.Sprintf(infoLogFormat, a.Config.DataDir, msgFormat)
+	a.StaticAntsCommon.Logger.Println(fmt.Sprintf(format, v...))
+}
+
+// logInfoPrintln is a logger wrapper to println ant info log
+func (a *Ant) logInfoPrintln(msg string) {
+	a.StaticAntsCommon.Logger.Println(fmt.Sprintf(infoLogFormat, a.Config.DataDir, msg))
 }
 
 // StartJob starts the job indicated by `job` after an ant has been
@@ -215,7 +268,7 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 
 // UpdateSiad updates ant to use the given siad binary.
 func (a *Ant) UpdateSiad(siadPath string) error {
-	log.Printf("[INFO] [ant] [%v] Closing ant before siad update\n", a.Config.SiadConfig.DataDir)
+	a.logInfoPrintln("Closing ant before siad update")
 
 	// Stop ant
 	err := a.Close()
@@ -227,12 +280,12 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	a.Config.SiadConfig.SiadPath = siadPath
 
 	// Construct the ant's Siad instance
-	log.Printf("[INFO] [ant] [%v] Starting new siad process using %v\n", a.Config.SiadConfig.DataDir, siadPath)
+	a.logInfoPrintf("Starting new siad process using %v", siadPath)
 	siad, err := newSiad(a.Config.SiadConfig)
 	if err != nil {
 		return errors.AddContext(err, "unable to create new siad process")
 	}
-	log.Printf("[INFO] [ant] [%v] Siad process started\n", a.Config.SiadConfig.DataDir)
+	a.logInfoPrintln("Siad process started")
 
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
@@ -252,16 +305,16 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	a.Jr = jr
 
 	// Give a new siad process some warm-up time
-	log.Printf("[INFO] [ant] [%v] Siad warm-up...\n", a.Config.SiadConfig.DataDir)
+	a.logInfoPrintln("Siad warm-up...")
 	select {
 	case <-a.Jr.StaticTG.StopChan():
 		return nil
 	case <-time.After(updateSiadWarmUpTime):
 	}
-	log.Printf("[INFO] [ant] [%v] Siad warm-up finished\n", a.Config.SiadConfig.DataDir)
+	a.logInfoPrintln("Siad warm-up finished")
 
 	// Restart jobs
-	log.Printf("[INFO] [ant] [%v] Restarting ant's jobs\n", a.Config.SiadConfig.DataDir)
+	a.logInfoPrintln("Restarting ant's jobs")
 	for _, job := range a.Config.Jobs {
 		a.StartJob(a.Jr.staticAntsSyncWG, job)
 	}

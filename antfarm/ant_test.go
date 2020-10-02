@@ -3,7 +3,6 @@ package antfarm
 import (
 	"fmt"
 	"reflect"
-	"sync"
 	"testing"
 	"time"
 
@@ -47,8 +46,12 @@ func TestStartAnts(t *testing.T) {
 		},
 	}
 
+	// Prepare antsCommon
+	antsCommon := ant.NewAntsCommon(t, dataDir)
+	defer antsCommon.Logger.Close()
+
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, configs...)
+	ants, err := startAnts(&antsCommon, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -110,8 +113,12 @@ func TestStartAntWithSiadPath(t *testing.T) {
 				},
 			}
 
+			// Prepare antsCommon
+			antsCommon := ant.NewAntsCommon(t, dataDir)
+			defer antsCommon.Logger.Close()
+
 			// Start an ant
-			ants, err := startAnts(&sync.WaitGroup{}, configs...)
+			ants, err := startAnts(&antsCommon, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -176,8 +183,12 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 				configs[0].RenterDisableIPViolationCheck = true
 			}
 
+			// Prepare antsCommon
+			antsCommon := ant.NewAntsCommon(t, dataDir)
+			defer antsCommon.Logger.Close()
+
 			// Start ant
-			ants, err := startAnts(&sync.WaitGroup{}, configs...)
+			ants, err := startAnts(&antsCommon, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -263,8 +274,12 @@ func TestConnectAnts(t *testing.T) {
 		},
 	}
 
+	// Prepare antsCommon
+	antsCommon := ant.NewAntsCommon(t, dataDir)
+	defer antsCommon.Logger.Close()
+
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, configs...)
+	ants, err := startAnts(&antsCommon, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -340,8 +355,12 @@ func TestAntConsensusGroups(t *testing.T) {
 		},
 	}
 
+	// Prepare antsCommon
+	antsCommon := ant.NewAntsCommon(t, dataDir)
+	defer antsCommon.Logger.Close()
+
 	// Start Ants
-	ants, err := startAnts(&sync.WaitGroup{}, configs...)
+	ants, err := startAnts(&antsCommon, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +395,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherAnt, err := ant.New(&sync.WaitGroup{}, cfg)
+	otherAnt, err := ant.New(&antsCommon, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

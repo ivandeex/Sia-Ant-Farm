@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 )
 
 const (
@@ -27,9 +29,13 @@ func TestBuildBinaries(t *testing.T) {
 	}
 	releases = append(releases, "master")
 
+	// Prepare logger
+	testLogger := test.NewTestLogger(t)
+	defer testLogger.Close()
+
 	// Build release binaries
 	binariesDir := "../upgrade-binaries"
-	err = buildSiad(binariesDir, releases...)
+	err = buildSiad(testLogger, binariesDir, releases...)
 	if err != nil {
 		t.Fatal(err)
 	}

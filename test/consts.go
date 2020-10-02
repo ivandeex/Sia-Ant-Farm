@@ -17,6 +17,13 @@ const (
 
 	// RenterAntName defines name of the renter ant
 	RenterAntName = "Renter"
+
+	// AntfarmTest defines log message source from a test (not an antfarm or an
+	// ant)
+	AntfarmTest = "antfarm-test"
+
+	// AntfarmTestLog defines test log filename
+	AntfarmTestLog = AntfarmTest + ".log"
 )
 
 // AbsoluteSiadPath returns default absolute siad path in local or Gitlab CI
