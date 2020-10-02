@@ -72,7 +72,7 @@ const (
 
 	// renterUploadReadyTimeout defines timeout for renter to become upload
 	// ready
-	renterUploadReadyTimeout = time.Minute * 5
+	renterUploadReadyTimeout = time.Minute * 10
 
 	// renterUploadReadyFrequency defines how frequently the renter job checks
 	// if renter became upload ready
@@ -91,7 +91,7 @@ const (
 	fileApearInDownloadListFrequency = time.Second
 
 	// downloadFileTimeout defines timeout for file to be downloaded
-	downloadFileTimeout = time.Minute * 5
+	downloadFileTimeout = time.Minute * 2
 
 	// downloadFileFrequency defines how frequently the renter job checks if a
 	// file is downloaded
