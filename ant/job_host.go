@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -81,7 +82,7 @@ func (j *JobRunner) jobHost() {
 		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[ERROR] [host] [%v] Error getting wallet info: %v\n", j.staticSiaDirectory, err)
+			j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntHost, j.staticAnt.Config.DataDir, fmt.Sprintf("error getting wallet info: %v", err))
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {

@@ -1,8 +1,11 @@
 package ant
 
 import (
+	"fmt"
 	"log"
 	"time"
+
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 )
 
 const (
@@ -29,7 +32,7 @@ func (j *JobRunner) blockMining() {
 
 	err = j.staticClient.MinerStartGet()
 	if err != nil {
-		log.Printf("[ERROR] [blockMining] [%v] Can't start miner: %v\n", j.staticSiaDirectory, err)
+		j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntMiner, j.staticAnt.Config.DataDir, fmt.Sprintf("can't start miner: %v", err))
 		return
 	}
 

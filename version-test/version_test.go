@@ -101,15 +101,19 @@ func TestUpgrades(t *testing.T) {
 	// Get latest release
 	latestVersion := upgradePathVersions[len(upgradePathVersions)-1]
 
+	// Prepare logger
+	dataDir := test.TestDir(t.Name())
+	logger := test.NewTestLogger(t, dataDir)
+
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
-		err := buildSiad(binariesDir, upgradePathVersions...)
+		err := buildSiad(logger, dataDir, binariesDir, upgradePathVersions...)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if rebuildMaster {
-		err := buildSiad(binariesDir, "master")
+		err := buildSiad(logger, dataDir, binariesDir, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -127,7 +131,7 @@ func TestUpgrades(t *testing.T) {
 	}
 
 	// Check UPnP enabled router to spped up subtests
-	upnprouter.CheckUPnPEnabled()
+	upnprouter.CheckUPnPEnabled(logger, dataDir)
 
 	// Execute tests
 	for _, tt := range tests {

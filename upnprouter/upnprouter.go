@@ -5,6 +5,7 @@ import (
 	"net"
 	"os"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/go-upnp"
 )
@@ -17,9 +18,10 @@ var (
 
 // CheckUPnPEnabled checks wheteher there is UPnP enabled router connected and
 // sets the flag accordingly
-func CheckUPnPEnabled() {
+func CheckUPnPEnabled(logger *persist.Logger, callerDataDir string) {
 	// If we already know that UPnP is not enabled, do not check again
 	if !UPnPEnabled {
+		logger.Println(persist.LogLevelInfo, persist.LogCallerUPnPRouter, callerDataDir, "UPnP enabled router was already disabled")
 		return
 	}
 	// Gitlab CI doesn't have UPnP enabled router

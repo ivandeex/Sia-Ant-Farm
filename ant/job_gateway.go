@@ -1,8 +1,11 @@
 package ant
 
 import (
+	"fmt"
 	"log"
 	"time"
+
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 )
 
 const (
@@ -41,7 +44,7 @@ func (j *JobRunner) gatewayConnectability() {
 		// itself.
 		gatewayInfo, err := j.staticClient.GatewayGet()
 		if err != nil {
-			log.Printf("[ERROR] [gateway] [%v] error when calling /gateway: %v\n", j.staticSiaDirectory, err)
+			j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntGateway, j.staticAnt.Config.DataDir, fmt.Sprintf("error when calling /gateway: %v", err))
 			continue
 		}
 		if len(gatewayInfo.Peers) < 2 {

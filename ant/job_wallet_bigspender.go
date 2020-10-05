@@ -1,9 +1,11 @@
 package ant
 
 import (
+	"fmt"
 	"log"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/types"
 )
 
@@ -34,7 +36,7 @@ func (j *JobRunner) bigSpender() {
 
 		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[ERROR] [bigSpender] [%v] Can't get wallet info: %v\n", j.staticSiaDirectory, err)
+			j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntBigSpender, j.staticAnt.Config.DataDir, fmt.Sprintf("can't get wallet info: %v", err))
 			return
 		}
 

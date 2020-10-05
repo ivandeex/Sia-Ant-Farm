@@ -27,7 +27,7 @@ type JobRunner struct {
 // set, it expects previous node directory structure including existing wallet.
 // In both cases the wallet is unlocked for usage in the jobs. siadirectory is
 // used in logging to identify the job runner.
-func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpassword string, siadirectory string, existingWalletSeed string) (*JobRunner, error) {
+func newJobRunner(ant *Ant, apiaddr string, authpassword string, siadirectory string, existingWalletSeed string) (*JobRunner, error) {
 	opt, err := client.DefaultOptions()
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to get client options")
@@ -36,7 +36,7 @@ func newJobRunner(antsSyncWG *sync.WaitGroup, ant *Ant, apiaddr string, authpass
 	opt.Password = authpassword
 	c := client.New(opt)
 	jr := &JobRunner{
-		staticAntsSyncWG:   antsSyncWG,
+		staticAntsSyncWG:   ant.StaticAntsCommon.AntsSyncWG,
 		staticAnt:          ant,
 		staticClient:       c,
 		staticSiaDirectory: siadirectory,
@@ -88,7 +88,7 @@ func (j *JobRunner) waitForAntsSync() bool {
 // given job runner
 func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
 	// Create new job runner
-	newJR, err := newJobRunner(j.staticAntsSyncWG, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletSeed)
+	newJR, err := newJobRunner(j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletSeed)
 	if err != nil {
 		return &JobRunner{}, errors.AddContext(err, "couldn't create an updated job runner")
 	}

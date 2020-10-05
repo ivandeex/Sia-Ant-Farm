@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/merkletree"
 
@@ -177,7 +178,12 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 	if err != nil {
 		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
 	}
-	log.Printf("[INFO] [renter] [%v] Downloading\n\tsiaFile: %v\n\tto local file: %v\n", r.staticJR.staticSiaDirectory, siaPath, destPath)
+	r.staticJR.staticAnt.StaticAntsCommon.Logger.Println(
+		persist.LogLevelInfo,
+		persist.LogCallerAntRenter,
+		r.staticJR.staticAnt.Config.DataDir,
+		fmt.Sprintf("downloading\n\tsiaFile: %v\n\tto local file: %v", siaPath, destPath),
+	)
 	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
 	if err != nil {
 		return errors.AddContext(err, "failed in call to /renter/download")

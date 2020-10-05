@@ -7,12 +7,14 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
 	"github.com/julienschmidt/httprouter"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -23,6 +25,9 @@ const (
 
 	// antsSyncTimeout is a timeout for all ants to sync
 	antsSyncTimeout = time.Minute * 5
+
+	// antfarmLog defines antfarm log filename
+	antfarmLog = "antfarm.log"
 )
 
 type (
@@ -43,6 +48,7 @@ type (
 	// ants and provides an API server to interact with them.
 	AntFarm struct {
 		apiListener net.Listener
+		dataDir     string
 
 		// Ants is a slice of Ants in this antfarm.
 		Ants []*ant.Ant
@@ -55,21 +61,35 @@ type (
 		// antsSyncWG is a waitgroup to wait for all ants to be in sync and then
 		// start ant jobs
 		antsSyncWG sync.WaitGroup
+
+		// logger is an antfarm logger. It is passed to ants to log to the same
+		// logger.
+		logger *persist.Logger
 	}
 )
 
 // New creates a new antFarm given the supplied AntfarmConfig
 func New(config AntfarmConfig) (*AntFarm, error) {
 	// clear old antfarm data before creating an antfarm
-	datadir := "./antfarm-data"
+	dataDir := "./antfarm-data"
 	if config.DataDir != "" {
-		datadir = config.DataDir
+		dataDir = config.DataDir
 	}
 
-	os.RemoveAll(datadir)
-	os.MkdirAll(datadir, 0700)
+	os.RemoveAll(dataDir)
+	os.MkdirAll(dataDir, 0700)
 
-	farm := &AntFarm{}
+	// Initialize logger
+	logPath := filepath.Join(dataDir, antfarmLog)
+	logger, err := persist.NewFileLogger(logPath)
+	if err != nil {
+		return nil, err
+	}
+	farm := &AntFarm{
+		dataDir: dataDir,
+		logger:  logger,
+	}
+	log.Printf("INFO antfarm %v: This Antfarm logs to: %v", dataDir, logPath)
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
@@ -78,7 +98,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Check whether UPnP is enabled on router
-	upnprouter.CheckUPnPEnabled()
+	upnprouter.CheckUPnPEnabled(farm.logger, farm.dataDir)
 
 	// Check ant names are unique
 	antNames := make(map[string]struct{})
@@ -94,7 +114,12 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Start up each ant process with its jobs
-	ants, err := startAnts(&farm.antsSyncWG, config.AntConfigs...)
+	antsCommon := ant.AntsCommon{
+		AntsSyncWG:    &farm.antsSyncWG,
+		Logger:        farm.logger,
+		CallerDataDir: farm.dataDir,
+	}
+	ants, err := startAnts(&antsCommon, config.AntConfigs...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start ants")
 	}
@@ -109,7 +134,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 		if err != nil {
 			closeErr := farm.Close()
 			if closeErr != nil {
-				log.Printf("[ERROR] [ant-farm] [%v] Error closing antfarm: %v\n", config.DataDir, err)
+				farm.logger.Println(persist.LogLevelError, persist.LogCallerAntfarm, farm.dataDir, fmt.Sprintf("error closing antfarm: %v", err))
 			}
 		}
 	}()
@@ -235,7 +260,7 @@ func (af *AntFarm) PermanentSyncMonitor() {
 		// Grab consensus groups
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
-			log.Printf("[ERROR] [ant-farm] Error checking sync status of antfarm: %v\n", err)
+			af.logger.Println(persist.LogLevelError, persist.LogCallerAntfarm, af.dataDir, fmt.Sprintf("error checking sync status of antfarm: %v", err))
 			continue
 		}
 

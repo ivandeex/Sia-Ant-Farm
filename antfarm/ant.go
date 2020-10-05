@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
@@ -120,7 +121,7 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
-func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
+func startAnts(antsCommon *ant.AntsCommon, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
 	// Ensure that, if an error occurs, all the ants that have been started are
 	// closed before returning.
 	defer func() {
@@ -143,14 +144,14 @@ func startAnts(antsSyncWG *sync.WaitGroup, configs ...ant.AntConfig) (ants []*an
 			return ants, errors.AddContext(err, "unable to parse config")
 		}
 		// Log config information about the Ant
-		fmt.Printf("[INFO] starting ant %v with config: \n", i)
-		err = ant.PrintJSON(cfg)
+		antConfigStr, err := ant.SprintJSON(cfg)
 		if err != nil {
 			return ants, err
 		}
+		antsCommon.Logger.Println(persist.LogLevelInfo, persist.LogCallerAntfarm, antsCommon.CallerDataDir, fmt.Sprintf("starting ant %v with config:\n%v", i, antConfigStr))
 
 		// Create Ant
-		a, err := ant.New(antsSyncWG, cfg)
+		a, err := ant.New(antsCommon, cfg)
 		if err != nil {
 			// Ant is nil, we can't close it in defer
 			er := errors.AddContext(err, "can't create an ant")
