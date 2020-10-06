@@ -19,6 +19,12 @@ const (
 	// directory.
 	binariesDir = "../upgrade-binaries"
 
+	// excludeReleasedVersions defines comma separated list of Sia releases to
+	// be excluded from the version test (TestUpgrades). v1.4.9 is also
+	// excluded from the version test, but v1.4.9 didn't have Sia Gitlab
+	// release so there is no need to list it here.
+	excludeReleasedVersions = "v1.4.10"
+
 	// minVersion defines minimum released Sia version to include in built and
 	// tested binaries.
 	// TODO: Bring minVersion to v1.3.7
@@ -82,15 +88,17 @@ func TestUpgrades(t *testing.T) {
 	}
 	t.Parallel()
 
-	// Get versions to test.
-	// TODO:
-	// v1.3.7 and on can be enabled on the Hetzner box when
-	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
-	// is done
+	// Get releases from Sia Gitlab repo.
 	upgradePathVersions, err := getReleases(minVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Exclude unwanted releases
+	exclVersions := strings.Split(excludeReleasedVersions, ",")
+	upgradePathVersions = excludeVersions(upgradePathVersions, exclVersions)
+
+	// Get latest release
 	latestVersion := upgradePathVersions[len(upgradePathVersions)-1]
 
 	// Build binaries to test.

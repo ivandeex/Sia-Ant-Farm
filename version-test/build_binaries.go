@@ -212,6 +212,27 @@ func buildSiad(binariesDir string, versions ...string) error {
 	return nil
 }
 
+// excludeVersions takes as an input a slice of versions to be filtered and a
+// slice of versions which should be excluded from the first slice. It returns
+// a slice of versions without excluded versions.
+func excludeVersions(versions, excludeVersions []string) []string {
+	result := []string{}
+
+versionsLoop:
+	for _, v := range versions {
+		for _, ev := range excludeVersions {
+			// Check if we have found the version we want to exclude. Exclude
+			// also versions with "-antfarm" tag postfix.
+			if v == ev || v == ev+"-antfarm" {
+				continue versionsLoop
+			}
+		}
+		result = append(result, v)
+	}
+
+	return result
+}
+
 // getReleases returns slice of git tags of Sia Gitlab releases greater than or
 // equal to the given minimal version in ascending semantic version order. If
 // there is a patch tagged with "-antfarm" suffix for a Sia release, patch tag
