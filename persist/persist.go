@@ -12,8 +12,8 @@ type Logger struct {
 	logger *log.Logger
 }
 
-// logCaller defines a type for callers of the log printing
-type logCaller string
+// LogCaller defines a type for callers of the log printing
+type LogCaller string
 
 // logLevel defines log level type
 type logLevel string
@@ -21,42 +21,42 @@ type logLevel string
 // Log callers
 var (
 	// LogCallerAnt defines string id for ant logs
-	LogCallerAnt logCaller = "ant"
+	LogCallerAnt LogCaller = "ant"
 
 	// LogCallerAntBalanceMaintainer defines string id for ant's
 	// balanceMaintainer logs
-	LogCallerAntBalanceMaintainer logCaller = "ant > balanceMaintainer"
+	LogCallerAntBalanceMaintainer LogCaller = "ant > balanceMaintainer"
 
 	// LogCallerAntBigSpender defines string id for ant's bigSpender logs
-	LogCallerAntBigSpender logCaller = "ant > bigSpender"
+	LogCallerAntBigSpender LogCaller = "ant > bigSpender"
 
 	// LogCallerAntGateway defines string id for ant's gateway logs
-	LogCallerAntGateway logCaller = "ant > gateway"
+	LogCallerAntGateway LogCaller = "ant > gateway"
 
 	// LogCallerAntHost defines string id for ant's host logs
-	LogCallerAntHost logCaller = "ant > host"
+	LogCallerAntHost LogCaller = "ant > host"
 
 	// LogCallerAntLittleSupplier defines string id for ant's littleSupplier
 	// logs
-	LogCallerAntLittleSupplier logCaller = "ant > littleSupplier"
+	LogCallerAntLittleSupplier LogCaller = "ant > littleSupplier"
 
 	// LogCallerAntMiner defines string id for ant's miner logs
-	LogCallerAntMiner logCaller = "ant > miner"
+	LogCallerAntMiner LogCaller = "ant > miner"
 
 	// LogCallerAntRenter defines id for ant's renter job logs
-	LogCallerAntRenter logCaller = "ant > renter"
+	LogCallerAntRenter LogCaller = "ant > renter"
 
 	// LogCallerAntfarm defines string id for antfarm logs
-	LogCallerAntfarm logCaller = "antfarm"
+	LogCallerAntfarm LogCaller = "antfarm"
 
 	// LogCallerBuildBinaries defines string id for build binaries logs
-	LogCallerBuildBinaries logCaller = "buildBinaries"
+	LogCallerBuildBinaries LogCaller = "buildBinaries"
 
 	// LogCallerTest defines string id for antfarm test logs
-	LogCallerTest logCaller = "test"
+	LogCallerTest LogCaller = "test"
 
 	// LogCallerUPnPRouter defines string id for UPnP router logs
-	LogCallerUPnPRouter logCaller = "upnpRouter"
+	LogCallerUPnPRouter LogCaller = "upnpRouter"
 )
 
 // Log levels
@@ -106,7 +106,7 @@ func buildReleaseType() log.ReleaseType {
 }
 
 // Println adds a log message to the logger
-func (l *Logger) Println(logLevel logLevel, logCaller logCaller, callerDataDir, msg string) {
+func (l *Logger) Println(logLevel logLevel, logCaller LogCaller, callerDataDir, msg string) {
 	// Generate formated string from msg options
 	formatedString := fmt.Sprintf("%v %v %v: %v", logLevel, logCaller, callerDataDir, msg)
 	l.logger.Logger.Println(formatedString)

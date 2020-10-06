@@ -44,7 +44,7 @@ func (j *JobRunner) gatewayConnectability() {
 		// itself.
 		gatewayInfo, err := j.staticClient.GatewayGet()
 		if err != nil {
-			j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntGateway, j.staticAnt.Config.DataDir, fmt.Sprintf("error when calling /gateway: %v", err))
+			j.staticLogger.Println(persist.LogLevelError, persist.LogCallerAntGateway, j.staticAnt.Config.DataDir, fmt.Sprintf("error when calling /gateway: %v", err))
 			continue
 		}
 		if len(gatewayInfo.Peers) < 2 {

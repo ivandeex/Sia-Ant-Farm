@@ -1,11 +1,10 @@
 package upnprouter
 
 import (
-	"log"
+	"fmt"
 	"net"
 	"os"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/go-upnp"
 )
@@ -18,11 +17,10 @@ var (
 
 // CheckUPnPEnabled checks wheteher there is UPnP enabled router connected and
 // sets the flag accordingly
-func CheckUPnPEnabled(logger *persist.Logger, callerDataDir string) {
+func CheckUPnPEnabled() string {
 	// If we already know that UPnP is not enabled, do not check again
 	if !UPnPEnabled {
-		logger.Println(persist.LogLevelInfo, persist.LogCallerUPnPRouter, callerDataDir, "UPnP enabled router was already disabled")
-		return
+		return "UPnP enabled router was already disabled"
 	}
 	// Gitlab CI doesn't have UPnP enabled router
 	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
@@ -33,10 +31,9 @@ func CheckUPnPEnabled(logger *persist.Logger, callerDataDir string) {
 	_, err := upnp.Discover()
 	if err != nil {
 		UPnPEnabled = false
-		log.Printf("[INFO] [ant-farm] UPnP enabled router is not available: %v", err)
-	} else {
-		log.Println("[INFO] [ant-farm] UPnP enabled router is available")
+		return fmt.Sprintf("UPnP enabled router is not available: %v", err)
 	}
+	return "[INFO] [ant-farm] UPnP enabled router is available"
 }
 
 // ClearPorts clears ports on UPnP enabled router

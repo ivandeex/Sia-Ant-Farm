@@ -82,7 +82,7 @@ func (j *JobRunner) jobHost() {
 		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntHost, j.staticAnt.Config.DataDir, fmt.Sprintf("error getting wallet info: %v", err))
+			j.staticLogger.Println(persist.LogLevelError, persist.LogCallerAntHost, j.staticAnt.Config.DataDir, fmt.Sprintf("error getting wallet info: %v", err))
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {

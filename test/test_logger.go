@@ -1,7 +1,6 @@
 package test
 
 import (
-	"log"
 	"path/filepath"
 	"testing"
 
@@ -15,6 +14,6 @@ func NewTestLogger(t *testing.T, dataDir string) *persist.Logger {
 	if err != nil {
 		t.Fatal(err)
 	}
-	log.Printf("INFO antfarm-test %v: This test logs to: %v", t.Name(), testLogPath)
+	t.Logf("INFO antfarm-test %v: Test logs are stored at: %v", t.Name(), testLogPath)
 	return testLogger
 }

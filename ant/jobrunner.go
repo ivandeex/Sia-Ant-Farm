@@ -5,6 +5,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/threadgroup"
@@ -12,6 +13,7 @@ import (
 
 // A JobRunner is used to start up jobs on the running Sia node.
 type JobRunner struct {
+	staticLogger        *persist.Logger
 	staticAntsSyncWG    *sync.WaitGroup
 	staticAnt           *Ant
 	staticClient        *client.Client
@@ -27,7 +29,7 @@ type JobRunner struct {
 // set, it expects previous node directory structure including existing wallet.
 // In both cases the wallet is unlocked for usage in the jobs. siadirectory is
 // used in logging to identify the job runner.
-func newJobRunner(ant *Ant, apiaddr string, authpassword string, siadirectory string, existingWalletSeed string) (*JobRunner, error) {
+func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword string, siadirectory string, existingWalletSeed string) (*JobRunner, error) {
 	opt, err := client.DefaultOptions()
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to get client options")
@@ -36,7 +38,8 @@ func newJobRunner(ant *Ant, apiaddr string, authpassword string, siadirectory st
 	opt.Password = authpassword
 	c := client.New(opt)
 	jr := &JobRunner{
-		staticAntsSyncWG:   ant.StaticAntsCommon.AntsSyncWG,
+		staticLogger:       logger,
+		staticAntsSyncWG:   ant.staticAntsSyncWG,
 		staticAnt:          ant,
 		staticClient:       c,
 		staticSiaDirectory: siadirectory,
@@ -88,7 +91,7 @@ func (j *JobRunner) waitForAntsSync() bool {
 // given job runner
 func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
 	// Create new job runner
-	newJR, err := newJobRunner(j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletSeed)
+	newJR, err := newJobRunner(j.staticLogger, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletSeed)
 	if err != nil {
 		return &JobRunner{}, errors.AddContext(err, "couldn't create an updated job runner")
 	}

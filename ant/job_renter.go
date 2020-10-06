@@ -134,7 +134,8 @@ type RenterFile struct {
 // importantly, it contains a list of files that the renter is currently
 // uploading to the network.
 type RenterJob struct {
-	Files []RenterFile
+	staticLogger *persist.Logger
+	Files        []RenterFile
 
 	staticJR *JobRunner
 	mu       sync.Mutex
@@ -178,7 +179,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 	if err != nil {
 		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
 	}
-	r.staticJR.staticAnt.StaticAntsCommon.Logger.Println(
+	r.staticLogger.Println(
 		persist.LogLevelInfo,
 		persist.LogCallerAntRenter,
 		r.staticJR.staticAnt.Config.DataDir,
@@ -278,7 +279,8 @@ func randFillFile(f *os.File, size uint64) (h crypto.Hash, err error) {
 // NewRenterJob returns new renter job
 func (j *JobRunner) NewRenterJob() RenterJob {
 	return RenterJob{
-		staticJR: j,
+		staticLogger: j.staticLogger,
+		staticJR:     j,
 	}
 }
 

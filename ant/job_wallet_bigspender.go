@@ -36,7 +36,7 @@ func (j *JobRunner) bigSpender() {
 
 		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntBigSpender, j.staticAnt.Config.DataDir, fmt.Sprintf("can't get wallet info: %v", err))
+			j.staticLogger.Println(persist.LogLevelError, persist.LogCallerAntBigSpender, j.staticAnt.Config.DataDir, fmt.Sprintf("can't get wallet info: %v", err))
 			return
 		}
 

@@ -37,7 +37,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	minerRunning := true
 	err = j.staticClient.MinerStartGet()
 	if err != nil {
-		j.staticAnt.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAntBalanceMaintainer, j.staticAnt.Config.DataDir, fmt.Sprintf("can't start miner: %v", err))
+		j.staticLogger.Println(persist.LogLevelError, persist.LogCallerAntBalanceMaintainer, j.staticAnt.Config.DataDir, fmt.Sprintf("can't start miner: %v", err))
 		return
 	}
 

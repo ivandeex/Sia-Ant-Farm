@@ -98,7 +98,8 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Check whether UPnP is enabled on router
-	upnprouter.CheckUPnPEnabled(farm.logger, farm.dataDir)
+	upnpStatus := upnprouter.CheckUPnPEnabled()
+	farm.logger.Println(persist.LogLevelInfo, persist.LogCallerAntfarm, farm.dataDir, upnpStatus)
 
 	// Check ant names are unique
 	antNames := make(map[string]struct{})
@@ -114,12 +115,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Start up each ant process with its jobs
-	antsCommon := ant.AntsCommon{
-		AntsSyncWG:    &farm.antsSyncWG,
-		Logger:        farm.logger,
-		CallerDataDir: farm.dataDir,
-	}
-	ants, err := startAnts(&antsCommon, config.AntConfigs...)
+	ants, err := startAnts(&farm.antsSyncWG, farm.logger, persist.LogCallerAntfarm, farm.dataDir, config.AntConfigs...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start ants")
 	}

@@ -3,10 +3,12 @@ package antfarm
 import (
 	"fmt"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
@@ -46,11 +48,11 @@ func TestStartAnts(t *testing.T) {
 		},
 	}
 
-	// Prepare antsCommon
-	antsCommon := ant.NewAntsCommon(t, dataDir)
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&antsCommon, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,11 +114,11 @@ func TestStartAntWithSiadPath(t *testing.T) {
 				},
 			}
 
-			// Prepare antsCommon
-			antsCommon := ant.NewAntsCommon(t, dataDir)
+			// Create logger
+			logger := test.NewTestLogger(t, dataDir)
 
-			// Start an ant
-			ants, err := startAnts(&antsCommon, configs...)
+			// Start ants
+			ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -181,11 +183,11 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 				configs[0].RenterDisableIPViolationCheck = true
 			}
 
-			// Prepare antsCommon
-			antsCommon := ant.NewAntsCommon(t, dataDir)
+			// Create logger
+			logger := test.NewTestLogger(t, dataDir)
 
-			// Start ant
-			ants, err := startAnts(&antsCommon, configs...)
+			// Start ants
+			ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -271,11 +273,11 @@ func TestConnectAnts(t *testing.T) {
 		},
 	}
 
-	// Prepare antsCommon
-	antsCommon := ant.NewAntsCommon(t, dataDir)
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&antsCommon, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -351,11 +353,11 @@ func TestAntConsensusGroups(t *testing.T) {
 		},
 	}
 
-	// Prepare antsCommon
-	antsCommon := ant.NewAntsCommon(t, dataDir)
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
-	// Start Ants
-	ants, err := startAnts(&antsCommon, configs...)
+	// Start ants
+	ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -390,7 +392,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherAnt, err := ant.New(&antsCommon, cfg)
+	otherAnt, err := ant.New(&sync.WaitGroup{}, logger, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

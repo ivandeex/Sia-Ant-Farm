@@ -7,6 +7,7 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/build"
@@ -131,7 +132,8 @@ func TestUpgrades(t *testing.T) {
 	}
 
 	// Check UPnP enabled router to spped up subtests
-	upnprouter.CheckUPnPEnabled(logger, dataDir)
+	upnpStatus := upnprouter.CheckUPnPEnabled()
+	logger.Println(persist.LogLevelInfo, persist.LogCallerTest, dataDir, upnpStatus)
 
 	// Execute tests
 	for _, tt := range tests {

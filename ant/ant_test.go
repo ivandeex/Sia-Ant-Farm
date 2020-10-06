@@ -94,11 +94,11 @@ func TestNewAnt(t *testing.T) {
 	dataDir := test.TestDir(t.Name())
 	config := newTestingAntConfig(dataDir)
 
-	// Prepare antsCommon
-	antsCommon := NewAntsCommon(t, dataDir)
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
 	// Create Ant
-	ant, err := New(&antsCommon, config)
+	ant, err := New(&sync.WaitGroup{}, logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -129,11 +129,11 @@ func TestStartJob(t *testing.T) {
 	dataDir := test.TestDir(t.Name())
 	config := newTestingAntConfig(dataDir)
 
-	// Prepare antsCommon
-	antsCommon := NewAntsCommon(t, dataDir)
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
 	// Create Ant
-	ant, err := New(&antsCommon, config)
+	ant, err := New(&sync.WaitGroup{}, logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -158,11 +158,11 @@ func TestUpdateAnt(t *testing.T) {
 	dataDir := test.TestDir(t.Name())
 	config := newTestingAntConfig(dataDir)
 
-	// Prepare antsCommon
-	antsCommon := NewAntsCommon(t, dataDir)
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
 	// Create Ant
-	ant, err := New(&antsCommon, config)
+	ant, err := New(&sync.WaitGroup{}, logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,11 +202,11 @@ func TestWalletAddress(t *testing.T) {
 	dataDir := test.TestDir(t.Name())
 	config := newTestingAntConfig(dataDir)
 
-	// Prepare antsCommon
-	antsCommon := NewAntsCommon(t, dataDir)
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
 	// Create Ant
-	ant, err := New(&antsCommon, config)
+	ant, err := New(&sync.WaitGroup{}, logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -36,7 +36,8 @@ type AntConfig struct {
 // An Ant is a Sia Client programmed with network user stories. It executes
 // these user stories and reports on their successfulness.
 type Ant struct {
-	StaticAntsCommon *AntsCommon
+	staticAntsSyncWG *sync.WaitGroup
+	staticLogger     *persist.Logger
 
 	APIAddr string
 	RPCAddr string
@@ -50,13 +51,6 @@ type Ant struct {
 	// for this ant. The map will just keep growing, but it shouldn't take up a
 	// prohibitive amount of space.
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
-}
-
-// AntsCommon are common variables shared between ants
-type AntsCommon struct {
-	AntsSyncWG    *sync.WaitGroup
-	Logger        *persist.Logger
-	CallerDataDir string
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -92,7 +86,7 @@ func clearPorts(config AntConfig) error {
 }
 
 // New creates a new Ant using the configuration passed through `config`.
-func New(antsCommon *AntsCommon, config AntConfig) (*Ant, error) {
+func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (*Ant, error) {
 	// Create ant working dir if it doesn't exist
 	// (e.g. ant farm deleted the whole farm dir)
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
@@ -104,7 +98,7 @@ func New(antsCommon *AntsCommon, config AntConfig) (*Ant, error) {
 	if upnprouter.UPnPEnabled {
 		err := clearPorts(config)
 		if err != nil {
-			antsCommon.Logger.Println(persist.LogLevelDebug, persist.LogCallerAnt, config.DataDir, fmt.Sprintf("can't clear upnp ports for ant: %v", err))
+			logger.Println(persist.LogLevelDebug, persist.LogCallerAnt, config.DataDir, fmt.Sprintf("can't clear upnp ports for ant: %v", err))
 		}
 	}
 
@@ -122,7 +116,8 @@ func New(antsCommon *AntsCommon, config AntConfig) (*Ant, error) {
 	}()
 
 	ant := &Ant{
-		StaticAntsCommon: antsCommon,
+		staticAntsSyncWG: antsSyncWG,
+		staticLogger:     logger,
 		APIAddr:          config.APIAddr,
 		RPCAddr:          config.RPCAddr,
 		Config:           config,
@@ -130,14 +125,14 @@ func New(antsCommon *AntsCommon, config AntConfig) (*Ant, error) {
 		SeenBlocks:       make(map[types.BlockHeight]types.BlockID),
 	}
 
-	j, err := newJobRunner(ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
 	ant.Jr = j
 
 	for _, job := range config.Jobs {
-		ant.StartJob(antsCommon.AntsSyncWG, job)
+		ant.StartJob(antsSyncWG, job)
 	}
 
 	if config.DesiredCurrency != 0 {
@@ -226,7 +221,7 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 
 // UpdateSiad updates ant to use the given siad binary.
 func (a *Ant) UpdateSiad(siadPath string) error {
-	a.StaticAntsCommon.Logger.Println(persist.LogLevelInfo, persist.LogCallerAnt, a.Config.DataDir, "closing ant before siad update")
+	a.staticLogger.Println(persist.LogLevelInfo, persist.LogCallerAnt, a.Config.DataDir, "closing ant before siad update")
 
 	// Stop ant
 	err := a.Close()

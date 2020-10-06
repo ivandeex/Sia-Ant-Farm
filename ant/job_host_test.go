@@ -2,6 +2,7 @@ package ant
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,12 +30,17 @@ func TestAnnounceHost(t *testing.T) {
 	}
 	defer stopSiad(config.APIAddr, config.APIPassword, siad.Process)
 
-	// Prepare antsCommon and ant
-	antsCommon := NewAntsCommon(t, dataDir)
-	ant := &Ant{StaticAntsCommon: &antsCommon}
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
+
+	// Create ant
+	ant := &Ant{
+		staticAntsSyncWG: &sync.WaitGroup{},
+		staticLogger:     logger,
+	}
 
 	// Create jobRunnner on same APIAddr as the siad process
-	j, err := newJobRunner(ant, config.APIAddr, config.APIPassword, config.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.DataDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +60,7 @@ func TestAnnounceHost(t *testing.T) {
 		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			ant.StaticAntsCommon.Logger.Println(persist.LogLevelError, persist.LogCallerAnt, dataDir, fmt.Sprintf("error getting wallet info: %v", err))
+			ant.staticLogger.Println(persist.LogLevelError, persist.LogCallerAnt, dataDir, fmt.Sprintf("error getting wallet info: %v", err))
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(initialbalance) > 0 {
