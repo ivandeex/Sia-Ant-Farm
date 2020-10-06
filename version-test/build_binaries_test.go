@@ -13,6 +13,13 @@ const (
 	minReleaseVersion = "v1.3.7"
 )
 
+type excludeVersionTestConfig struct {
+	testName         string
+	givenVersions    []string
+	excludeVersions  []string
+	expectedVersions []string
+}
+
 // TestBuildBinaries builds siad-dev binaries according to the settings in
 // const.
 func TestBuildBinaries(t *testing.T) {
@@ -46,6 +53,54 @@ func TestBuildBinaries(t *testing.T) {
 	}
 }
 
+// TestExcludeVersions checks correctness of excludeVersions function.
+func TestExcludeVersions(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	tests := []excludeVersionTestConfig{
+		{
+			testName:         "TestEmptyVersions",
+			givenVersions:    []string{},
+			excludeVersions:  []string{"v1.2.3", "master"},
+			expectedVersions: []string{},
+		},
+		{
+			testName:         "TestEmptyExcludeVersions",
+			givenVersions:    []string{"v1.2.3", "master"},
+			excludeVersions:  []string{},
+			expectedVersions: []string{"v1.2.3", "master"},
+		},
+		{
+			testName:         "TestNoIntersectionVersions",
+			givenVersions:    []string{"v1.2.3", "master"},
+			excludeVersions:  []string{"v1.0.0", "v1.1.1"},
+			expectedVersions: []string{"v1.2.3", "master"},
+		},
+		{
+			testName:         "TestExcludeSomeVersions",
+			givenVersions:    []string{"v1.0.0", "v1.1.1", "v1.2.3", "master"},
+			excludeVersions:  []string{"v1.0.0", "v1.2.3"},
+			expectedVersions: []string{"v1.1.1", "master"},
+		},
+		{
+			testName:         "TestExcludeAntfarmPostfixVersions",
+			givenVersions:    []string{"v1.0.0", "v1.1.1-antfarm", "v1.2.3-antfarm", "master"},
+			excludeVersions:  []string{"v1.0.0", "v1.2.3"},
+			expectedVersions: []string{"v1.1.1-antfarm", "master"},
+		},
+	}
+
+	// Execute tests
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			excludeVersionsTest(t, tt)
+		})
+	}
+}
+
 // TestGetReleases checks if we get correct Sia releases from Sia Gitlab
 // repository. Some official Sia releases need patches to work with Sia Antfarm
 // so we need to build and test on patched version having '-antfarm' git tag
@@ -76,5 +131,16 @@ func TestGetReleases(t *testing.T) {
 		if releases[i] != expectedReleases[i] {
 			t.Fatalf("Expected to get release %v, got release %v\n", expectedReleases[i], releases[i])
 		}
+	}
+}
+
+// excludeVersionsTest is a testing helper for TestExcludeVersions test group.
+// It tests excludeVersions function.
+func excludeVersionsTest(t *testing.T, tc excludeVersionTestConfig) {
+	gotVersions := excludeVersions(tc.givenVersions, tc.excludeVersions)
+	got := fmt.Sprintf("%q", gotVersions)
+	exp := fmt.Sprintf("%q", tc.expectedVersions)
+	if got != exp {
+		t.Errorf("expected %v, got %v", exp, got)
 	}
 }
