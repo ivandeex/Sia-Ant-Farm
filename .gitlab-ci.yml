@@ -42,6 +42,7 @@ default: &default_params
   <<: *default_params
   <<: *default_test_common_params
   stage: test
+  needs: []
 
   ## disable default tests for scheduled pipelines (nightlies)
   except:
@@ -49,6 +50,7 @@ default: &default_params
 
 lint:
   stage: lint
+  needs: []
   cache:
     key: lint-cache
     paths:
@@ -61,6 +63,7 @@ lint:
 
 build:
   stage: lint
+  needs: []
   ## go 1.13 is the minimum accepted version for building Sia.
   image: golang:1.13
   artifacts:
