@@ -33,7 +33,7 @@ func CheckUPnPEnabled() string {
 		UPnPEnabled = false
 		return fmt.Sprintf("UPnP enabled router is not available: %v", err)
 	}
-	return "[INFO] [ant-farm] UPnP enabled router is available"
+	return "UPnP enabled router is available"
 }
 
 // ClearPorts clears ports on UPnP enabled router
