@@ -106,7 +106,7 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
 		if err != nil {
-			stopSiad(config.APIAddr, siad.Process)
+			stopSiad(config.APIAddr, config.APIPassword, siad.Process)
 		}
 	}()
 
@@ -160,7 +160,7 @@ func (a *Ant) BlockHeight() types.BlockHeight {
 // subprocess.
 func (a *Ant) Close() error {
 	a.Jr.Stop()
-	stopSiad(a.APIAddr, a.siad.Process)
+	stopSiad(a.APIAddr, a.Config.APIPassword, a.siad.Process)
 	return nil
 }
 
@@ -237,7 +237,7 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
 		if err != nil {
-			stopSiad(a.Config.APIAddr, siad.Process)
+			stopSiad(a.Config.APIAddr, a.Config.APIPassword, siad.Process)
 		}
 	}()
 

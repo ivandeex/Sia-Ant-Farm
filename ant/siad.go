@@ -152,12 +152,13 @@ func siadFlagSupported(siadPath, flag string) (bool, error) {
 
 // stopSiad tries to stop the siad running at `apiAddr`, issuing a kill to its
 // `process` after a timeout.
-func stopSiad(apiAddr string, process *os.Process) {
+func stopSiad(apiAddr, apiPassword string, process *os.Process) {
 	opts, err := client.DefaultOptions()
 	if err != nil {
 		panic(err)
 	}
 	opts.Address = apiAddr
+	opts.Password = apiPassword
 	if err := client.New(opts).DaemonStopGet(); err != nil {
 		process.Kill()
 	}
@@ -207,7 +208,7 @@ waitLoop:
 		}
 	}
 	if !success {
-		stopSiad(config.APIAddr, siad.Process)
+		stopSiad(config.APIAddr, config.APIPassword, siad.Process)
 		return fmt.Errorf("siad hasn't finished full setup within %v timeout", waitForFullSetupTimeout)
 	}
 	return nil
