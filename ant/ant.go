@@ -90,6 +90,7 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	}
 
 	// Unforward the ports required for this ant
+	upnprouter.CheckUPnPEnabled()
 	if upnprouter.UPnPEnabled {
 		err := clearPorts(config)
 		if err != nil {
