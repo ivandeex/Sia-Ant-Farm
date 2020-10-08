@@ -23,7 +23,7 @@ func TestNewJobRunner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer stopSiad(config.APIAddr, siad.Process)
+	defer stopSiad(config.APIAddr, config.APIPassword, siad.Process)
 
 	// Create jobRunnner on same APIAddr as the siad process
 	j, err := newJobRunner(&sync.WaitGroup{}, &Ant{}, config.APIAddr, config.APIPassword, config.DataDir, "")
