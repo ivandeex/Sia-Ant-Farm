@@ -15,8 +15,8 @@ func TestNewJobRunner(t *testing.T) {
 	t.Parallel()
 
 	// Create testing config
-	datadir := test.TestDir(t.Name())
-	config := newTestingSiadConfig(datadir)
+	dataDir := test.TestDir(t.Name())
+	config := newTestingSiadConfig(dataDir)
 
 	// Create siad process
 	siad, err := newSiad(config)
@@ -25,8 +25,17 @@ func TestNewJobRunner(t *testing.T) {
 	}
 	defer stopSiad(config.APIAddr, config.APIPassword, siad.Process)
 
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
+
+	// Create ant
+	ant := &Ant{
+		staticAntsSyncWG: &sync.WaitGroup{},
+		staticLogger:     logger,
+	}
+
 	// Create jobRunnner on same APIAddr as the siad process
-	j, err := newJobRunner(&sync.WaitGroup{}, &Ant{}, config.APIAddr, config.APIPassword, config.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.DataDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}

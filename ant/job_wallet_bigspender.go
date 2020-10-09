@@ -4,6 +4,7 @@ import (
 	"log"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/types"
 )
 
@@ -34,7 +35,8 @@ func (j *JobRunner) bigSpender() {
 
 		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[ERROR] [bigSpender] [%v] Can't get wallet info: %v\n", j.staticSiaDirectory, err)
+			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+			j.staticLogger.Printf("%v %v: can't get wallet info: %v", persist.ErrorLogPrefix, j.staticDataDir, err)
 			return
 		}
 
@@ -42,15 +44,15 @@ func (j *JobRunner) bigSpender() {
 			continue
 		}
 
-		log.Printf("[INFO] [bigSpender] [%v] Sending a large transaction\n", j.staticSiaDirectory)
+		log.Printf("[INFO] [bigSpender] [%v] Sending a large transaction\n", j.staticDataDir)
 
 		voidaddress := types.UnlockHash{}
 		_, err = j.staticClient.WalletSiacoinsPost(spendThreshold, voidaddress, false)
 		if err != nil {
-			log.Printf("[ERROR] [bigSpender] [%v] Can't send Siacoins: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[ERROR] [bigSpender] [%v] Can't send Siacoins: %v\n", j.staticDataDir, err)
 			continue
 		}
 
-		log.Printf("[INFO] [bigSpender] [%v] Large transaction send successful\n", j.staticSiaDirectory)
+		log.Printf("[INFO] [bigSpender] [%v] Large transaction send successful\n", j.staticDataDir)
 	}
 }

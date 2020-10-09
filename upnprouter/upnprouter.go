@@ -1,7 +1,7 @@
 package upnprouter
 
 import (
-	"log"
+	"fmt"
 	"net"
 	"os"
 
@@ -17,24 +17,22 @@ var (
 
 // CheckUPnPEnabled checks wheteher there is UPnP enabled router connected and
 // sets the flag accordingly
-func CheckUPnPEnabled() {
+func CheckUPnPEnabled() string {
 	// If we already know that UPnP is not enabled, do not check again
 	if !UPnPEnabled {
-		return
+		return "UPnP enabled router was already disabled"
 	}
 	// Gitlab CI doesn't have UPnP enabled router
 	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
 		UPnPEnabled = false
-		log.Println("[INFO] [ant-farm] UPnP enabled router is not available in Gitlab CI")
-		return
+		return "UPnP enabled router is not available in Gitlab CI"
 	}
 	_, err := upnp.Discover()
 	if err != nil {
 		UPnPEnabled = false
-		log.Printf("[INFO] [ant-farm] UPnP enabled router is not available: %v", err)
-	} else {
-		log.Println("[INFO] [ant-farm] UPnP enabled router is available")
+		return fmt.Sprintf("UPnP enabled router is not available: %v", err)
 	}
+	return "UPnP enabled router is available"
 }
 
 // ClearPorts clears ports on UPnP enabled router

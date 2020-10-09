@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
@@ -35,6 +36,12 @@ type AntConfig struct {
 // An Ant is a Sia Client programmed with network user stories. It executes
 // these user stories and reports on their successfulness.
 type Ant struct {
+	staticAntsSyncWG *sync.WaitGroup
+
+	// staticLogger defines a logger an ant should log to. Each ant log message
+	// should identify the ant by ant's siad dataDir.
+	staticLogger *persist.Logger
+
 	APIAddr string
 	RPCAddr string
 
@@ -82,7 +89,7 @@ func clearPorts(config AntConfig) error {
 }
 
 // New creates a new Ant using the configuration passed through `config`.
-func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
+func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (*Ant, error) {
 	// Create ant working dir if it doesn't exist
 	// (e.g. ant farm deleted the whole farm dir)
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
@@ -94,7 +101,7 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	if upnprouter.UPnPEnabled {
 		err := clearPorts(config)
 		if err != nil {
-			log.Printf("[DEBUG] [ant] [%v] Can't clear upnp ports for ant: %v\n", config.SiadConfig.DataDir, err)
+			logger.Debugf("%v: can't clear upnp ports for ant: %v", config.DataDir, err)
 		}
 	}
 
@@ -112,14 +119,16 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	}()
 
 	ant := &Ant{
-		APIAddr:    config.APIAddr,
-		RPCAddr:    config.RPCAddr,
-		Config:     config,
-		siad:       siad,
-		SeenBlocks: make(map[types.BlockHeight]types.BlockID),
+		staticAntsSyncWG: antsSyncWG,
+		staticLogger:     logger,
+		APIAddr:          config.APIAddr,
+		RPCAddr:          config.RPCAddr,
+		Config:           config,
+		SeenBlocks:       make(map[types.BlockHeight]types.BlockID),
+		siad:             siad,
 	}
 
-	j, err := newJobRunner(antsSyncWG, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
@@ -136,14 +145,13 @@ func New(antsSyncWG *sync.WaitGroup, config AntConfig) (*Ant, error) {
 	return ant, nil
 }
 
-// PrintJSON is a wrapper for json.MarshalIndent
-func PrintJSON(v interface{}) error {
+// SprintJSON is a wrapper for json.MarshalIndent
+func SprintJSON(v interface{}) (string, error) {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
-		return err
+		return "", err
 	}
-	fmt.Println(string(data))
-	return nil
+	return fmt.Sprintln(string(data)), nil
 }
 
 // BlockHeight returns the highest block height seen by the ant.
@@ -216,7 +224,7 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 
 // UpdateSiad updates ant to use the given siad binary.
 func (a *Ant) UpdateSiad(siadPath string) error {
-	log.Printf("[INFO] [ant] [%v] Closing ant before siad update\n", a.Config.SiadConfig.DataDir)
+	a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
 
 	// Stop ant
 	err := a.Close()

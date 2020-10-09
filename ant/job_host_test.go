@@ -1,11 +1,11 @@
 package ant
 
 import (
-	"log"
 	"sync"
 	"testing"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -19,8 +19,8 @@ func TestAnnounceHost(t *testing.T) {
 	t.Parallel()
 
 	// Create testing config
-	datadir := test.TestDir(t.Name())
-	config := newTestingSiadConfig(datadir)
+	dataDir := test.TestDir(t.Name())
+	config := newTestingSiadConfig(dataDir)
 
 	// Create siad process
 	siad, err := newSiad(config)
@@ -29,8 +29,17 @@ func TestAnnounceHost(t *testing.T) {
 	}
 	defer stopSiad(config.APIAddr, config.APIPassword, siad.Process)
 
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
+
+	// Create ant
+	ant := &Ant{
+		staticAntsSyncWG: &sync.WaitGroup{},
+		staticLogger:     logger,
+	}
+
 	// Create jobRunnner on same APIAddr as the siad process
-	j, err := newJobRunner(&sync.WaitGroup{}, &Ant{}, config.APIAddr, config.APIPassword, config.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.DataDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,7 +59,8 @@ func TestAnnounceHost(t *testing.T) {
 		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[ERROR] [host] [%v] Error getting wallet info: %v\n", j.staticSiaDirectory, err)
+			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+			ant.staticLogger.Printf("%v %v: error getting wallet info: %v", persist.ErrorLogPrefix, dataDir, err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(initialbalance) > 0 {
