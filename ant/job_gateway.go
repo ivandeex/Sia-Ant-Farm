@@ -1,7 +1,6 @@
 package ant
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -44,11 +43,12 @@ func (j *JobRunner) gatewayConnectability() {
 		// itself.
 		gatewayInfo, err := j.staticClient.GatewayGet()
 		if err != nil {
-			j.staticLogger.Println(persist.LogLevelError, persist.LogCallerAntGateway, j.staticAnt.Config.DataDir, fmt.Sprintf("error when calling /gateway: %v", err))
+			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+			j.staticLogger.Printf("%v %v: error when calling /gateway: %v", persist.ErrorLogPrefix, j.staticDataDir, err)
 			continue
 		}
 		if len(gatewayInfo.Peers) < 2 {
-			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.staticSiaDirectory, gatewayInfo.Peers)
+			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.staticDataDir, gatewayInfo.Peers)
 			continue
 		}
 	}

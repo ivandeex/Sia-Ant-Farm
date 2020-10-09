@@ -7,7 +7,6 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/build"
@@ -108,13 +107,13 @@ func TestUpgrades(t *testing.T) {
 
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
-		err := buildSiad(logger, dataDir, binariesDir, upgradePathVersions...)
+		err := buildSiad(logger, binariesDir, upgradePathVersions...)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if rebuildMaster {
-		err := buildSiad(logger, dataDir, binariesDir, "master")
+		err := buildSiad(logger, binariesDir, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -133,7 +132,7 @@ func TestUpgrades(t *testing.T) {
 
 	// Check UPnP enabled router to spped up subtests
 	upnpStatus := upnprouter.CheckUPnPEnabled()
-	logger.Println(persist.LogLevelInfo, persist.LogCallerTest, dataDir, upnpStatus)
+	logger.Debugln(upnpStatus)
 
 	// Execute tests
 	for _, tt := range tests {

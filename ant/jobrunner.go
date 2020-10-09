@@ -13,12 +13,15 @@ import (
 
 // A JobRunner is used to start up jobs on the running Sia node.
 type JobRunner struct {
-	staticLogger        *persist.Logger
+	// staticLogger defines a logger an ant's jobrunner should log to. Each
+	// jobrunner log message should identify the ant by ant's siad dataDir.
+	staticLogger *persist.Logger
+
 	staticAntsSyncWG    *sync.WaitGroup
 	staticAnt           *Ant
 	staticClient        *client.Client
 	staticWalletSeed    string
-	staticSiaDirectory  string
+	staticDataDir       string
 	StaticTG            threadgroup.ThreadGroup
 	renterUploadReadyWG sync.WaitGroup
 }
@@ -38,11 +41,11 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 	opt.Password = authpassword
 	c := client.New(opt)
 	jr := &JobRunner{
-		staticLogger:       logger,
-		staticAntsSyncWG:   ant.staticAntsSyncWG,
-		staticAnt:          ant,
-		staticClient:       c,
-		staticSiaDirectory: siadirectory,
+		staticLogger:     logger,
+		staticAntsSyncWG: ant.staticAntsSyncWG,
+		staticAnt:        ant,
+		staticClient:     c,
+		staticDataDir:    ant.Config.DataDir,
 	}
 	if existingWalletSeed == "" {
 		walletParams, err := jr.staticClient.WalletInitPost("", false)
@@ -91,7 +94,7 @@ func (j *JobRunner) waitForAntsSync() bool {
 // given job runner
 func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
 	// Create new job runner
-	newJR, err := newJobRunner(j.staticLogger, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticSiaDirectory, j.staticWalletSeed)
+	newJR, err := newJobRunner(j.staticLogger, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticDataDir, j.staticWalletSeed)
 	if err != nil {
 		return &JobRunner{}, errors.AddContext(err, "couldn't create an updated job runner")
 	}

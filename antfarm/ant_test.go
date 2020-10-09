@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
@@ -52,7 +51,7 @@ func TestStartAnts(t *testing.T) {
 	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +117,7 @@ func TestStartAntWithSiadPath(t *testing.T) {
 			logger := test.NewTestLogger(t, dataDir)
 
 			// Start ants
-			ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
+			ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -187,7 +186,7 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 			logger := test.NewTestLogger(t, dataDir)
 
 			// Start ants
-			ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
+			ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -277,7 +276,7 @@ func TestConnectAnts(t *testing.T) {
 	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +356,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, logger, persist.LogCallerTest, dataDir, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}

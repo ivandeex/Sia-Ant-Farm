@@ -1,7 +1,6 @@
 package ant
 
 import (
-	"fmt"
 	"log"
 	"time"
 
@@ -36,7 +35,8 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 
 		walletGet, err := j.staticClient.WalletGet()
 		if err != nil {
-			j.staticLogger.Println(persist.LogLevelError, persist.LogCallerAntLittleSupplier, j.staticAnt.Config.DataDir, fmt.Sprintf("can't get wallet info: %v", err))
+			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+			j.staticLogger.Printf("%v %v: can't get wallet info: %v", persist.ErrorLogPrefix, j.staticDataDir, err)
 			return
 		}
 
@@ -46,7 +46,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 
 		_, err = j.staticClient.WalletSiacoinsPost(sendAmount, sendAddress, false)
 		if err != nil {
-			log.Printf("[ERROR] [littleSupplier] [%v] Can't send Siacoins: %v\n", j.staticSiaDirectory, err)
+			log.Printf("[ERROR] [littleSupplier] [%v] Can't send Siacoins: %v\n", j.staticDataDir, err)
 		}
 	}
 }

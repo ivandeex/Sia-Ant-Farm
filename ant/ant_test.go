@@ -25,11 +25,14 @@ func TestClosingAnt(t *testing.T) {
 	t.Parallel()
 
 	// Create testing config
-	datadir := test.TestDir(t.Name())
-	config := newTestingAntConfig(datadir)
+	dataDir := test.TestDir(t.Name())
+	config := newTestingAntConfig(dataDir)
+
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
 
 	// Create Ant
-	ant, err := New(&sync.WaitGroup{}, config)
+	ant, err := New(&sync.WaitGroup{}, logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}

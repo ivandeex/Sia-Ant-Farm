@@ -25,8 +25,7 @@ func CheckUPnPEnabled() string {
 	// Gitlab CI doesn't have UPnP enabled router
 	if _, ok := os.LookupEnv("GITLAB_CI"); ok {
 		UPnPEnabled = false
-		log.Println("[INFO] [ant-farm] UPnP enabled router is not available in Gitlab CI")
-		return
+		return "UPnP enabled router is not available in Gitlab CI"
 	}
 	_, err := upnp.Discover()
 	if err != nil {

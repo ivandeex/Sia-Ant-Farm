@@ -42,7 +42,7 @@ func TestBuildBinaries(t *testing.T) {
 
 	// Build release binaries
 	binariesDir := "../upgrade-binaries"
-	err = buildSiad(logger, dataDir, binariesDir, releases...)
+	err = buildSiad(logger, binariesDir, releases...)
 	if err != nil {
 		t.Fatal(err)
 	}

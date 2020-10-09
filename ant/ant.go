@@ -37,7 +37,10 @@ type AntConfig struct {
 // these user stories and reports on their successfulness.
 type Ant struct {
 	staticAntsSyncWG *sync.WaitGroup
-	staticLogger     *persist.Logger
+
+	// staticLogger defines a logger an ant should log to. Each ant log message
+	// should identify the ant by ant's siad dataDir.
+	staticLogger *persist.Logger
 
 	APIAddr string
 	RPCAddr string
@@ -98,7 +101,7 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	if upnprouter.UPnPEnabled {
 		err := clearPorts(config)
 		if err != nil {
-			logger.Println(persist.LogLevelDebug, persist.LogCallerAnt, config.DataDir, fmt.Sprintf("can't clear upnp ports for ant: %v", err))
+			logger.Debugf("%v: can't clear upnp ports for ant: %v", config.DataDir, err)
 		}
 	}
 
@@ -121,8 +124,8 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 		APIAddr:          config.APIAddr,
 		RPCAddr:          config.RPCAddr,
 		Config:           config,
-		siad:             siad,
 		SeenBlocks:       make(map[types.BlockHeight]types.BlockID),
+		siad:             siad,
 	}
 
 	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
@@ -221,7 +224,7 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 
 // UpdateSiad updates ant to use the given siad binary.
 func (a *Ant) UpdateSiad(siadPath string) error {
-	a.staticLogger.Println(persist.LogLevelInfo, persist.LogCallerAnt, a.Config.DataDir, "closing ant before siad update")
+	a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
 
 	// Stop ant
 	err := a.Close()

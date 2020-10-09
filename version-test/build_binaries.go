@@ -51,10 +51,9 @@ type (
 // buildSiad builds specified siad-dev versions defined by git tags into the
 // given directory. If the given directory is relative path, it is relative to
 // Sia-Ant-Farm/version-test directory.
-func buildSiad(logger *persist.Logger, callerDataDir string, binariesDir string, versions ...string) error {
+func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) error {
 	vs := strings.Join(versions, ", ")
-	log.Printf("[INFO] [build-binaries] Preparing to build siad versions: %v\n", vs)
-	logger.Println(persist.LogLevelInfo, persist.LogCallerBuildBinaries, callerDataDir, fmt.Sprintf("preparing to build siad versions: %v", vs))
+	logger.Debugf("preparing to build siad versions: %v", vs)
 
 	// Get current working directory and change back to it when done
 	startDir, err := os.Getwd()

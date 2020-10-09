@@ -1,7 +1,6 @@
 package ant
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -60,7 +59,8 @@ func TestAnnounceHost(t *testing.T) {
 		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			ant.staticLogger.Println(persist.LogLevelError, persist.LogCallerAnt, dataDir, fmt.Sprintf("error getting wallet info: %v", err))
+			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+			ant.staticLogger.Printf("%v %v: error getting wallet info: %v", persist.ErrorLogPrefix, dataDir, err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(initialbalance) > 0 {

@@ -89,7 +89,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 		dataDir: dataDir,
 		logger:  logger,
 	}
-	log.Printf("INFO antfarm %v: This Antfarm logs to: %v", dataDir, logPath)
+	log.Printf("antfarm %v: Antfarm log is stored at: %v", dataDir, logPath)
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
@@ -99,7 +99,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 
 	// Check whether UPnP is enabled on router
 	upnpStatus := upnprouter.CheckUPnPEnabled()
-	farm.logger.Println(persist.LogLevelInfo, persist.LogCallerAntfarm, farm.dataDir, upnpStatus)
+	farm.logger.Debugln(upnpStatus)
 
 	// Check ant names are unique
 	antNames := make(map[string]struct{})
@@ -115,7 +115,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Start up each ant process with its jobs
-	ants, err := startAnts(&farm.antsSyncWG, farm.logger, persist.LogCallerAntfarm, farm.dataDir, config.AntConfigs...)
+	ants, err := startAnts(&farm.antsSyncWG, farm.logger, config.AntConfigs...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start ants")
 	}
@@ -130,7 +130,8 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 		if err != nil {
 			closeErr := farm.Close()
 			if closeErr != nil {
-				farm.logger.Println(persist.LogLevelError, persist.LogCallerAntfarm, farm.dataDir, fmt.Sprintf("error closing antfarm: %v", err))
+				// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+				farm.logger.Printf("%v error closing antfarm: %v", persist.ErrorLogPrefix, err)
 			}
 		}
 	}()
@@ -256,7 +257,8 @@ func (af *AntFarm) PermanentSyncMonitor() {
 		// Grab consensus groups
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
-			af.logger.Println(persist.LogLevelError, persist.LogCallerAntfarm, af.dataDir, fmt.Sprintf("error checking sync status of antfarm: %v", err))
+			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+			af.logger.Printf("%v error checking sync status of antfarm: %v", persist.ErrorLogPrefix, err)
 			continue
 		}
 

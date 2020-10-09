@@ -121,12 +121,14 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
-func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, logCaller persist.LogCaller, callerDataDir string, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
+func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
 	// Ensure that, if an error occurs, all the ants that have been started are
 	// closed before returning.
 	defer func() {
 		if returnErr != nil {
-			log.Println("[ERROR] [antfarm] Error starting ants")
+			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
+			logger.Println(persist.ErrorLogPrefix, "error starting ants")
+
 			for _, ant := range ants {
 				err := ant.Close()
 				if err != nil {
@@ -148,7 +150,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, logCaller per
 		if err != nil {
 			return ants, err
 		}
-		logger.Println(persist.LogLevelInfo, logCaller, callerDataDir, fmt.Sprintf("starting ant %v with config:\n%v", i, antConfigStr))
+		logger.Printf("starting ant %v with config:\n%v", i, antConfigStr)
 
 		// Create Ant
 		a, err := ant.New(antsSyncWG, logger, cfg)
