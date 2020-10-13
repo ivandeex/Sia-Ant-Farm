@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/http"
 	"net/url"
@@ -126,13 +125,12 @@ func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, configs ...an
 	// closed before returning.
 	defer func() {
 		if returnErr != nil {
-			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
-			logger.Println(persist.ErrorLogPrefix, "error starting ants")
+			logger.Errorf("%v: %v", "error starting ants", returnErr)
 
 			for _, ant := range ants {
 				err := ant.Close()
 				if err != nil {
-					log.Printf("[ERROR] [ant] [%v] Error closing ant: %v\n", ant.Config.SiadConfig.DataDir, err)
+					logger.Errorf("%v: error closing ant: %v", ant.Config.SiadConfig.DataDir, err)
 				}
 			}
 			ants = nil
@@ -157,7 +155,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, configs ...an
 		if err != nil {
 			// Ant is nil, we can't close it in defer
 			er := errors.AddContext(err, "can't create an ant")
-			log.Printf("[ERROR] [ant] [%v] ant: %v\n", cfg.DataDir, er)
+			logger.Errorf("%v: %v", cfg.DataDir, er)
 			return ants, er
 		}
 		ants = append(ants, a)
@@ -173,7 +171,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, configs ...an
 		err = c.HostModifySettingPost(client.HostParamNetAddress, netAddress)
 		if err != nil {
 			er := errors.AddContext(err, "couldn't set host's netAddress")
-			log.Printf("[ERROR] [ant] [%v] ant: %v\n", cfg.DataDir, er)
+			logger.Errorf("%v: %v", cfg.DataDir, er)
 			return ants, er
 		}
 

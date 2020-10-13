@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -179,11 +178,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 	if err != nil {
 		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
 	}
-	r.staticLogger.Printf(
-		"%v: downloading\n\tsiaFile: %v\n\tto local file: %v",
-		r.staticJR.staticDataDir,
-		siaPath, destPath,
-	)
+	r.staticLogger.Debugf("%v: downloading\n\tsiaFile: %v\n\tto local file: %v", r.staticJR.staticDataDir, siaPath, destPath)
 	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
 	if err != nil {
 		return errors.AddContext(err, "failed in call to /renter/download")
@@ -226,16 +221,17 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		if hasFile && info.Received == info.Filesize {
 			break
 		} else if !hasFile {
-			log.Printf("[INFO] [renter] [%v] File unexpectedly missing from download list\n", r.staticJR.staticDataDir)
+			r.staticLogger.Errorf("%v: file unexpectedly missing from download list", r.staticJR.staticDataDir)
 		} else {
-			log.Printf("[INFO] [renter] [%v] Currently downloading %v, received %v bytes\n", r.staticJR.staticDataDir, fileToDownload.SiaPath, info.Received)
+			r.staticLogger.Debugf("%v: currently downloading %v, received %v bytes", r.staticJR.staticDataDir, fileToDownload.SiaPath, info.Received)
 		}
 		if time.Since(start) > downloadFileTimeout {
-			log.Printf("[ERROR] [renter] [%v] File %v hasn't been downloaded within %v timeout\n", r.staticJR.staticDataDir, siaPath, downloadFileTimeout)
-			return fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
+			msg := fmt.Sprintf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
+			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, msg)
+			return errors.New(msg)
 		}
 	}
-	log.Printf("[INFO] [renter] [%v] Successfully downloaded\n\tsiaFile: %v\n\tto local file:%v\n", r.staticJR.staticDataDir, siaPath, destPath)
+	r.staticLogger.Printf("%v: successfully downloaded\n\tsiaFile: %v\n\tto local file:%v", r.staticJR.staticDataDir, siaPath, destPath)
 	return nil
 }
 
@@ -299,18 +295,15 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 		return
 	}
 
-	// Start basic renter
-	rj := j.NewRenterJob()
-
 	// Block until a minimum threshold of coins have been mined.
 	start := time.Now()
-	log.Printf("[INFO] [renter] [%v] Blocking until wallet is sufficiently full\n", rj.staticJR.staticDataDir)
+	j.staticLogger.Debugf("%v: blocking until wallet is sufficiently full", j.staticDataDir)
 	for {
 		// Get the wallet balance.
-		walletInfo, err := rj.staticJR.staticClient.WalletGet()
+		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
 			// Log if there was an error.
-			log.Printf("[ERROR] [renter] [%v] Trouble when calling /wallet: %v\n", rj.staticJR.staticDataDir, err)
+			j.staticLogger.Errorf("%v: trouble when calling /wallet: %v", j.staticDataDir, err)
 		} else if walletInfo.ConfirmedSiacoinBalance.Cmp(requiredInitialBalance) > 0 {
 			// Break the wait loop when we have enough balance.
 			break
@@ -318,71 +311,74 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 
 		// Log an error if the time elapsed has exceeded the warning threshold.
 		if time.Since(start) > initialBalanceWarningTimeout {
-			log.Printf("[ERROR] [renter] [%v] Minimum balance for allowance has not been reached. Time elapsed: %v\n", rj.staticJR.staticDataDir, time.Since(start))
+			j.staticLogger.Errorf("%v: minimum balance for allowance has not been reached. Time elapsed: %v", j.staticDataDir, time.Since(start))
 		}
 
 		// Wait before trying to get the balance again.
 		select {
-		case <-rj.staticJR.StaticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
 		case <-time.After(balanceCheckFrequency):
 		}
 	}
-	log.Printf("[INFO] [renter] [%v] Wallet filled successfully. Blocking until allowance has been set.\n", rj.staticJR.staticDataDir)
+	j.staticLogger.Debugf("%v: wallet filled successfully. Blocking until allowance has been set", j.staticDataDir)
 
 	// Block until a renter allowance has successfully been set.
 	start = time.Now()
 	for {
-		log.Printf("[DEBUG] [renter] [%v] Attempting to set allowance.\n", rj.staticJR.staticDataDir)
-		err := rj.staticJR.staticClient.RenterPostAllowance(allowance)
-		log.Printf("[DEBUG] [renter] [%v] Allowance attempt complete: %v\n", rj.staticJR.staticDataDir, err)
+		j.staticLogger.Debugf("%v: attempting to set allowance.", j.staticDataDir)
+		err := j.staticClient.RenterPostAllowance(allowance)
+		j.staticLogger.Debugf("%v: allowance attempt complete", j.staticDataDir)
 		if err == nil {
 			// Success, we can exit the loop.
 			break
 		}
 		// There was an error
-		log.Printf("[ERROR] [renter] [%v] Trouble when setting renter allowance: %v\n", rj.staticJR.staticDataDir, err)
+		j.staticLogger.Errorf("%v: trouble when setting renter allowance: %v", j.staticDataDir, err)
 		if time.Since(start) > setAllowanceTimeout {
 			// Timeout was reached
-			log.Printf("[ERROR] [renter] [%v] Couldn't set allowance within %v timeout\n", rj.staticJR.staticDataDir, setAllowanceTimeout)
+			j.staticLogger.Errorf("%v: couldn't set allowance within %v timeout", j.staticDataDir, setAllowanceTimeout)
 		}
 
 		// Wait a bit before trying again.
 		select {
-		case <-rj.staticJR.StaticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
 		case <-time.After(setAllowanceFrequency):
 		}
 	}
-	log.Printf("[INFO] [renter] [%v] Renter allowance has been set successfully.\n", rj.staticJR.staticDataDir)
+	j.staticLogger.Debugf("%v: renter allowance has been set successfully.", j.staticDataDir)
 
 	// Block until renter is upload ready
 	start = time.Now()
-	log.Printf("[INFO] [renter] [%v] Waiting for renter to become upload ready.\n", rj.staticJR.staticDataDir)
+	j.staticLogger.Debugf("%v: waiting for renter to become upload ready.", j.staticDataDir)
 	for {
-		rur, err := rj.staticJR.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
+		rur, err := j.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
 		if err != nil {
 			// Error getting RenterUploadReady
-			log.Printf("[ERROR] [renter] [%v] Trouble when getting renter upload ready status: %v\n", rj.staticJR.staticDataDir, err)
+			j.staticLogger.Errorf("%v: trouble when getting renter upload ready status: %v\n", j.staticDataDir, err)
 		} else if rur.Ready {
 			// Success, we can exit the loop.
 			break
 		}
 		if time.Since(start) > renterUploadReadyTimeout {
 			// We have hit the timeout
-			log.Printf("[ERROR] [renter] [%v] Renter is not upload ready within %v timeout.\n", rj.staticJR.staticDataDir, renterUploadReadyTimeout)
+			j.staticLogger.Errorf("%v: renter is not upload ready within %v timeout.", j.staticDataDir, renterUploadReadyTimeout)
 		}
 
 		// Wait a bit before trying again.
 		select {
-		case <-rj.staticJR.StaticTG.StopChan():
+		case <-j.StaticTG.StopChan():
 			return
 		case <-time.After(renterUploadReadyFrequency):
 		}
 	}
-	log.Printf("[INFO] [renter] [%v] Renter is upload ready.\n", rj.staticJR.staticDataDir)
+	j.staticLogger.Printf("%v: renter is upload ready.", j.staticDataDir)
 
 	if startBackgroundJobs {
+		// Start basic renter
+		rj := j.NewRenterJob()
+
 		// Spawn the uploader, downloader and deleter threads.
 		go rj.threadedUploader()
 		go rj.threadedDownloader()
@@ -422,7 +418,7 @@ func (r *RenterJob) managedDeleteRandom() error {
 		return err
 	}
 
-	log.Printf("[INFO] [renter] [%v] Successfully deleted file.\n", r.staticJR.staticDataDir)
+	r.staticLogger.Printf("%v: successfully deleted file.\n", r.staticJR.staticDataDir)
 	os.Remove(r.Files[randindex].SourceFile)
 	r.Files = append(r.Files[:randindex], r.Files[randindex+1:]...)
 
@@ -521,7 +517,7 @@ func (r *RenterJob) managedDownloadRandomFile() error {
 func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err error) {
 	// Generate some random data to upload. The file needs to be closed before
 	// the upload to the network starts.
-	log.Printf("[INFO] [renter] [%v] File upload preparation beginning.\n", r.staticJR.staticDataDir)
+	r.staticLogger.Debugf("%v: file upload preparation beginning.", r.staticJR.staticDataDir)
 	tempSubDir := filepath.Join(r.staticJR.staticDataDir, "renterSourceFiles")
 	pattern := "renterFile"
 	sourcePath, merkleRoot, err := createTempFile(tempSubDir, pattern, fileSize)
@@ -543,15 +539,14 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 	r.mu.Lock()
 	r.Files = append(r.Files, rf)
 	r.mu.Unlock()
-	log.Printf("[INFO] [renter] [%v] File upload preparation complete, beginning file upload.\n", r.staticJR.staticDataDir)
 
 	// Upload the file to network
-	log.Printf("[INFO] [renter] [%v] Beginning file upload.\n", r.staticJR.staticDataDir)
+	r.staticLogger.Debugf("%v: beginning file upload.", r.staticJR.staticDataDir)
 	err = r.staticJR.staticClient.RenterUploadPost(sourcePath, siaPath, renterDataPieces, renterParityPieces)
 	if err != nil {
 		return modules.SiaPath{}, errors.AddContext(err, "error uploading a file to network")
 	}
-	log.Printf("[INFO] [renter] [%v] /renter/upload call completed successfully.  Waiting for the upload to complete\n", r.staticJR.staticDataDir)
+	r.staticLogger.Debugf("%v: /renter/upload call completed successfully.  Waiting for the upload to complete", r.staticJR.staticDataDir)
 
 	// Block until the upload has reached 100%
 	start := time.Now()
@@ -576,7 +571,7 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 				break
 			}
 		}
-		log.Printf("[INFO] [renter] [%v] upload progress: %v%%\n", r.staticJR.staticDataDir, uploadProgress)
+		r.staticLogger.Debugf("%v: upload progress: %v%%", r.staticJR.staticDataDir, uploadProgress)
 		if uploadProgress == 100 {
 			// The file has finished uploading
 			break
@@ -588,25 +583,25 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 			// Log number of hostdb active hosts
 			hdag, err := r.staticJR.staticClient.HostDbActiveGet()
 			if err != nil {
-				log.Printf("[ERROR] [renter] [%v] Can't get hostdb active hosts: %v\n", r.staticJR.staticDataDir, err)
+				r.staticLogger.Errorf("%v: can't get hostdb active hosts: %v", r.staticJR.staticDataDir, err)
 			} else {
-				log.Printf("[DEBUG] [renter] [%v] Number of HostDB Active Hosts: %v\n", r.staticJR.staticDataDir, len(hdag.Hosts))
+				r.staticLogger.Debugf("%v: number of HostDB Active Hosts: %v", r.staticJR.staticDataDir, len(hdag.Hosts))
 			}
 
 			// Log number of each type of contract
 			rc, err := r.staticJR.staticClient.RenterAllContractsGet()
 			if err != nil {
-				log.Printf("[ERROR] [renter] [%v] Can't get renter contracts: %v\n", r.staticJR.staticDataDir, err)
+				r.staticLogger.Errorf("%v: can't get renter contracts: %v", r.staticJR.staticDataDir, err)
 			} else {
-				log.Printf("[DEBUG] [renter] [%v] Number of Contracts: %v\n", r.staticJR.staticDataDir, len(rc.Contracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of ActiveContracts: %v\n", r.staticJR.staticDataDir, len(rc.ActiveContracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of DisabledContracts: %v\n", r.staticJR.staticDataDir, len(rc.DisabledContracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of ExpiredContracts: %v\n", r.staticJR.staticDataDir, len(rc.ExpiredContracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of ExpiredRefreshedContracts: %v\n", r.staticJR.staticDataDir, len(rc.ExpiredRefreshedContracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of InactiveContracts: %v\n", r.staticJR.staticDataDir, len(rc.InactiveContracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of PassiveContracts: %v\n", r.staticJR.staticDataDir, len(rc.PassiveContracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of RecoverableContracts: %v\n", r.staticJR.staticDataDir, len(rc.RecoverableContracts))
-				log.Printf("[DEBUG] [renter] [%v] Number of RefreshedContracts: %v\n", r.staticJR.staticDataDir, len(rc.RefreshedContracts))
+				r.staticLogger.Debugf("%v: number of Contracts: %v", r.staticJR.staticDataDir, len(rc.Contracts))
+				r.staticLogger.Debugf("%v: number of ActiveContracts: %v", r.staticJR.staticDataDir, len(rc.ActiveContracts))
+				r.staticLogger.Debugf("%v: number of DisabledContracts: %v", r.staticJR.staticDataDir, len(rc.DisabledContracts))
+				r.staticLogger.Debugf("%v: number of ExpiredContracts: %v", r.staticJR.staticDataDir, len(rc.ExpiredContracts))
+				r.staticLogger.Debugf("%v: number of ExpiredRefreshedContracts: %v", r.staticJR.staticDataDir, len(rc.ExpiredRefreshedContracts))
+				r.staticLogger.Debugf("%v: number of InactiveContracts: %v", r.staticJR.staticDataDir, len(rc.InactiveContracts))
+				r.staticLogger.Debugf("%v: number of PassiveContracts: %v", r.staticJR.staticDataDir, len(rc.PassiveContracts))
+				r.staticLogger.Debugf("%v: number of RecoverableContracts: %v", r.staticJR.staticDataDir, len(rc.RecoverableContracts))
+				r.staticLogger.Debugf("%v: number of RefreshedContracts: %v", r.staticJR.staticDataDir, len(rc.RefreshedContracts))
 			}
 		}
 		lastUploadProgress = uploadProgress
@@ -615,11 +610,11 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 		if time.Since(start) > uploadTimeout {
 			// Log error
 			err := fmt.Errorf("file with siaPath %v could not be fully uploaded within %v timeout. Progress reached: %v%%", siaPath, uploadTimeout, uploadProgress)
-			log.Printf("[ERROR] [renter] [%v] %v", r.staticJR.staticDataDir, err)
+			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, err)
 			return modules.SiaPath{}, err
 		}
 	}
-	log.Printf("[INFO] [renter] [%v] file has been successfully uploaded to 100%%.\n", r.staticJR.staticDataDir)
+	r.staticLogger.Printf("%v: file has been successfully uploaded to 100%%.", r.staticJR.staticDataDir)
 	return siaPath, nil
 }
 
@@ -640,7 +635,7 @@ func (r *RenterJob) threadedDeleter() {
 		}
 
 		if err := r.managedDeleteRandom(); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticDataDir, err)
+			r.staticLogger.Errorf("%v: can't delete random file: %v", r.staticJR.staticDataDir, err)
 		}
 	}
 }
@@ -665,7 +660,7 @@ func (r *RenterJob) threadedDownloader() {
 
 		// Download a file.
 		if err := r.managedDownloadRandomFile(); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticDataDir, err)
+			r.staticLogger.Errorf("%v: can't download random file: %v", r.staticJR.staticDataDir, err)
 		}
 	}
 }
@@ -692,7 +687,7 @@ func (r *RenterJob) threadedUploader() {
 
 		// Upload a file.
 		if _, err := r.managedUpload(uploadFileSize); err != nil {
-			log.Printf("[ERROR] [renter] [%v]: %v\n", r.staticJR.staticDataDir, err)
+			r.staticLogger.Errorf("%v: can't upload file: %v", r.staticJR.staticDataDir, err)
 		}
 	}
 }
