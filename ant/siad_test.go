@@ -53,8 +53,8 @@ func TestNewSiad(t *testing.T) {
 		t.Error(err)
 	}
 
-	// Kill siad process
-	siad.Process.Kill()
+	// Stop siad process
+	stopSiad(config.APIAddr, config.APIPassword, siad.Process)
 
 	// Test Creating siad with a blank config
 	_, err = newSiad(SiadConfig{})
