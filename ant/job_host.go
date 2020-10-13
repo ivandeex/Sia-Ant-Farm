@@ -2,13 +2,11 @@ package ant
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -82,15 +80,14 @@ func (j *JobRunner) jobHost() {
 		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
-			j.staticLogger.Printf("%v %v: error getting wallet info: %v", persist.ErrorLogPrefix, j.staticDataDir, err)
+			j.staticLogger.Errorf("%v: error getting wallet info: %v", j.staticDataDir, err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {
 			break
 		}
 		if time.Since(start) > miningTimeout {
-			log.Printf("[ERROR] [host] [%v]: timeout: could not mine enough currency after 5 minutes\n", j.staticDataDir)
+			j.staticLogger.Errorf("%v: could not mine enough currency within %v timeout", j.staticDataDir, miningTimeout)
 			return
 		}
 	}
@@ -100,12 +97,12 @@ func (j *JobRunner) jobHost() {
 	// jobHost after the ant upgrade.
 	hostdir, err := filepath.Abs(filepath.Join(j.staticDataDir, "hostdata"))
 	if err != nil {
-		log.Printf("[ERROR] [jobHost] [%v] Can't get hostdata directory absolute path: %v\n", j.staticDataDir, err)
+		j.staticLogger.Errorf("%v: can't get hostdata directory absolute path: %v", j.staticDataDir, err)
 		return
 	}
 	_, err = os.Stat(hostdir)
 	if err != nil && !os.IsNotExist(err) {
-		log.Printf("[ERROR] [jobHost] [%v] Can't get hostdata directory info: %v\n", j.staticDataDir, err)
+		j.staticLogger.Errorf("%v: can't get hostdata directory info: %v", j.staticDataDir, err)
 		return
 	}
 	// Folder doesn't exist
@@ -113,7 +110,7 @@ func (j *JobRunner) jobHost() {
 		// Create a temporary folder for hosting
 		err = os.MkdirAll(hostdir, 0700)
 		if err != nil {
-			log.Printf("[ERROR] [jobHost] [%v] Can't create hostdata directory: %v\n", j.staticDataDir, err)
+			j.staticLogger.Errorf("%v: can't create hostdata directory: %v", j.staticDataDir, err)
 			return
 		}
 
@@ -121,16 +118,16 @@ func (j *JobRunner) jobHost() {
 		size := modules.SectorSize * 4096
 		err = j.staticClient.HostStorageFoldersAddPost(hostdir, size)
 		if err != nil {
-			log.Printf("[ERROR] [jobHost] [%v] Can't add storage folder: %v\n", j.staticDataDir, err)
+			j.staticLogger.Errorf("%v: can't add storage folder: %v", j.staticDataDir, err)
 			return
 		}
 	}
 
 	// Accept contracts
-	log.Printf("[INFO] [host] [%v] Accept contracts\n", j.staticDataDir)
+	j.staticLogger.Debugf("%v: accept contracts", j.staticDataDir)
 	err = j.staticClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
 	if err != nil {
-		log.Printf("[ERROR] [host] [%v] Can't post to accept contracts: %v\n", j.staticDataDir, err)
+		j.staticLogger.Errorf("%v: can't accept contracts: %v", j.staticDataDir, err)
 		return
 	}
 
@@ -139,7 +136,7 @@ func (j *JobRunner) jobHost() {
 	// storage revenue doesn't decrease.
 	hjr, err := j.newHostJobRunner()
 	if err != nil {
-		log.Printf("[ERROR] [host] [%v] Can't create host job runner: %v\n", j.staticDataDir, err)
+		j.staticLogger.Errorf("%v: can't create host job runner: %v", j.staticDataDir, err)
 		return
 	}
 	for {
@@ -153,10 +150,10 @@ func (j *JobRunner) jobHost() {
 		// Announce host to the network
 		if !hjr.managedAnnounced() {
 			// Announce host
-			log.Printf("[INFO] [host] [%v] Announce host\n", hjr.staticDataDir)
-			err := hjr.staticClient.HostAnnouncePost()
+			j.staticLogger.Debugf("%v: announce host", j.staticDataDir)
+			err := j.staticClient.HostAnnouncePost()
 			if err != nil {
-				log.Printf("[ERROR] [host] [%v] Host announcement failed: %v\n", hjr.staticDataDir, err)
+				j.staticLogger.Errorf("%v: host announcement failed: %v", j.staticDataDir, err)
 				select {
 				case <-j.StaticTG.StopChan():
 					return
@@ -169,7 +166,7 @@ func (j *JobRunner) jobHost() {
 			// Wait till host announcement transaction is in blockchain
 			err = hjr.managedWaitAnnounceTransactionInBlockchain()
 			if err != nil {
-				log.Printf("[ERROR] [host] [%v] Waiting for host announcement transaction failed: %v\n", hjr.staticDataDir, err)
+				j.staticLogger.Errorf("%v: waiting for host announcement transaction failed: %v", j.staticDataDir, err)
 				hjr.managedSetAnnounced(false)
 				continue
 			}
@@ -178,7 +175,7 @@ func (j *JobRunner) jobHost() {
 		// Check announce host transaction is not re-orged
 		found, err := hjr.announcementTransactionInBlock(hjr.managedAnnouncedBlockHeight())
 		if err != nil {
-			log.Printf("[ERROR] [host] [%v] Checking host announcement transaction failed: %v\n", hjr.staticDataDir, err)
+			j.staticLogger.Errorf("%v: checking host announcement transaction failed: %v", j.staticDataDir, err)
 			select {
 			case <-j.StaticTG.StopChan():
 				return
@@ -187,7 +184,7 @@ func (j *JobRunner) jobHost() {
 			}
 		}
 		if !found {
-			log.Printf("[INFO] [host] [%v] Host announcement transaction was not found, it was probably re-orged\n", hjr.staticDataDir)
+			j.staticLogger.Debugf("%v: host announcement transaction was not found, it was probably re-orged", j.staticDataDir)
 			hjr.managedSetAnnounced(false)
 			continue
 		}
@@ -195,7 +192,7 @@ func (j *JobRunner) jobHost() {
 		// Check storage revenue didn't decreased
 		err = hjr.managedCheckStorageRevenueNotDecreased()
 		if err != nil {
-			log.Printf("[ERROR] [host] [%v] Checking storage revenue failed: %v\n", hjr.staticDataDir, err)
+			j.staticLogger.Errorf("%v: checking storage revenue failed: %v", j.staticDataDir, err)
 			select {
 			case <-j.StaticTG.StopChan():
 				return
@@ -299,7 +296,7 @@ func (hjr *hostJobRunner) managedCheckStorageRevenueNotDecreased() error {
 
 	if hostInfo.FinancialMetrics.StorageRevenue.Cmp(r) < 0 {
 		// Storage revenue has decreased!
-		log.Printf("[ERROR] [host] [%v] StorageRevenue decreased! Was %v, is now %v\n", hjr.staticDataDir, hjr.lastStorageRevenue, hostInfo.FinancialMetrics.StorageRevenue)
+		hjr.staticLogger.Errorf("%v: storage revenue decreased! Was %v, is now %v", hjr.staticDataDir, hjr.lastStorageRevenue, hostInfo.FinancialMetrics.StorageRevenue)
 	}
 
 	// Update previous revenue to new amount
@@ -345,14 +342,14 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 			}
 		}
 		if found {
-			log.Printf("[INFO] [host] [%v] Host announcement transaction is in blockchain\n", hjr.staticDataDir)
+			hjr.staticLogger.Debugf("%v: host announcement transaction is in blockchain", hjr.staticDataDir)
 			return nil
 		}
 
 		// Timeout waiting for host announcement transaction
 		if currentBH > startBH+hostAnnounceBlockHeightDelay {
 			msg := fmt.Sprintf("host announcement transaction was not found in blockchain within %v blocks, transaction was probably re-orged", hostAnnounceBlockHeightDelay)
-			log.Printf("[INFO] [host] [%v] %v\n", hjr.staticDataDir, msg)
+			hjr.staticLogger.Debugf("%v: %v", hjr.staticDataDir, msg)
 			return errors.New(msg)
 		}
 

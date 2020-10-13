@@ -1,10 +1,8 @@
 package ant
 
 import (
-	"log"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/types"
 )
 
@@ -36,8 +34,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	minerRunning := true
 	err = j.staticClient.MinerStartGet()
 	if err != nil {
-		// TODO: Will be changed to Errorf once NebulousLabs/log is updated
-		j.staticLogger.Printf("%v %v: can't start miner: %v", persist.ErrorLogPrefix, j.staticDataDir, err)
+		j.staticLogger.Errorf("%v: can't start miner: %v", j.staticDataDir, err)
 		return
 	}
 
@@ -48,7 +45,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	for {
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			log.Printf("[ERROR] [balanceMaintainer] [%v] Can't get wallet info: %v\n", j.staticDataDir, err)
+			j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
 			select {
 			case <-j.StaticTG.StopChan():
 				return
@@ -59,10 +56,10 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 
 		haveDesiredBalance := walletInfo.ConfirmedSiacoinBalance.Cmp(desiredBalance) > 0
 		if !minerRunning && !haveDesiredBalance {
-			j.staticLogger.Debugf("%v: not enough currency, starting the miner", j.staticDataDir)
+			j.staticLogger.Printf("%v: not enough currency, starting the miner", j.staticDataDir)
 			minerRunning = true
 			if err = j.staticClient.MinerStartGet(); err != nil {
-				log.Printf("[ERROR] [balanceMaintainer] [%v] Can't start miner: %v\n", j.staticDataDir, err)
+				j.staticLogger.Errorf("%v: can't start miner: %v", j.staticDataDir, err)
 				select {
 				case <-j.StaticTG.StopChan():
 					return
@@ -71,10 +68,10 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 				continue
 			}
 		} else if minerRunning && haveDesiredBalance {
-			log.Printf("[INFO] [balanceMaintainer] [%v] Mined enough currency, stopping the miner\n", j.staticDataDir)
+			j.staticLogger.Printf("%v: mined enough currency, stopping the miner", j.staticDataDir)
 			minerRunning = false
 			if err = j.staticClient.MinerStopGet(); err != nil {
-				log.Printf("[ERROR] [balanceMaintainer] [%v] Can't stop miner: %v\n", j.staticDataDir, err)
+				j.staticLogger.Errorf("%v: can't stop miner: %v", j.staticDataDir, err)
 				select {
 				case <-j.StaticTG.StopChan():
 					return

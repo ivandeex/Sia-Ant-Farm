@@ -3,7 +3,6 @@ package ant
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
@@ -236,12 +235,12 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	a.Config.SiadConfig.SiadPath = siadPath
 
 	// Construct the ant's Siad instance
-	log.Printf("[INFO] [ant] [%v] Starting new siad process using %v\n", a.Config.SiadConfig.DataDir, siadPath)
+	a.staticLogger.Printf("%v: starting new siad process using %v", a.Config.SiadConfig.DataDir, siadPath)
 	siad, err := newSiad(a.Config.SiadConfig)
 	if err != nil {
 		return errors.AddContext(err, "unable to create new siad process")
 	}
-	log.Printf("[INFO] [ant] [%v] Siad process started\n", a.Config.SiadConfig.DataDir)
+	a.staticLogger.Debugf("%v: sSiad process started", a.Config.SiadConfig.DataDir)
 
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
@@ -261,16 +260,16 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	a.Jr = jr
 
 	// Give a new siad process some warm-up time
-	log.Printf("[INFO] [ant] [%v] Siad warm-up...\n", a.Config.SiadConfig.DataDir)
+	a.staticLogger.Debugf("%v: siad warm-up...", a.Config.SiadConfig.DataDir)
 	select {
 	case <-a.Jr.StaticTG.StopChan():
 		return nil
 	case <-time.After(updateSiadWarmUpTime):
 	}
-	log.Printf("[INFO] [ant] [%v] Siad warm-up finished\n", a.Config.SiadConfig.DataDir)
+	a.staticLogger.Debugf("%v: siad warm-up finished", a.Config.SiadConfig.DataDir)
 
 	// Restart jobs
-	log.Printf("[INFO] [ant] [%v] Restarting ant's jobs\n", a.Config.SiadConfig.DataDir)
+	a.staticLogger.Debugf("%v: restarting ant's jobs", a.Config.SiadConfig.DataDir)
 	for _, job := range a.Config.Jobs {
 		a.StartJob(a.Jr.staticAntsSyncWG, job)
 	}

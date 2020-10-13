@@ -130,8 +130,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 		if err != nil {
 			closeErr := farm.Close()
 			if closeErr != nil {
-				// TODO: Will be changed to Errorf once NebulousLabs/log is updated
-				farm.logger.Printf("%v error closing antfarm: %v", persist.ErrorLogPrefix, err)
+				farm.logger.Errorf("can't close antfarm: %v", err)
 			}
 		}
 	}()
@@ -151,7 +150,7 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 
 	// Wait for all ants to sync
 	if config.WaitForSync {
-		err = waitForAntsToSync(antsSyncTimeout, ants...)
+		err = farm.waitForAntsToSync(antsSyncTimeout)
 		if err != nil {
 			return nil, errors.AddContext(err, "wait for ants to sync failed")
 		}
@@ -168,40 +167,6 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	farm.router.GET("/ants", farm.getAnts)
 
 	return farm, nil
-}
-
-// waitForAntsToSync waits for all ants to be synced with a given tmeout
-func waitForAntsToSync(timeout time.Duration, ants ...*ant.Ant) error {
-	log.Println("[INFO] [ant-farm] waiting for all ants to sync")
-	start := time.Now()
-	for {
-		// Check sync status
-		groups, err := antConsensusGroups(ants...)
-		if err != nil {
-			return errors.AddContext(err, "unable to get consensus groups")
-		}
-
-		// We have reached ants sync
-		if len(groups) == 1 {
-			break
-		}
-
-		// We have reached timeout
-		if time.Since(start) > timeout {
-			return fmt.Errorf("ants didn't synced within %v timeout", timeout)
-		}
-
-		// Wait for jobs stop, timout or sleep
-		select {
-		case <-ants[0].Jr.StaticTG.StopChan():
-			// Jobs were stopped, do not wait anymore
-			return errors.New("jobs were stopped")
-		case <-time.After(waitForAntsToSyncFrequency):
-			// Continue waiting for sync after sleep
-		}
-	}
-	log.Println("[INFO] [ant-farm] all ants are now synced")
-	return nil
 }
 
 // allAnts returns all ants, external and internal, associated with this
@@ -257,28 +222,28 @@ func (af *AntFarm) PermanentSyncMonitor() {
 		// Grab consensus groups
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
-			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
-			af.logger.Printf("%v error checking sync status of antfarm: %v", persist.ErrorLogPrefix, err)
+			af.logger.Errorf(" can't check sync status of antfarm: %v", err)
 			continue
 		}
 
 		// Check if ants are synced
 		if len(groups) == 1 {
-			log.Printf("[INFO] [ant-farm] Ants are synchronized. Block Height: %v\n", af.Ants[0].BlockHeight())
+			af.logger.Printf("ants are synchronized. Block Height: %v", af.Ants[0].BlockHeight())
 			continue
 		}
 
 		// Log out information about the unsync ants
-		log.Println("[INFO] [ant-farm] Ants split into multiple groups.")
+		msg := "Ants split into multiple groups.\n"
 		for i, group := range groups {
 			if i != 0 {
-				log.Println()
+				msg += "\n"
 			}
-			log.Println("Group ", i+1)
+			msg += fmt.Sprintf("\tGroup %d:\n", i+1)
 			for _, a := range group {
-				log.Println(a.APIAddr)
+				msg += fmt.Sprintf("\t\t%s\n", a.APIAddr)
 			}
 		}
+		af.logger.Print(msg)
 	}
 }
 
@@ -304,7 +269,7 @@ func (af *AntFarm) Close() error {
 		go func(a *ant.Ant) {
 			err := a.Close()
 			if err != nil {
-				log.Printf("[ERROR] [ant] [%v] Error closing ant: %v\n", a.Config.SiadConfig.DataDir, err)
+				af.logger.Errorf("can't close ant %v: %v", a.Config.SiadConfig.DataDir, err)
 			}
 			antCloseWG.Done()
 		}(a)
@@ -337,4 +302,38 @@ func (afc *AntfarmConfig) GetHostAntConfigIndices() (antConfigIndices []int) {
 		}
 	}
 	return antConfigIndices
+}
+
+// waitForAntsToSync waits for all ants to be synced with a given tmeout
+func (af *AntFarm) waitForAntsToSync(timeout time.Duration) error {
+	af.logger.Debugln("waiting for all ants to sync")
+	start := time.Now()
+	for {
+		// Check sync status
+		groups, err := antConsensusGroups(af.Ants...)
+		if err != nil {
+			return errors.AddContext(err, "unable to get consensus groups")
+		}
+
+		// We have reached ants sync
+		if len(groups) == 1 {
+			break
+		}
+
+		// We have reached timeout
+		if time.Since(start) > timeout {
+			return fmt.Errorf("ants didn't synced within %v timeout", timeout)
+		}
+
+		// Wait for jobs stop, timout or sleep
+		select {
+		case <-af.Ants[0].Jr.StaticTG.StopChan():
+			// Jobs were stopped, do not wait anymore
+			return errors.New("jobs were stopped")
+		case <-time.After(waitForAntsToSyncFrequency):
+			// Continue waiting for sync after sleep
+		}
+	}
+	af.logger.Debugln("all ants are now synced")
+	return nil
 }

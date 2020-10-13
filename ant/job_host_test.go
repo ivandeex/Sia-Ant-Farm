@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -59,8 +58,7 @@ func TestAnnounceHost(t *testing.T) {
 		}
 		walletInfo, err := j.staticClient.WalletGet()
 		if err != nil {
-			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
-			ant.staticLogger.Printf("%v %v: error getting wallet info: %v", persist.ErrorLogPrefix, dataDir, err)
+			ant.staticLogger.Errorf("%v: error getting wallet info: %v", dataDir, err)
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(initialbalance) > 0 {

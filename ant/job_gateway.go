@@ -1,10 +1,7 @@
 package ant
 
 import (
-	"log"
 	"time"
-
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 )
 
 const (
@@ -43,12 +40,11 @@ func (j *JobRunner) gatewayConnectability() {
 		// itself.
 		gatewayInfo, err := j.staticClient.GatewayGet()
 		if err != nil {
-			// TODO: Will be changed to Errorf once NebulousLabs/log is updated
-			j.staticLogger.Printf("%v %v: error when calling /gateway: %v", persist.ErrorLogPrefix, j.staticDataDir, err)
+			j.staticLogger.Errorf("%v: error when calling /gateway: %v", j.staticDataDir, err)
 			continue
 		}
 		if len(gatewayInfo.Peers) < 2 {
-			log.Printf("[ERROR] [gateway] [%v] ant has less than two peers: %v\n", j.staticDataDir, gatewayInfo.Peers)
+			j.staticLogger.Errorf("%v: ant has less than two peers: %v", j.staticDataDir, gatewayInfo.Peers)
 			continue
 		}
 	}

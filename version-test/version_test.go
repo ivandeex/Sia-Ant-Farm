@@ -27,8 +27,7 @@ const (
 
 	// minVersion defines minimum released Sia version to include in built and
 	// tested binaries.
-	// TODO: Bring minVersion to v1.3.7
-	minVersion = "v1.4.8"
+	minVersion = "v1.4.7"
 
 	// rebuildReleaseBinaries defines whether the release siad binaries should
 	// be rebuilt. It can be set to false when rerunning the test(s) on already
@@ -45,11 +44,6 @@ const (
 	// on Gitlab CI and on machines without publicly accessible ports and
 	// without UPnP enabled router. When set to false, currently it allows to
 	// test with external IPs on network with UPnP enabled router.
-	// TODO:
-	// Testing on public IPs without UPnP enabled router (e.g. on the Hetzner
-	// box) can be enabled when
-	// https://gitlab.com/NebulousLabs/Sia-Ant-Farm/-/issues/102
-	// is done.
 	allowLocalIPs = false
 )
 

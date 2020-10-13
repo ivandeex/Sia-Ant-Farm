@@ -5,13 +5,6 @@ import (
 	"gitlab.com/NebulousLabs/log"
 )
 
-const (
-	// ErrorLogPrefix defines prefix for error log messages
-	// TODO: Remove ErrorLogPrefix, use logger.Errorf when NebulousLabs/log is
-	// updated
-	ErrorLogPrefix = "ERROR"
-)
-
 // Logger is a wrapper for log.Logger.
 type Logger struct {
 	*log.Logger
