@@ -1,0 +1,1 @@
+- Fix closing siad process in TestNewSiad.
