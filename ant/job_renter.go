@@ -106,7 +106,7 @@ var (
 	// allowance is the set of allowance settings that will be used by
 	// renter
 	allowance = modules.Allowance{
-		Funds:       types.NewCurrency64(20e3).Mul(types.SiacoinPrecision),
+		Funds:       types.NewCurrency64(100).Mul(types.SiacoinPrecision), //xxx
 		Hosts:       5,
 		Period:      renterAllowancePeriod,
 		RenewWindow: renterAllowancePeriod / 4,
