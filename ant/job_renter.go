@@ -24,7 +24,7 @@ import (
 const (
 	// downloadFileFrequency defines how frequently the renter job downloads
 	// files from the network.
-	downloadFileFrequency = uploadFileFrequency * 3 / 2
+	downloadFileFrequency = time.Second * 5 //xxx
 
 	// initialBalanceWarningTimeout defines how long the renter will wait before
 	// reporting to the user that the required initial balance has not been
@@ -42,7 +42,7 @@ const (
 
 	// uploadFileFrequency defines how frequently the renter job uploads files
 	// to the network.
-	uploadFileFrequency = time.Second * 60
+	uploadFileFrequency = time.Second * 30 //xxx
 
 	// deleteFileFrequency defines how frequently the renter job deletes files
 	// from the network.
