@@ -349,31 +349,10 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 	}
 	j.staticLogger.Debugf("%v: renter allowance has been set successfully.", j.staticDataDir)
 
-	// Block until renter is upload ready
-	start = time.Now()
-	j.staticLogger.Debugf("%v: waiting for renter to become upload ready.", j.staticDataDir)
-	for {
-		rur, err := j.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
-		if err != nil {
-			// Error getting RenterUploadReady
-			j.staticLogger.Errorf("%v: trouble when getting renter upload ready status: %v\n", j.staticDataDir, err)
-		} else if rur.Ready {
-			// Success, we can exit the loop.
-			break
-		}
-		if time.Since(start) > renterUploadReadyTimeout {
-			// We have hit the timeout
-			j.staticLogger.Errorf("%v: renter is not upload ready within %v timeout.", j.staticDataDir, renterUploadReadyTimeout)
-		}
-
-		// Wait a bit before trying again.
-		select {
-		case <-j.StaticTG.StopChan():
-			return
-		case <-time.After(renterUploadReadyFrequency):
-		}
+	err = j.WaitForRenterUploadReady()
+	if err != nil {
+		return
 	}
-	j.staticLogger.Printf("%v: renter is upload ready.", j.staticDataDir)
 
 	if startBackgroundJobs {
 		// Start basic renter
@@ -384,6 +363,42 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 		go rj.threadedDownloader()
 		go rj.threadedDeleter()
 	}
+}
+
+// WaitForRenterUploadReady waits for renter upload ready with default timeout,
+// data pieces and parity pieces if the ant has renter job. If the ant doesn't
+// have renter job, it returns an error.
+func (j *JobRunner) WaitForRenterUploadReady() error {
+	if !j.staticAnt.HasRenterTypeJob() {
+		return errors.New("this ant hasn't renter job")
+	}
+	// Block until renter is upload ready or till timeout is reached
+	start := time.Now()
+	j.staticLogger.Debugf("%v: waiting for renter to become upload ready.", j.staticDataDir)
+	for {
+		// Timeout
+		if time.Since(start) > renterUploadReadyTimeout {
+			j.staticLogger.Errorf("%v: renter is not upload ready within %v timeout.", j.staticDataDir, renterUploadReadyTimeout)
+		}
+
+		rur, err := j.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
+		if err != nil {
+			// Error getting RenterUploadReady
+			j.staticLogger.Errorf("%v: can't get renter upload ready status: %v", j.staticDataDir, err)
+		} else if rur.Ready {
+			// Success, we can exit the loop.
+			break
+		}
+
+		// Wait a bit before trying again.
+		select {
+		case <-j.StaticTG.StopChan():
+			return errors.New("ant was stopped")
+		case <-time.After(renterUploadReadyFrequency):
+		}
+	}
+	j.staticLogger.Printf("%v: renter is upload ready.", j.staticDataDir)
+	return nil
 }
 
 // Download will download the given file from the network to the given

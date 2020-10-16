@@ -197,17 +197,9 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 	case "host":
 		go a.Jr.jobHost()
 	case "renter":
-		a.Jr.renterUploadReadyWG.Add(1)
-		go func() {
-			defer a.Jr.renterUploadReadyWG.Done()
-			a.Jr.renter(false)
-		}()
+		go a.Jr.renter(false)
 	case "autoRenter":
-		a.Jr.renterUploadReadyWG.Add(1)
-		go func() {
-			defer a.Jr.renterUploadReadyWG.Done()
-			a.Jr.renter(true)
-		}()
+		go a.Jr.renter(true)
 	case "gateway":
 		go a.Jr.gatewayConnectability()
 	case "bigspender":
