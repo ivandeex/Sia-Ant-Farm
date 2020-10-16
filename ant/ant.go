@@ -196,10 +196,12 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 		go a.Jr.blockMining()
 	case "host":
 		go a.Jr.jobHost()
+	case "noAllowanceRenter":
+		go a.Jr.renter(walletFull)
 	case "renter":
-		go a.Jr.renter(false)
+		go a.Jr.renter(allowanceSet)
 	case "autoRenter":
-		go a.Jr.renter(true)
+		go a.Jr.renter(backgroundJobsStarted)
 	case "gateway":
 		go a.Jr.gatewayConnectability()
 	case "bigspender":
@@ -280,7 +282,7 @@ func (a *Ant) WalletAddress() (*types.UnlockHash, error) {
 		return nil, errors.New("ant is not running")
 	}
 
-	addressGet, err := a.Jr.staticClient.WalletAddressGet()
+	addressGet, err := a.Jr.StaticClient.WalletAddressGet()
 	if err != nil {
 		return nil, err
 	}

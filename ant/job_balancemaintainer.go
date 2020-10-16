@@ -32,7 +32,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	}
 
 	minerRunning := true
-	err = j.staticClient.MinerStartGet()
+	err = j.StaticClient.MinerStartGet()
 	if err != nil {
 		j.staticLogger.Errorf("%v: can't start miner: %v", j.staticDataDir, err)
 		return
@@ -43,7 +43,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	// balance has not been reached and the miner is not running, the miner is
 	// started.
 	for {
-		walletInfo, err := j.staticClient.WalletGet()
+		walletInfo, err := j.StaticClient.WalletGet()
 		if err != nil {
 			j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
 			select {
@@ -58,7 +58,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 		if !minerRunning && !haveDesiredBalance {
 			j.staticLogger.Printf("%v: not enough currency, starting the miner", j.staticDataDir)
 			minerRunning = true
-			if err = j.staticClient.MinerStartGet(); err != nil {
+			if err = j.StaticClient.MinerStartGet(); err != nil {
 				j.staticLogger.Errorf("%v: can't start miner: %v", j.staticDataDir, err)
 				select {
 				case <-j.StaticTG.StopChan():
@@ -70,7 +70,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 		} else if minerRunning && haveDesiredBalance {
 			j.staticLogger.Printf("%v: mined enough currency, stopping the miner", j.staticDataDir)
 			minerRunning = false
-			if err = j.staticClient.MinerStopGet(); err != nil {
+			if err = j.StaticClient.MinerStopGet(); err != nil {
 				j.staticLogger.Errorf("%v: can't stop miner: %v", j.staticDataDir, err)
 				select {
 				case <-j.StaticTG.StopChan():

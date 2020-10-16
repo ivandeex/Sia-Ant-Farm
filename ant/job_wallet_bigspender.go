@@ -31,7 +31,7 @@ func (j *JobRunner) bigSpender() {
 		case <-time.After(spendInterval):
 		}
 
-		walletGet, err := j.staticClient.WalletGet()
+		walletGet, err := j.StaticClient.WalletGet()
 		if err != nil {
 			j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
 			return
@@ -44,7 +44,7 @@ func (j *JobRunner) bigSpender() {
 		j.staticLogger.Debugf("%v: sending a large transaction", j.staticDataDir)
 
 		voidaddress := types.UnlockHash{}
-		_, err = j.staticClient.WalletSiacoinsPost(spendThreshold, voidaddress, false)
+		_, err = j.StaticClient.WalletSiacoinsPost(spendThreshold, voidaddress, false)
 		if err != nil {
 			j.staticLogger.Errorf("%v: can't send Siacoins: %v", j.staticDataDir, err)
 			continue

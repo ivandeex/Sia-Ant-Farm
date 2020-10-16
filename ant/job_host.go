@@ -78,7 +78,7 @@ func (j *JobRunner) jobHost() {
 			return
 		case <-time.After(miningCheckFrequency):
 		}
-		walletInfo, err := j.staticClient.WalletGet()
+		walletInfo, err := j.StaticClient.WalletGet()
 		if err != nil {
 			j.staticLogger.Errorf("%v: error getting wallet info: %v", j.staticDataDir, err)
 			continue
@@ -116,7 +116,7 @@ func (j *JobRunner) jobHost() {
 
 		// Add the storage folder.
 		size := modules.SectorSize * 4096
-		err = j.staticClient.HostStorageFoldersAddPost(hostdir, size)
+		err = j.StaticClient.HostStorageFoldersAddPost(hostdir, size)
 		if err != nil {
 			j.staticLogger.Errorf("%v: can't add storage folder: %v", j.staticDataDir, err)
 			return
@@ -125,7 +125,7 @@ func (j *JobRunner) jobHost() {
 
 	// Accept contracts
 	j.staticLogger.Debugf("%v: accept contracts", j.staticDataDir)
-	err = j.staticClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
+	err = j.StaticClient.HostModifySettingPost(client.HostParamAcceptingContracts, true)
 	if err != nil {
 		j.staticLogger.Errorf("%v: can't accept contracts: %v", j.staticDataDir, err)
 		return
@@ -151,7 +151,7 @@ func (j *JobRunner) jobHost() {
 		if !hjr.managedAnnounced() {
 			// Announce host
 			j.staticLogger.Debugf("%v: announce host", j.staticDataDir)
-			err := j.staticClient.HostAnnouncePost()
+			err := j.StaticClient.HostAnnouncePost()
 			if err != nil {
 				j.staticLogger.Errorf("%v: host announcement failed: %v", j.staticDataDir, err)
 				select {
@@ -213,7 +213,7 @@ func (j *JobRunner) jobHost() {
 // jobRunner. hostJobRunner should be createad after host netAddress is
 // possibly set for the host.
 func (j *JobRunner) newHostJobRunner() (hostJobRunner, error) {
-	hg, err := j.staticClient.HostGet()
+	hg, err := j.StaticClient.HostGet()
 	if err != nil {
 		return hostJobRunner{}, errors.AddContext(err, "can't get host info")
 	}
@@ -225,7 +225,7 @@ func (j *JobRunner) newHostJobRunner() (hostJobRunner, error) {
 // transaction can be found in the given block.
 func (hjr *hostJobRunner) announcementTransactionInBlock(blockHeight types.BlockHeight) (found bool, err error) {
 	// Get blocks consensus with transactions
-	cbg, err := hjr.staticClient.ConsensusBlocksHeightGet(blockHeight)
+	cbg, err := hjr.StaticClient.ConsensusBlocksHeightGet(blockHeight)
 	if err != nil {
 		return
 	}
@@ -284,7 +284,9 @@ func (hjr *hostJobRunner) managedAnnouncementTransactionInBlockRange(start, end 
 // managedCheckStorageRevenueNotDecreased logs an error if the host's storage
 // revenue decreases and managed updates host's last storage revenue.
 func (hjr *hostJobRunner) managedCheckStorageRevenueNotDecreased() error {
-	hostInfo, err := hjr.staticClient.HostGet()
+	hjr.mu.Lock()
+	hostInfo, err := hjr.StaticClient.HostGet()
+	hjr.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -320,7 +322,9 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 	var startBH types.BlockHeight
 	for {
 		// Get latest block height
-		cg, err := hjr.staticClient.ConsensusGet()
+		hjr.mu.Lock()
+		cg, err := hjr.StaticClient.ConsensusGet()
+		hjr.mu.Unlock()
 		if err != nil {
 			return err
 		}

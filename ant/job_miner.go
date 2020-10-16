@@ -26,13 +26,13 @@ func (j *JobRunner) blockMining() {
 		return
 	}
 
-	err = j.staticClient.MinerStartGet()
+	err = j.StaticClient.MinerStartGet()
 	if err != nil {
 		j.staticLogger.Errorf("%v: can't start miner: %v", j.staticDataDir, err)
 		return
 	}
 
-	walletInfo, err := j.staticClient.WalletGet()
+	walletInfo, err := j.StaticClient.WalletGet()
 	if err != nil {
 		j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
 		return
@@ -47,7 +47,7 @@ func (j *JobRunner) blockMining() {
 		case <-time.After(balanceIncreaseCheckInterval):
 		}
 
-		walletInfo, err = j.staticClient.WalletGet()
+		walletInfo, err = j.StaticClient.WalletGet()
 		if err != nil {
 			j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
 			continue

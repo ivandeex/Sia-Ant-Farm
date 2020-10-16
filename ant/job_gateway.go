@@ -38,7 +38,7 @@ func (j *JobRunner) gatewayConnectability() {
 		// Count the number of peers that the gateway has. An error is reported
 		// for less than two peers because the gateway is likely connected to
 		// itself.
-		gatewayInfo, err := j.staticClient.GatewayGet()
+		gatewayInfo, err := j.StaticClient.GatewayGet()
 		if err != nil {
 			j.staticLogger.Errorf("%v: error when calling /gateway: %v", j.staticDataDir, err)
 			continue

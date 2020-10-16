@@ -31,7 +31,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 		case <-time.After(sendInterval):
 		}
 
-		walletGet, err := j.staticClient.WalletGet()
+		walletGet, err := j.StaticClient.WalletGet()
 		if err != nil {
 			j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
 			return
@@ -41,7 +41,7 @@ func (j *JobRunner) littleSupplier(sendAddress types.UnlockHash) {
 			continue
 		}
 
-		_, err = j.staticClient.WalletSiacoinsPost(sendAmount, sendAddress, false)
+		_, err = j.StaticClient.WalletSiacoinsPost(sendAmount, sendAddress, false)
 		if err != nil {
 			j.staticLogger.Errorf("%v: can't send Siacoins: %v", j.staticDataDir, err)
 		}

@@ -56,7 +56,7 @@ func TestAnnounceHost(t *testing.T) {
 			return
 		case <-time.After(miningCheckFrequency):
 		}
-		walletInfo, err := j.staticClient.WalletGet()
+		walletInfo, err := j.StaticClient.WalletGet()
 		if err != nil {
 			ant.staticLogger.Errorf("%v: error getting wallet info: %v", dataDir, err)
 			continue
@@ -71,7 +71,7 @@ func TestAnnounceHost(t *testing.T) {
 
 	// Set netAddress
 	netAddress := config.HostAddr
-	err = j.staticClient.HostModifySettingPost(client.HostParamNetAddress, netAddress)
+	err = j.StaticClient.HostModifySettingPost(client.HostParamNetAddress, netAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +83,7 @@ func TestAnnounceHost(t *testing.T) {
 	}
 
 	// Check no host announcement transaction in blockchain
-	cg, err := j.staticClient.ConsensusGet()
+	cg, err := j.StaticClient.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +97,7 @@ func TestAnnounceHost(t *testing.T) {
 	}
 
 	// Announce host
-	err = hjr.staticClient.HostAnnouncePost()
+	err = hjr.StaticClient.HostAnnouncePost()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -111,7 +111,7 @@ func TestAnnounceHost(t *testing.T) {
 
 	// Check host announcement transaction in block range.
 	// Test announcementTransactionInBlockRange().
-	cg, err = j.staticClient.ConsensusGet()
+	cg, err = j.StaticClient.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
 	}

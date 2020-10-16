@@ -102,6 +102,19 @@ const (
 	balanceCheckFrequency = time.Second * 15
 )
 
+const (
+	// walletFull defines a renter with filled wallet
+	walletFull renterPreparationPhase = iota
+
+	// allowanceSet defines a renter with filled wallet, default allowance set
+	// and being renter upload ready
+	allowanceSet
+
+	// backgroundJobsStarted defines a renter with filled wallet, default
+	// allowance set, being renter upload ready and background jobs started
+	backgroundJobsStarted
+)
+
 var (
 	// allowance is the set of allowance settings that will be used by
 	// renter
@@ -139,6 +152,8 @@ type RenterJob struct {
 	staticJR *JobRunner
 	mu       sync.Mutex
 }
+
+type renterPreparationPhase int
 
 // createTempFile creates temporary file in the given temporary sub-directory,
 // with the given filename pattern. The file is filled with random data of the
@@ -179,7 +194,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
 	}
 	r.staticLogger.Debugf("%v: downloading\n\tsiaFile: %v\n\tto local file: %v", r.staticJR.staticDataDir, siaPath, destPath)
-	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
+	_, err = r.staticJR.StaticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
 	if err != nil {
 		return errors.AddContext(err, "failed in call to /renter/download")
 	}
@@ -193,7 +208,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		case <-time.After(fileApearInDownloadListFrequency):
 		}
 
-		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		hasFile, _, err := isFileInDownloads(r.staticJR.StaticClient, fileToDownload)
 		if err != nil {
 			return errors.AddContext(err, "error checking renter download queue")
 		}
@@ -214,7 +229,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		case <-time.After(downloadFileCheckFrequency):
 		}
 
-		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		hasFile, info, err := isFileInDownloads(r.staticJR.StaticClient, fileToDownload)
 		if err != nil {
 			return errors.AddContext(err, "error checking renter download queue")
 		}
@@ -282,7 +297,7 @@ func (j *JobRunner) NewRenterJob() RenterJob {
 // renter blocks until renter has a sufficiently full wallet, the allowance is
 // set, and until renter is upload ready. Then it optionally starts periodic
 // uploader, downloader and deleter jobs.
-func (j *JobRunner) renter(startBackgroundJobs bool) {
+func (j *JobRunner) renter(phase renterPreparationPhase) {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -300,7 +315,7 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 	j.staticLogger.Debugf("%v: blocking until wallet is sufficiently full", j.staticDataDir)
 	for {
 		// Get the wallet balance.
-		walletInfo, err := j.staticClient.WalletGet()
+		walletInfo, err := j.StaticClient.WalletGet()
 		if err != nil {
 			// Log if there was an error.
 			j.staticLogger.Errorf("%v: trouble when calling /wallet: %v", j.staticDataDir, err)
@@ -321,13 +336,17 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 		case <-time.After(balanceCheckFrequency):
 		}
 	}
-	j.staticLogger.Debugf("%v: wallet filled successfully. Blocking until allowance has been set", j.staticDataDir)
+	j.staticLogger.Debugf("%v: wallet filled successfully.", j.staticDataDir)
+
+	if phase == walletFull {
+		return
+	}
 
 	// Block until a renter allowance has successfully been set.
 	start = time.Now()
 	for {
 		j.staticLogger.Debugf("%v: attempting to set allowance.", j.staticDataDir)
-		err := j.staticClient.RenterPostAllowance(allowance)
+		err := j.StaticClient.RenterPostAllowance(allowance)
 		j.staticLogger.Debugf("%v: allowance attempt complete", j.staticDataDir)
 		if err == nil {
 			// Success, we can exit the loop.
@@ -354,15 +373,17 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 		return
 	}
 
-	if startBackgroundJobs {
-		// Start basic renter
-		rj := j.NewRenterJob()
-
-		// Spawn the uploader, downloader and deleter threads.
-		go rj.threadedUploader()
-		go rj.threadedDownloader()
-		go rj.threadedDeleter()
+	if phase == allowanceSet {
+		return
 	}
+
+	// Start basic renter
+	rj := j.NewRenterJob()
+
+	// Spawn the uploader, downloader and deleter threads.
+	go rj.threadedUploader()
+	go rj.threadedDownloader()
+	go rj.threadedDeleter()
 }
 
 // WaitForRenterUploadReady waits for renter upload ready with default timeout,
@@ -381,7 +402,7 @@ func (j *JobRunner) WaitForRenterUploadReady() error {
 			j.staticLogger.Errorf("%v: renter is not upload ready within %v timeout.", j.staticDataDir, renterUploadReadyTimeout)
 		}
 
-		rur, err := j.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
+		rur, err := j.StaticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
 		if err != nil {
 			// Error getting RenterUploadReady
 			j.staticLogger.Errorf("%v: can't get renter upload ready status: %v", j.staticDataDir, err)
@@ -429,7 +450,7 @@ func (r *RenterJob) managedDeleteRandom() error {
 	if err != nil {
 		return err
 	}
-	if err := r.staticJR.staticClient.RenterFileDeletePost(path); err != nil {
+	if err := r.staticJR.StaticClient.RenterFileDeletePost(path); err != nil {
 		return err
 	}
 
@@ -444,7 +465,7 @@ func (r *RenterJob) managedDeleteRandom() error {
 // destination path.
 func (r *RenterJob) managedDownload(siaPath modules.SiaPath, destPath string) error {
 	// Check file is in renter file list and is available
-	renterFiles, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
+	renterFiles, err := r.staticJR.StaticClient.RenterFilesGet(false) // cached=false
 	if err != nil {
 		return errors.AddContext(err, "error calling /renter/files")
 	}
@@ -487,7 +508,7 @@ func (r *RenterJob) managedDownload(siaPath modules.SiaPath, destPath string) er
 // managedDownloadRandomFile will managed download a random file from the network.
 func (r *RenterJob) managedDownloadRandomFile() error {
 	// Download a random file from the renter's file list
-	renterFiles, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
+	renterFiles, err := r.staticJR.StaticClient.RenterFilesGet(false) // cached=false
 	if err != nil {
 		return fmt.Errorf("error calling /renter/files: %v", err)
 	}
@@ -557,7 +578,7 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 
 	// Upload the file to network
 	r.staticLogger.Debugf("%v: beginning file upload.", r.staticJR.staticDataDir)
-	err = r.staticJR.staticClient.RenterUploadPost(sourcePath, siaPath, renterDataPieces, renterParityPieces)
+	err = r.staticJR.StaticClient.RenterUploadPost(sourcePath, siaPath, renterDataPieces, renterParityPieces)
 	if err != nil {
 		return modules.SiaPath{}, errors.AddContext(err, "error uploading a file to network")
 	}
@@ -573,7 +594,7 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 		case <-time.After(uploadFileCheckFrequency):
 		}
 
-		rfg, err := r.staticJR.staticClient.RenterFilesGet(false) // cached=false
+		rfg, err := r.staticJR.StaticClient.RenterFilesGet(false) // cached=false
 		if err != nil {
 			return modules.SiaPath{}, errors.AddContext(err, "error calling /renter/files")
 		}
@@ -596,7 +617,7 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 		// contracts
 		if uploadProgress == lastUploadProgress {
 			// Log number of hostdb active hosts
-			hdag, err := r.staticJR.staticClient.HostDbActiveGet()
+			hdag, err := r.staticJR.StaticClient.HostDbActiveGet()
 			if err != nil {
 				r.staticLogger.Errorf("%v: can't get hostdb active hosts: %v", r.staticJR.staticDataDir, err)
 			} else {
@@ -604,7 +625,7 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 			}
 
 			// Log number of each type of contract
-			rc, err := r.staticJR.staticClient.RenterAllContractsGet()
+			rc, err := r.staticJR.StaticClient.RenterAllContractsGet()
 			if err != nil {
 				r.staticLogger.Errorf("%v: can't get renter contracts: %v", r.staticJR.staticDataDir, err)
 			} else {

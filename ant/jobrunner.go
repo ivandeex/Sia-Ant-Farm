@@ -17,7 +17,7 @@ type JobRunner struct {
 
 	staticAntsSyncWG *sync.WaitGroup
 	staticAnt        *Ant
-	staticClient     *client.Client
+	StaticClient     *client.Client
 	staticWalletSeed string
 	staticDataDir    string
 	StaticTG         threadgroup.ThreadGroup
@@ -41,11 +41,11 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 		staticLogger:     logger,
 		staticAntsSyncWG: ant.staticAntsSyncWG,
 		staticAnt:        ant,
-		staticClient:     c,
+		StaticClient:     c,
 		staticDataDir:    ant.Config.DataDir,
 	}
 	if existingWalletSeed == "" {
-		walletParams, err := jr.staticClient.WalletInitPost("", false)
+		walletParams, err := jr.StaticClient.WalletInitPost("", false)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,7 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 		jr.staticWalletSeed = existingWalletSeed
 	}
 
-	err = jr.staticClient.WalletUnlockPost(jr.staticWalletSeed)
+	err = jr.StaticClient.WalletUnlockPost(jr.staticWalletSeed)
 	if err != nil {
 		return nil, err
 	}
