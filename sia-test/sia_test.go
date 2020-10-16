@@ -47,6 +47,7 @@ func TestInsufficientMaxDuration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer farm.Close()
 
 	// Set custom renter allowance
 	period := 40
