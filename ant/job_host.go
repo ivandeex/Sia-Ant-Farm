@@ -284,7 +284,9 @@ func (hjr *hostJobRunner) managedAnnouncementTransactionInBlockRange(start, end 
 // managedCheckStorageRevenueNotDecreased logs an error if the host's storage
 // revenue decreases and managed updates host's last storage revenue.
 func (hjr *hostJobRunner) managedCheckStorageRevenueNotDecreased() error {
+	hjr.mu.Lock()
 	hostInfo, err := hjr.staticClient.HostGet()
+	hjr.mu.Unlock()
 	if err != nil {
 		return err
 	}
@@ -320,7 +322,9 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 	var startBH types.BlockHeight
 	for {
 		// Get latest block height
+		hjr.mu.Lock()
 		cg, err := hjr.staticClient.ConsensusGet()
+		hjr.mu.Unlock()
 		if err != nil {
 			return err
 		}

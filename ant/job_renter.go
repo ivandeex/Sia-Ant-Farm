@@ -102,6 +102,20 @@ const (
 	balanceCheckFrequency = time.Second * 15
 )
 
+// Define possible renter phases enum
+const (
+	// walletFull defines a renter with filled wallet
+	walletFull renterPreparationPhase = iota
+
+	// allowanceSet defines a renter with filled wallet, default allowance set
+	// and being renter upload ready
+	allowanceSet
+
+	// backgroundJobsStarted defines a renter with filled wallet, default
+	// allowance set, being renter upload ready and background jobs started
+	backgroundJobsStarted
+)
+
 var (
 	// allowance is the set of allowance settings that will be used by
 	// renter
@@ -139,6 +153,9 @@ type RenterJob struct {
 	staticJR *JobRunner
 	mu       sync.Mutex
 }
+
+// renterPreparationPhase defines type for renter preparation phases enum
+type renterPreparationPhase int
 
 // createTempFile creates temporary file in the given temporary sub-directory,
 // with the given filename pattern. The file is filled with random data of the
@@ -279,10 +296,11 @@ func (j *JobRunner) NewRenterJob() RenterJob {
 	}
 }
 
-// renter blocks until renter has a sufficiently full wallet, the allowance is
-// set, and until renter is upload ready. Then it optionally starts periodic
-// uploader, downloader and deleter jobs.
-func (j *JobRunner) renter(startBackgroundJobs bool) {
+// renter blocks until renter reaches the desired state defined in phase.
+// Either to have a sufficiently full wallet; to set the allowance and renter
+// to become upload ready; or to start periodic uploader, downloader and
+// deleter jobs.
+func (j *JobRunner) renter(phase renterPreparationPhase) {
 	err := j.StaticTG.Add()
 	if err != nil {
 		return
@@ -321,7 +339,11 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 		case <-time.After(balanceCheckFrequency):
 		}
 	}
-	j.staticLogger.Debugf("%v: wallet filled successfully. Blocking until allowance has been set", j.staticDataDir)
+	j.staticLogger.Debugf("%v: wallet filled successfully.", j.staticDataDir)
+
+	if phase == walletFull {
+		return
+	}
 
 	// Block until a renter allowance has successfully been set.
 	start = time.Now()
@@ -349,41 +371,58 @@ func (j *JobRunner) renter(startBackgroundJobs bool) {
 	}
 	j.staticLogger.Debugf("%v: renter allowance has been set successfully.", j.staticDataDir)
 
-	// Block until renter is upload ready
-	start = time.Now()
+	err = j.WaitForRenterUploadReady()
+	if err != nil {
+		return
+	}
+
+	if phase == allowanceSet {
+		return
+	}
+
+	// Start basic renter
+	rj := j.NewRenterJob()
+
+	// Spawn the uploader, downloader and deleter threads.
+	go rj.threadedUploader()
+	go rj.threadedDownloader()
+	go rj.threadedDeleter()
+}
+
+// WaitForRenterUploadReady waits for renter upload ready with default timeout,
+// data pieces and parity pieces if the ant has renter job. If the ant doesn't
+// have renter job, it returns an error.
+func (j *JobRunner) WaitForRenterUploadReady() error {
+	if !j.staticAnt.HasRenterTypeJob() {
+		return errors.New("this ant hasn't renter job")
+	}
+	// Block until renter is upload ready or till timeout is reached
+	start := time.Now()
 	j.staticLogger.Debugf("%v: waiting for renter to become upload ready.", j.staticDataDir)
 	for {
+		// Timeout
+		if time.Since(start) > renterUploadReadyTimeout {
+			j.staticLogger.Errorf("%v: renter is not upload ready within %v timeout.", j.staticDataDir, renterUploadReadyTimeout)
+		}
+
 		rur, err := j.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
 		if err != nil {
 			// Error getting RenterUploadReady
-			j.staticLogger.Errorf("%v: trouble when getting renter upload ready status: %v\n", j.staticDataDir, err)
+			j.staticLogger.Errorf("%v: can't get renter upload ready status: %v", j.staticDataDir, err)
 		} else if rur.Ready {
 			// Success, we can exit the loop.
 			break
-		}
-		if time.Since(start) > renterUploadReadyTimeout {
-			// We have hit the timeout
-			j.staticLogger.Errorf("%v: renter is not upload ready within %v timeout.", j.staticDataDir, renterUploadReadyTimeout)
 		}
 
 		// Wait a bit before trying again.
 		select {
 		case <-j.StaticTG.StopChan():
-			return
+			return errors.New("ant was stopped")
 		case <-time.After(renterUploadReadyFrequency):
 		}
 	}
 	j.staticLogger.Printf("%v: renter is upload ready.", j.staticDataDir)
-
-	if startBackgroundJobs {
-		// Start basic renter
-		rj := j.NewRenterJob()
-
-		// Spawn the uploader, downloader and deleter threads.
-		go rj.threadedUploader()
-		go rj.threadedDownloader()
-		go rj.threadedDeleter()
-	}
+	return nil
 }
 
 // Download will download the given file from the network to the given
