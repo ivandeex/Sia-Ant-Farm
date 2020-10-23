@@ -1,7 +1,11 @@
 package persist
 
 import (
+	"os"
+	"path/filepath"
+
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/build"
+	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/log"
 )
 
@@ -24,8 +28,15 @@ var (
 
 // NewFileLogger returns a logger that logs to logFilename. The file is opened
 // in append mode, and created if it does not exist.
-func NewFileLogger(logFilename string) (*Logger, error) {
-	logger, err := log.NewFileLogger(logFilename, options)
+func NewFileLogger(logFilepath string) (*Logger, error) {
+	// Create a dir if it doesn't exist
+	logDir := filepath.Dir(logFilepath)
+	err := os.MkdirAll(logDir, 0700)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't create logger dir(s)")
+	}
+
+	logger, err := log.NewFileLogger(logFilepath, options)
 	return &Logger{logger}, err
 }
 
