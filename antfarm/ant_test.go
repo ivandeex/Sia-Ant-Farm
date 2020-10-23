@@ -51,7 +51,7 @@ func TestStartAnts(t *testing.T) {
 	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, nil, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestStartAntWithSiadPath(t *testing.T) {
 			logger := test.NewTestLogger(t, dataDir)
 
 			// Start ants
-			ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
+			ants, err := startAnts(&sync.WaitGroup{}, logger, nil, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -186,7 +186,7 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 			logger := test.NewTestLogger(t, dataDir)
 
 			// Start ants
-			ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
+			ants, err := startAnts(&sync.WaitGroup{}, logger, nil, configs...)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -276,7 +276,7 @@ func TestConnectAnts(t *testing.T) {
 	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, nil, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -356,7 +356,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	logger := test.NewTestLogger(t, dataDir)
 
 	// Start ants
-	ants, err := startAnts(&sync.WaitGroup{}, logger, configs...)
+	ants, err := startAnts(&sync.WaitGroup{}, logger, nil, configs...)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -391,7 +391,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	otherAnt, err := ant.New(&sync.WaitGroup{}, logger, cfg)
+	otherAnt, err := ant.New(&sync.WaitGroup{}, logger, nil, cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

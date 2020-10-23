@@ -115,7 +115,8 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Start up each ant process with its jobs
-	ants, err := startAnts(&farm.antsSyncWG, farm.logger, config.AntConfigs...)
+	paymentRequestChan := make(chan ant.PaymentRequest)
+	ants, err := startAnts(&farm.antsSyncWG, farm.logger, paymentRequestChan, config.AntConfigs...)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to start ants")
 	}

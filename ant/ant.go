@@ -41,6 +41,9 @@ type Ant struct {
 	// should identify the ant by ant's siad dataDir.
 	staticLogger *persist.Logger
 
+	// xxx doc
+	staticMinerPaymentRequestChan chan PaymentRequest
+
 	APIAddr string
 	RPCAddr string
 
@@ -88,7 +91,7 @@ func clearPorts(config AntConfig) error {
 }
 
 // New creates a new Ant using the configuration passed through `config`.
-func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (*Ant, error) {
+func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, paymentRequestChan chan PaymentRequest, config AntConfig) (*Ant, error) {
 	// Create ant working dir if it doesn't exist
 	// (e.g. ant farm deleted the whole farm dir)
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
@@ -118,13 +121,14 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	}()
 
 	ant := &Ant{
-		staticAntsSyncWG: antsSyncWG,
-		staticLogger:     logger,
-		APIAddr:          config.APIAddr,
-		RPCAddr:          config.RPCAddr,
-		Config:           config,
-		SeenBlocks:       make(map[types.BlockHeight]types.BlockID),
-		siad:             siad,
+		staticAntsSyncWG:              antsSyncWG,
+		staticLogger:                  logger,
+		staticMinerPaymentRequestChan: paymentRequestChan,
+		APIAddr:                       config.APIAddr,
+		RPCAddr:                       config.RPCAddr,
+		Config:                        config,
+		SeenBlocks:                    make(map[types.BlockHeight]types.BlockID),
+		siad:                          siad,
 	}
 
 	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")

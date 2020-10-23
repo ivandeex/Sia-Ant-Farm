@@ -120,7 +120,7 @@ func antConsensusGroups(ants ...*ant.Ant) (groups [][]*ant.Ant, err error) {
 
 // startAnts starts the ants defined by configs and blocks until every API
 // has loaded.
-func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
+func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, paymentRequestChan chan ant.PaymentRequest, configs ...ant.AntConfig) (ants []*ant.Ant, returnErr error) {
 	// Ensure that, if an error occurs, all the ants that have been started are
 	// closed before returning.
 	defer func() {
@@ -151,7 +151,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, configs ...an
 		logger.Printf("starting ant %v with config:\n%v", i, antConfigStr)
 
 		// Create Ant
-		a, err := ant.New(antsSyncWG, logger, cfg)
+		a, err := ant.New(antsSyncWG, logger, paymentRequestChan, cfg)
 		if err != nil {
 			// Ant is nil, we can't close it in defer
 			er := errors.AddContext(err, "can't create an ant")
