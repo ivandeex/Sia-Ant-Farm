@@ -27,6 +27,7 @@ func TestNewJobRunner(t *testing.T) {
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
+	defer logger.Close()
 
 	// Create ant
 	ant := &Ant{

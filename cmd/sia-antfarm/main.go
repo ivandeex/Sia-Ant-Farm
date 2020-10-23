@@ -31,7 +31,14 @@ func main() {
 	}
 	f.Close()
 
-	farm, err := antfarm.New(antfarmConfig)
+	logger, err := antfarm.NewAntfarmLogger(antfarmConfig.DataDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating antfram logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer logger.Close()
+
+	farm, err := antfarm.New(logger, antfarmConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating antfarm: %v\n", err)
 		os.Exit(1)

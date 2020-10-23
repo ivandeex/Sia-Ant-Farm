@@ -3,7 +3,6 @@ package antfarm
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -69,7 +68,7 @@ type (
 )
 
 // New creates a new antFarm given the supplied AntfarmConfig
-func New(config AntfarmConfig) (*AntFarm, error) {
+func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 	// clear old antfarm data before creating an antfarm
 	dataDir := "./antfarm-data"
 	if config.DataDir != "" {
@@ -79,17 +78,10 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	os.RemoveAll(dataDir)
 	os.MkdirAll(dataDir, 0700)
 
-	// Initialize logger
-	logPath := filepath.Join(dataDir, antfarmLog)
-	logger, err := persist.NewFileLogger(logPath)
-	if err != nil {
-		return nil, err
-	}
 	farm := &AntFarm{
 		dataDir: dataDir,
 		logger:  logger,
 	}
-	log.Printf("antfarm %v: Antfarm log is stored at: %v", dataDir, logPath)
 
 	// Set ants sync waitgroup
 	if config.WaitForSync {
@@ -169,6 +161,16 @@ func New(config AntfarmConfig) (*AntFarm, error) {
 	return farm, nil
 }
 
+// NewAntfarmLogger creates a new antfarm logger
+func NewAntfarmLogger(dataDir string) (*persist.Logger, error) {
+	logPath := filepath.Join(dataDir, antfarmLog)
+	logger, err := persist.NewFileLogger(logPath)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't create antfarm logger")
+	}
+	return logger, nil
+}
+
 // allAnts returns all ants, external and internal, associated with this
 // antFarm.
 func (af *AntFarm) allAnts() []*ant.Ant {
@@ -222,7 +224,7 @@ func (af *AntFarm) PermanentSyncMonitor() {
 		// Grab consensus groups
 		groups, err := antConsensusGroups(af.allAnts()...)
 		if err != nil {
-			af.logger.Errorf(" can't check sync status of antfarm: %v", err)
+			af.logger.Errorf("can't check sync status of antfarm: %v", err)
 			continue
 		}
 
@@ -235,9 +237,6 @@ func (af *AntFarm) PermanentSyncMonitor() {
 		// Log out information about the unsync ants
 		msg := "Ants split into multiple groups.\n"
 		for i, group := range groups {
-			if i != 0 {
-				msg += "\n"
-			}
 			msg += fmt.Sprintf("\tGroup %d:\n", i+1)
 			for _, a := range group {
 				msg += fmt.Sprintf("\t\t%s\n", a.APIAddr)

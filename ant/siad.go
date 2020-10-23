@@ -208,11 +208,8 @@ func waitForFullSetup(config SiadConfig, siad *exec.Cmd, siadOutput *bytes.Buffe
 		select {
 		case err := <-exitChan:
 			// Siad process terminated
-			msg := "siad exited unexpectedly while waiting for full setup"
-			if err != nil {
-				return errors.AddContext(err, msg)
-			}
-			return errors.New(msg)
+			errMsg := errors.New("siad exited unexpectedly while waiting for full setup")
+			return errors.Compose(errMsg, err)
 		case <-time.After(waitForFullSetupFrequency):
 		}
 

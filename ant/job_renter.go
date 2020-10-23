@@ -593,15 +593,17 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 			if err != nil {
 				r.staticLogger.Errorf("%v: can't get renter contracts: %v", r.staticJR.staticDataDir, err)
 			} else {
-				r.staticLogger.Debugf("%v: number of Contracts: %v", r.staticJR.staticDataDir, len(rc.Contracts))
-				r.staticLogger.Debugf("%v: number of ActiveContracts: %v", r.staticJR.staticDataDir, len(rc.ActiveContracts))
-				r.staticLogger.Debugf("%v: number of DisabledContracts: %v", r.staticJR.staticDataDir, len(rc.DisabledContracts))
-				r.staticLogger.Debugf("%v: number of ExpiredContracts: %v", r.staticJR.staticDataDir, len(rc.ExpiredContracts))
-				r.staticLogger.Debugf("%v: number of ExpiredRefreshedContracts: %v", r.staticJR.staticDataDir, len(rc.ExpiredRefreshedContracts))
-				r.staticLogger.Debugf("%v: number of InactiveContracts: %v", r.staticJR.staticDataDir, len(rc.InactiveContracts))
-				r.staticLogger.Debugf("%v: number of PassiveContracts: %v", r.staticJR.staticDataDir, len(rc.PassiveContracts))
-				r.staticLogger.Debugf("%v: number of RecoverableContracts: %v", r.staticJR.staticDataDir, len(rc.RecoverableContracts))
-				r.staticLogger.Debugf("%v: number of RefreshedContracts: %v", r.staticJR.staticDataDir, len(rc.RefreshedContracts))
+				var msg string
+				msg += fmt.Sprintf("%v: number of Contracts: %v\n", r.staticJR.staticDataDir, len(rc.Contracts))
+				msg += fmt.Sprintf("%v: number of ActiveContracts: %v\n", r.staticJR.staticDataDir, len(rc.ActiveContracts))
+				msg += fmt.Sprintf("%v: number of DisabledContracts: %v\n", r.staticJR.staticDataDir, len(rc.DisabledContracts))
+				msg += fmt.Sprintf("%v: number of ExpiredContracts: %v\n", r.staticJR.staticDataDir, len(rc.ExpiredContracts))
+				msg += fmt.Sprintf("%v: number of ExpiredRefreshedContracts: %v\n", r.staticJR.staticDataDir, len(rc.ExpiredRefreshedContracts))
+				msg += fmt.Sprintf("%v: number of InactiveContracts: %v\n", r.staticJR.staticDataDir, len(rc.InactiveContracts))
+				msg += fmt.Sprintf("%v: number of PassiveContracts: %v\n", r.staticJR.staticDataDir, len(rc.PassiveContracts))
+				msg += fmt.Sprintf("%v: number of RecoverableContracts: %v\n", r.staticJR.staticDataDir, len(rc.RecoverableContracts))
+				msg += fmt.Sprintf("%v: number of RefreshedContracts: %v\n", r.staticJR.staticDataDir, len(rc.RefreshedContracts))
+				r.staticLogger.Debugln(msg)
 			}
 		}
 		lastUploadProgress = uploadProgress
