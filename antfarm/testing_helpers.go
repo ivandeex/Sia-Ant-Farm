@@ -101,6 +101,104 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) An
 	return config
 }
 
+// NewDefaultRenterAntfarmTestingConfigXXX creates default basic antfarm config
+// for running renter tests
+func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool) AntfarmConfig {
+	antFarmAddr := test.RandomLocalAddress()
+	antFarmDir := filepath.Join(dataDir, "antfarm-data")
+	antDirs := test.AntDirs(dataDir, 8)
+	config := AntfarmConfig{
+		ListenAddress: antFarmAddr,
+		DataDir:       antFarmDir,
+		AntConfigs: []ant.AntConfig{
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: allowLocalIPs,
+					APIAddr:                  test.RandomLocalAddress(),
+					DataDir:                  antDirs[0],
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs: []string{"gateway", "miner"},
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: allowLocalIPs,
+					APIAddr:                  test.RandomLocalAddress(),
+					DataDir:                  antDirs[1],
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: allowLocalIPs,
+					APIAddr:                  test.RandomLocalAddress(),
+					DataDir:                  antDirs[2],
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: allowLocalIPs,
+					APIAddr:                  test.RandomLocalAddress(),
+					DataDir:                  antDirs[3],
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: allowLocalIPs,
+					APIAddr:                  test.RandomLocalAddress(),
+					DataDir:                  antDirs[4],
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: allowLocalIPs,
+					APIAddr:                  test.RandomLocalAddress(),
+					DataDir:                  antDirs[5],
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs:            []string{"host"},
+				DesiredCurrency: 100000,
+			},
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress:      allowLocalIPs,
+					APIAddr:                       test.RandomLocalAddress(),
+					RenterDisableIPViolationCheck: true,
+					DataDir:                       antDirs[6],
+					SiadPath:                      test.TestSiadFilename,
+				},
+				Jobs:            []string{"renter"},
+				DesiredCurrency: 100000,
+				Name:            test.RenterAntName,
+			},
+			//xxx
+			{
+				SiadConfig: ant.SiadConfig{
+					AllowHostLocalNetAddress: allowLocalIPs,
+					APIAddr:                  test.RandomLocalAddress(),
+					DataDir:                  antDirs[7],
+					SiadPath:                 test.TestSiadFilename,
+				},
+				Jobs: []string{"miner"},
+			},
+		},
+		AutoConnect: true,
+		WaitForSync: true,
+	}
+	return config
+}
+
 // DownloadAndVerifyFiles downloads given files and compares calculated
 // downloaded file hashes with recorded uploaded file hashes
 func DownloadAndVerifyFiles(t *testing.T, renterAnt *ant.Ant, files []ant.RenterFile) error {

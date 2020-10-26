@@ -194,7 +194,7 @@ func (mjr *minerJobRunner) paymentSender() {
 }
 
 // xxx doc
-func (mjr *minerJobRunner) waitForBallance(ballance types.Currency) error {
+func (mjr *minerJobRunner) waitForBallance(desiredBallance types.Currency) error {
 	start := time.Now()
 	for {
 		// Timeout
@@ -217,7 +217,7 @@ func (mjr *minerJobRunner) waitForBallance(ballance types.Currency) error {
 		// Check we have enough ballance
 		confirmedBallance := walletInfo.ConfirmedSiacoinBalance
 		unconfirmedOutgoingSiacoins := walletInfo.UnconfirmedOutgoingSiacoins
-		if unconfirmedOutgoingSiacoins.Add(ballance).Cmp(confirmedBallance) < 0 {
+		if unconfirmedOutgoingSiacoins.Add(desiredBallance).Cmp(confirmedBallance) < 0 {
 			return nil
 		}
 
