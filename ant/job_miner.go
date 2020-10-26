@@ -92,7 +92,7 @@ type minerJobRunner struct {
 
 // blockMining indefinitely mines blocks.  If more than 100
 // seconds passes before the wallet has received some amount of currency, this
-// job will print an error.
+// job will print an error. // xxx redoc
 func (j *JobRunner) blockMining() {
 	err := j.StaticTG.Add()
 	if err != nil {
@@ -214,10 +214,11 @@ func (mjr *minerJobRunner) waitForBallance(desiredBallance types.Currency) error
 			}
 		}
 
-		// Check we have enough ballance
+		// Check we have enough ballance (confirmed ballance + unconfirmed incoming - unconfirmed outgoing > desired balance)
 		confirmedBallance := walletInfo.ConfirmedSiacoinBalance
+		unconfirmedIncomingSiacoins := walletInfo.UnconfirmedIncomingSiacoins
 		unconfirmedOutgoingSiacoins := walletInfo.UnconfirmedOutgoingSiacoins
-		if unconfirmedOutgoingSiacoins.Add(desiredBallance).Cmp(confirmedBallance) < 0 {
+		if confirmedBallance.Add(unconfirmedIncomingSiacoins).Cmp(desiredBallance.Add(unconfirmedOutgoingSiacoins)) > 0 {
 			return nil
 		}
 

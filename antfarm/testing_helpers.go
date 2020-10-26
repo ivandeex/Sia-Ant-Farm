@@ -106,7 +106,7 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) An
 func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool) AntfarmConfig {
 	antFarmAddr := test.RandomLocalAddress()
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
-	antDirs := test.AntDirs(dataDir, 8)
+	antDirs := test.AntDirs(dataDir, 7)
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,
 		DataDir:       antFarmDir,
@@ -128,7 +128,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
+				DesiredCurrency: 1000000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -138,7 +138,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
+				DesiredCurrency: 1000000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -148,7 +148,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
+				DesiredCurrency: 1000000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -158,7 +158,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
+				DesiredCurrency: 1000000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -168,7 +168,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 100000,
+				DesiredCurrency: 1000000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -181,16 +181,6 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 				Jobs:            []string{"renter"},
 				DesiredCurrency: 100000,
 				Name:            test.RenterAntName,
-			},
-			//xxx
-			{
-				SiadConfig: ant.SiadConfig{
-					AllowHostLocalNetAddress: allowLocalIPs,
-					APIAddr:                  test.RandomLocalAddress(),
-					DataDir:                  antDirs[7],
-					SiadPath:                 test.TestSiadFilename,
-				},
-				Jobs: []string{"miner"},
 			},
 		},
 		AutoConnect: true,

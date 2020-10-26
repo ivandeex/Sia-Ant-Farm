@@ -164,7 +164,7 @@ func TestUploadDownloadFileData(t *testing.T) {
 
 	// Start Antfarm
 	dataDir := test.TestDir(t.Name())
-	config := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
+	config := NewDefaultRenterAntfarmTestingConfigXXX(dataDir, true)
 	farm, err := New(config)
 	if err != nil {
 		t.Fatal(err)

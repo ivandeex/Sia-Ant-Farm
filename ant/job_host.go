@@ -70,7 +70,8 @@ func (j *JobRunner) jobHost() {
 	}
 
 	// Mine at least 50,000 SC // xxx update mining comments, also below
-	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)
+	// desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision) //xxx
+	desiredbalance := types.NewCurrency64(j.staticAnt.Config.DesiredCurrency).Mul(types.SiacoinPrecision)
 	start := time.Now()
 	for {
 		select {
@@ -84,6 +85,7 @@ func (j *JobRunner) jobHost() {
 			continue
 		}
 		if walletInfo.ConfirmedSiacoinBalance.Cmp(desiredbalance) > 0 {
+			j.staticLogger.Debugf("xxx %v: confirmed balance: %v", j.staticDataDir, walletInfo.ConfirmedSiacoinBalance)
 			break
 		}
 		if time.Since(start) > miningTimeout {
@@ -151,6 +153,9 @@ func (j *JobRunner) jobHost() {
 		if !hjr.managedAnnounced() {
 			// Announce host
 			j.staticLogger.Debugf("%v: announce host", j.staticDataDir)
+			//xxx
+			wi0, _ := j.staticClient.WalletGet()
+			//xxx end
 			err := j.staticClient.HostAnnouncePost()
 			if err != nil {
 				j.staticLogger.Errorf("%v: host announcement failed: %v", j.staticDataDir, err)
@@ -161,6 +166,12 @@ func (j *JobRunner) jobHost() {
 					continue
 				}
 			}
+			//xxx
+			wi1, _ := j.staticClient.WalletGet()
+			confDiff := wi1.ConfirmedSiacoinBalance.Sub(wi0.ConfirmedSiacoinBalance)
+			unconfDiff := wi1.UnconfirmedOutgoingSiacoins.Sub(wi0.UnconfirmedOutgoingSiacoins)
+			j.staticLogger.Debugf("xxx %v: confDiff: %v, unconfDiff: %v", j.staticDataDir, confDiff, unconfDiff)
+			//xxx end
 			hjr.managedSetAnnounced(true)
 
 			// Wait till host announcement transaction is in blockchain

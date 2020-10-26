@@ -187,7 +187,7 @@ balanceMaintainerLoop:
 		j.staticLogger.Debugf("xxx %v: payment request for: %v", j.staticDataDir, paymentRequest.amount)
 		j.staticLogger.Debugf("xxx %v: payment request to channel: %v", j.staticDataDir, j.staticAnt.staticMinerPaymentRequestChan)
 		j.staticAnt.staticMinerPaymentRequestChan <- paymentRequest
-		j.staticLogger.Debugf("xxx %v: payment request sent", j.staticDataDir)
+		j.staticLogger.Debugf("xxx %v: payment request received by miner", j.staticDataDir)
 
 		// Check response to payment request
 		var paymentResponse paymentResponse
