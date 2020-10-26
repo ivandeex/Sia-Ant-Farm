@@ -196,18 +196,12 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 		go a.Jr.blockMining()
 	case "host":
 		go a.Jr.jobHost()
+	case "noAllowanceRenter":
+		go a.Jr.renter(walletFull)
 	case "renter":
-		a.Jr.renterUploadReadyWG.Add(1)
-		go func() {
-			defer a.Jr.renterUploadReadyWG.Done()
-			a.Jr.renter(false)
-		}()
+		go a.Jr.renter(allowanceSet)
 	case "autoRenter":
-		a.Jr.renterUploadReadyWG.Add(1)
-		go func() {
-			defer a.Jr.renterUploadReadyWG.Done()
-			a.Jr.renter(true)
-		}()
+		go a.Jr.renter(backgroundJobsStarted)
 	case "gateway":
 		go a.Jr.gatewayConnectability()
 	case "bigspender":

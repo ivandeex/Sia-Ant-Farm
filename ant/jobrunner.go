@@ -1,9 +1,7 @@
 package ant
 
 import (
-	"fmt"
 	"sync"
-	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
@@ -17,13 +15,12 @@ type JobRunner struct {
 	// jobrunner log message should identify the ant by ant's siad dataDir.
 	staticLogger *persist.Logger
 
-	staticAntsSyncWG    *sync.WaitGroup
-	staticAnt           *Ant
-	staticClient        *client.Client
-	staticWalletSeed    string
-	staticDataDir       string
-	StaticTG            threadgroup.ThreadGroup
-	renterUploadReadyWG sync.WaitGroup
+	staticAntsSyncWG *sync.WaitGroup
+	staticAnt        *Ant
+	staticClient     *client.Client
+	staticWalletSeed string
+	staticDataDir    string
+	StaticTG         threadgroup.ThreadGroup
 }
 
 // newJobRunner creates a new job runner using the provided parameters. If the
@@ -100,28 +97,4 @@ func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
 	}
 
 	return newJR, nil
-}
-
-// WaitForRenterUploadReady waits for renter upload ready with a given timeout
-// if the ant has renter job. If the ant doesn't have renter job, it returns an
-// error.
-func (j *JobRunner) WaitForRenterUploadReady() error {
-	if !j.staticAnt.HasRenterTypeJob() {
-		return errors.New("this ant hasn't renter job")
-	}
-	// Wait till renter is upload ready or till timeout is reached
-	ready := make(chan struct{})
-	go func() {
-		j.renterUploadReadyWG.Wait()
-		close(ready)
-	}()
-
-	select {
-	case <-ready:
-		return nil
-	case <-time.After(renterUploadReadyTimeout):
-		return fmt.Errorf("waiting for renter to become upload ready reached timeout %v", renterUploadReadyTimeout)
-	case <-j.StaticTG.StopChan():
-		return errors.New("ant was stopped")
-	}
 }
