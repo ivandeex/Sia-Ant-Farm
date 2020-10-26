@@ -20,7 +20,7 @@ const (
 	balanceMaintainerPaymentErrorFrequency = time.Second * 5
 
 	//xxx
-	balanceMaintainerTransactionsConfirmationTimeout = time.Minute * 2
+	balanceMaintainerTransactionsConfirmationTimeout = time.Minute * 5 // xxx set to 3?
 
 	// xxx
 	balanceMaintainerConfirmationCheckFrequency = time.Second * 5
@@ -42,6 +42,7 @@ type paymentResponse struct {
 	transactionIDs []types.TransactionID
 }
 
+//xxx remove
 // // balanceMaintainer mines when the balance is below desiredBalance. The miner // xxx remove
 // // is stopped if the balance exceeds the desired balance.
 // func (j *JobRunner) balanceMaintainerxxx(desiredBalance types.Currency) {
@@ -183,10 +184,10 @@ balanceMaintainerLoop:
 			continue
 		}
 		startHeight := cg.Height
-		j.staticLogger.Debugf("xxx %v: payment request: %v", j.staticDataDir, paymentRequest)
+		j.staticLogger.Debugf("xxx %v: payment request for: %v", j.staticDataDir, paymentRequest.amount)
 		j.staticLogger.Debugf("xxx %v: payment request to channel: %v", j.staticDataDir, j.staticAnt.staticMinerPaymentRequestChan)
 		j.staticAnt.staticMinerPaymentRequestChan <- paymentRequest
-		j.staticLogger.Debugf("xxx %v: payment response sent", j.staticDataDir)
+		j.staticLogger.Debugf("xxx %v: payment request sent", j.staticDataDir)
 
 		// Check response to payment request
 		var paymentResponse paymentResponse
@@ -241,21 +242,41 @@ balanceMaintainerLoop:
 				}
 			}
 
-			// Check if payment transaction are confirmed
-		paymentTxLoop:
-			for _, paymentTxID := range paymentResponse.transactionIDs {
+			// 	// Check if payment transaction is confirmed // xxx remove
+			// paymentTxLoop:
+			// 	for _, paymentTxID := range paymentResponse.transactionIDs {
+			// 		for _, walletTx := range wtg.ConfirmedTransactions {
+			// 			if walletTx.TransactionID == paymentTxID {
+			// 				continue paymentTxLoop
+			// 			}
+			// 		}
+			// 		// Payment transaction is not yet between confirmed wallet transactions
+			// 		select {
+			// 		case <-j.StaticTG.StopChan():
+			// 			return
+			// 		case <-time.After(balanceMaintainerConfirmationCheckFrequency):
+			// 			continue waitForConfirmationLoop
+			// 		}
+			// 	}
+
+			// Check that payment transaction (one of the miner transactions in
+			// the response) is confirmed
+			for _, minerTxID := range paymentResponse.transactionIDs {
 				for _, walletTx := range wtg.ConfirmedTransactions {
-					if walletTx.TransactionID == paymentTxID {
-						continue paymentTxLoop
+					if walletTx.TransactionID == minerTxID {
+						// Payment transaction from miner got confirmed
+						j.staticLogger.Debugf("xxx: %v: payment transaction confirmed", j.staticDataDir)
+						break waitForConfirmationLoop
 					}
 				}
-				// Payment transaction is not yet between confirmed wallet transactions
-				select {
-				case <-j.StaticTG.StopChan():
-					return
-				case <-time.After(balanceMaintainerConfirmationCheckFrequency):
-					continue waitForConfirmationLoop
-				}
+			}
+
+			// Payment transaction is not yet between confirmed wallet transactions
+			select {
+			case <-j.StaticTG.StopChan():
+				return
+			case <-time.After(balanceMaintainerConfirmationCheckFrequency):
+				continue waitForConfirmationLoop
 			}
 		}
 	}

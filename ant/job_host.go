@@ -69,7 +69,7 @@ func (j *JobRunner) jobHost() {
 		return
 	}
 
-	// Mine at least 50,000 SC
+	// Mine at least 50,000 SC // xxx update mining comments, also below
 	desiredbalance := types.NewCurrency64(50000).Mul(types.SiacoinPrecision)
 	start := time.Now()
 	for {

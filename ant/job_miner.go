@@ -34,10 +34,11 @@ var (
 type minerJobRunner struct {
 	*JobRunner
 	sync.Locker
-	lastWalletBallance   types.Currency
-	sentPaymentsBallance types.Currency
+	lastWalletBallance types.Currency
+	sentTotal          types.Currency
 }
 
+//xxx remove
 // // blockMining indefinitely mines blocks.  If more than 100
 // // seconds passes before the wallet has received some amount of currency, this
 // // job will print an error.
@@ -114,9 +115,9 @@ func (j *JobRunner) blockMining() {
 
 	// Create miner job runner
 	mjr := minerJobRunner{
-		JobRunner:            j,
-		lastWalletBallance:   types.ZeroCurrency,
-		sentPaymentsBallance: types.ZeroCurrency,
+		JobRunner:          j,
+		lastWalletBallance: types.ZeroCurrency,
+		sentTotal:          types.ZeroCurrency,
 	}
 
 	// Start miner balance checker and payment sender
@@ -141,7 +142,7 @@ func (mjr *minerJobRunner) ballanceChecker() {
 			continue
 		}
 		// Compare wallet ballance and sent out payments with last wallet balance
-		if walletInfo.ConfirmedSiacoinBalance.Add(mjr.sentPaymentsBallance).Cmp(mjr.lastWalletBallance) > 0 {
+		if walletInfo.ConfirmedSiacoinBalance.Add(mjr.sentTotal).Cmp(mjr.lastWalletBallance) > 0 {
 			mjr.staticLogger.Printf("%v: blockmining job succeeded", mjr.staticDataDir)
 			mjr.lastWalletBallance = walletInfo.ConfirmedSiacoinBalance
 		} else {
@@ -152,7 +153,7 @@ func (mjr *minerJobRunner) ballanceChecker() {
 
 // xxx doc
 func (mjr *minerJobRunner) paymentSender() {
-	// xxx
+	// xxx doc
 	// Wait till balance is high enough
 	// Timeout
 	// Send
@@ -183,6 +184,9 @@ func (mjr *minerJobRunner) paymentSender() {
 			pr.responseChan <- paymentResponse
 		}
 
+		// Update sent total
+		mjr.sentTotal = mjr.sentTotal.Add(pr.amount)
+
 		// Send confirmation response
 		paymentResponse.transactionIDs = wsp.TransactionIDs
 		pr.responseChan <- paymentResponse
@@ -211,7 +215,9 @@ func (mjr *minerJobRunner) waitForBallance(ballance types.Currency) error {
 		}
 
 		// Check we have enough ballance
-		if walletInfo.ConfirmedSiacoinBalance.Cmp(ballance) > 0 {
+		confirmedBallance := walletInfo.ConfirmedSiacoinBalance
+		unconfirmedOutgoingSiacoins := walletInfo.UnconfirmedOutgoingSiacoins
+		if unconfirmedOutgoingSiacoins.Add(ballance).Cmp(confirmedBallance) < 0 {
 			return nil
 		}
 
