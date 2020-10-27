@@ -102,6 +102,9 @@ const (
 	balanceCheckFrequency = time.Second * 15
 )
 
+// renterPreparationPhase defines type for renter preparation phases enum
+type renterPreparationPhase int
+
 // Define possible renter phases enum
 const (
 	// walletFull defines a renter with filled wallet
@@ -153,9 +156,6 @@ type RenterJob struct {
 	staticJR *JobRunner
 	mu       sync.Mutex
 }
-
-// renterPreparationPhase defines type for renter preparation phases enum
-type renterPreparationPhase int
 
 // createTempFile creates temporary file in the given temporary sub-directory,
 // with the given filename pattern. The file is filled with random data of the
