@@ -18,7 +18,6 @@ import (
 func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) AntfarmConfig {
 	antFarmAddr := test.RandomLocalAddress()
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
-
 	antDirs := test.AntDirs(dataDir, 7)
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,

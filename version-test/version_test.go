@@ -98,7 +98,11 @@ func TestUpgrades(t *testing.T) {
 	// Prepare logger
 	dataDir := test.TestDir(t.Name())
 	logger := test.NewTestLogger(t, dataDir)
-	defer logger.Close()
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
@@ -152,7 +156,11 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer logger.Close()
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	antfarmConfig := antfarm.NewDefaultRenterAntfarmTestingConfig(dataDir, allowLocalIPs)
 

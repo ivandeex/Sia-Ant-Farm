@@ -31,7 +31,11 @@ func TestNewAntfarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer logger.Close()
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,
@@ -189,7 +193,11 @@ func TestUploadDownloadFileData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer logger.Close()
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	config := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
 	farm, err := New(logger, config)
@@ -237,7 +245,11 @@ func TestUpdateRenter(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer logger.Close()
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	config := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
 	farm, err := New(logger, config)

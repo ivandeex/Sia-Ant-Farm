@@ -39,7 +39,11 @@ func TestBuildBinaries(t *testing.T) {
 	// Prepare logger
 	dataDir := test.TestDir(t.Name())
 	logger := test.NewTestLogger(t, dataDir)
-	defer logger.Close()
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Build release binaries
 	binariesDir := "../upgrade-binaries"
