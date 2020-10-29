@@ -30,6 +30,11 @@ func TestClosingAnt(t *testing.T) {
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create Ant
 	ant, err := New(&sync.WaitGroup{}, logger, config)
@@ -99,6 +104,11 @@ func TestNewAnt(t *testing.T) {
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create Ant
 	ant, err := New(&sync.WaitGroup{}, logger, config)
@@ -134,6 +144,11 @@ func TestStartJob(t *testing.T) {
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create Ant
 	ant, err := New(&sync.WaitGroup{}, logger, config)
@@ -163,6 +178,11 @@ func TestUpdateAnt(t *testing.T) {
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create Ant
 	ant, err := New(&sync.WaitGroup{}, logger, config)
@@ -207,6 +227,11 @@ func TestWalletAddress(t *testing.T) {
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create Ant
 	ant, err := New(&sync.WaitGroup{}, logger, config)

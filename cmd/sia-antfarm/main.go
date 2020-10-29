@@ -8,6 +8,7 @@ import (
 	"os/signal"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 func main() {
@@ -31,7 +32,18 @@ func main() {
 	}
 	f.Close()
 
-	farm, err := antfarm.New(antfarmConfig)
+	logger, err := antfarm.NewAntfarmLogger(antfarmConfig.DataDir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "error creating antfram logger: %v\n", err)
+		os.Exit(1)
+	}
+	defer func() {
+		if err := logger.Close(); err != nil {
+			fmt.Println(errors.AddContext(err, "can't close logger"))
+		}
+	}()
+
+	farm, err := antfarm.New(logger, antfarmConfig)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error creating antfarm: %v\n", err)
 		os.Exit(1)

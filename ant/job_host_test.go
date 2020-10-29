@@ -30,6 +30,11 @@ func TestAnnounceHost(t *testing.T) {
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create ant
 	ant := &Ant{

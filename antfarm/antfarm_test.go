@@ -26,6 +26,17 @@ func TestNewAntfarm(t *testing.T) {
 	dataDir := test.TestDir(t.Name())
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
 	antDirs := test.AntDirs(dataDir, 1)
+
+	logger, err := NewAntfarmLogger(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,
 		DataDir:       antFarmDir,
@@ -44,7 +55,7 @@ func TestNewAntfarm(t *testing.T) {
 		},
 	}
 
-	antfarm, err := New(config)
+	antfarm, err := New(logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,6 +91,17 @@ func TestConnectExternalAntfarm(t *testing.T) {
 
 	datadir := test.TestDir(t.Name())
 	antFarmDataDirs := []string{filepath.Join(datadir, "antfarm-data1"), filepath.Join(datadir, "antfarm-data2")}
+
+	logger1, err := NewAntfarmLogger(antFarmDataDirs[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := logger1.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress: true,
@@ -98,6 +120,16 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
+	logger2, err := NewAntfarmLogger(antFarmDataDirs[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := logger2.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	antConfig.SiadConfig.DataDir = test.AntDirs(antFarmDataDirs[1], 1)[0]
 	antConfig.RPCAddr = test.RandomLocalAddress()
 	config2 := AntfarmConfig{
@@ -106,14 +138,14 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		AntConfigs:    []ant.AntConfig{antConfig},
 	}
 
-	farm1, err := New(config1)
+	farm1, err := New(logger1, config1)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer farm1.Close()
 	go farm1.ServeAPI()
 
-	farm2, err := New(config2)
+	farm2, err := New(logger2, config2)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -164,8 +196,19 @@ func TestUploadDownloadFileData(t *testing.T) {
 
 	// Start Antfarm
 	dataDir := test.TestDir(t.Name())
+
+	logger, err := NewAntfarmLogger(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	config := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
-	farm, err := New(config)
+	farm, err := New(logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -205,8 +248,19 @@ func TestUpdateRenter(t *testing.T) {
 
 	// Start Antfarm
 	dataDir := test.TestDir(t.Name())
+
+	logger, err := NewAntfarmLogger(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	config := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
-	farm, err := New(config)
+	farm, err := New(logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
