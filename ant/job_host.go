@@ -172,6 +172,34 @@ func (j *JobRunner) jobHost() {
 				time.Sleep(time.Second) //xxx
 			}
 			//xxx end
+			// xxx wait for unconfirmed wallet siacoins
+			for {
+				wi, err := j.staticClient.WalletGet()
+				if err != nil {
+					panic(err)
+				}
+				uOutSc, uInSc := wi.UnconfirmedOutgoingSiacoins, wi.UnconfirmedIncomingSiacoins
+				j.staticLogger.Debugf("%v: uOutSc: %v, uInSc: %v", j.staticDataDir, uOutSc, uInSc)
+				if uOutSc.Cmp64(0) == 0 && uInSc.Cmp64(0) == 0 {
+					break
+				}
+				time.Sleep(time.Second)
+			}
+			// xxx end
+			// // xxx wait for tpool tx
+			// for {
+			// 	tptg, err := j.staticClient.TransactionPoolTransactionsGet()
+			// 	if err != nil {
+			// 		panic(err)
+			// 	}
+			// 	tpTxLen := len(tptg.Transactions)
+			// 	j.staticLogger.Debugf("%v: tp tx len: %v", j.staticDataDir, tpTxLen)
+			// 	if tpTxLen == 0 {
+			// 		break
+			// 	}
+			// 	time.Sleep(time.Second)
+			// }
+			// // xxx end
 			err := j.staticClient.HostAnnouncePost()
 			if err != nil {
 				j.staticLogger.Errorf("%v: host announcement failed: %v", j.staticDataDir, err)
@@ -188,31 +216,31 @@ func (j *JobRunner) jobHost() {
 			//xxx end
 			hjr.managedSetAnnounced(true)
 
-			// Wait till host announcement transaction is in blockchain // xxx put back
-			// err = hjr.managedWaitAnnounceTransactionInBlockchain()
-			// if err != nil {
-			// 	j.staticLogger.Errorf("%v: waiting for host announcement transaction failed: %v", j.staticDataDir, err)
-			// 	hjr.managedSetAnnounced(false)
-			// 	continue
-			// }
+			// Wait till host announcement transaction is in blockchain
+			err = hjr.managedWaitAnnounceTransactionInBlockchain()
+			if err != nil {
+				j.staticLogger.Errorf("%v: waiting for host announcement transaction failed: %v", j.staticDataDir, err)
+				hjr.managedSetAnnounced(false)
+				continue
+			}
 		}
 
-		// Check announce host transaction is not re-orged // xxx put back
-		// found, err := hjr.announcementTransactionInBlock(hjr.managedAnnouncedBlockHeight())
-		// if err != nil {
-		// 	j.staticLogger.Errorf("%v: checking host announcement transaction failed: %v", j.staticDataDir, err)
-		// 	select {
-		// 	case <-j.StaticTG.StopChan():
-		// 		return
-		// 	case <-time.After(hostAPIErrorFrequency):
-		// 		continue
-		// 	}
-		// }
-		// if !found {
-		// 	j.staticLogger.Debugf("%v: host announcement transaction was not found, it was probably re-orged", j.staticDataDir)
-		// 	hjr.managedSetAnnounced(false)
-		// 	continue
-		// }
+		// Check announce host transaction is not re-orged
+		found, err := hjr.announcementTransactionInBlock(hjr.managedAnnouncedBlockHeight())
+		if err != nil {
+			j.staticLogger.Errorf("%v: checking host announcement transaction failed: %v", j.staticDataDir, err)
+			select {
+			case <-j.StaticTG.StopChan():
+				return
+			case <-time.After(hostAPIErrorFrequency):
+				continue
+			}
+		}
+		if !found {
+			j.staticLogger.Debugf("%v: host announcement transaction was not found, it was probably re-orged", j.staticDataDir)
+			hjr.managedSetAnnounced(false)
+			continue
+		}
 
 		// Check storage revenue didn't decreased
 		err = hjr.managedCheckStorageRevenueNotDecreased()
