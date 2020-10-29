@@ -2,6 +2,7 @@ package ant
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sync"
@@ -155,6 +156,21 @@ func (j *JobRunner) jobHost() {
 			j.staticLogger.Debugf("%v: announce host", j.staticDataDir)
 			//xxx
 			wi0, _ := j.staticClient.WalletGet()
+			j.staticLogger.Debugf("%v: conBal: %v, bal: %v, uOut: %v, uIn: %v", j.staticDataDir, wi0.ConfirmedSiacoinBalance, wi0.ConfirmedSiacoinBalance.Add(wi0.UnconfirmedIncomingSiacoins).Sub(wi0.UnconfirmedOutgoingSiacoins), wi0.UnconfirmedOutgoingSiacoins, wi0.UnconfirmedIncomingSiacoins)
+			//xxx end
+			//xxx wait for all txs confirmed
+			for {
+				txs, err := j.staticClient.WalletTransactionsGet(0, math.MaxUint64)
+				if err != nil {
+					panic(err)
+				}
+				uTxLen := len(txs.UnconfirmedTransactions)
+				j.staticLogger.Debugf("%v: unco txs: %v", j.staticDataDir, uTxLen)
+				if uTxLen == 0 {
+					break
+				}
+				time.Sleep(time.Second) //xxx
+			}
 			//xxx end
 			err := j.staticClient.HostAnnouncePost()
 			if err != nil {
@@ -168,37 +184,35 @@ func (j *JobRunner) jobHost() {
 			}
 			//xxx
 			wi1, _ := j.staticClient.WalletGet()
-			confDiff := wi1.ConfirmedSiacoinBalance.Sub(wi0.ConfirmedSiacoinBalance)
-			unconfDiff := wi1.UnconfirmedOutgoingSiacoins.Sub(wi0.UnconfirmedOutgoingSiacoins)
-			j.staticLogger.Debugf("xxx %v: confDiff: %v, unconfDiff: %v", j.staticDataDir, confDiff, unconfDiff)
+			j.staticLogger.Debugf("%v: conBal: %v, bal: %v, uOut: %v, uIn: %v", j.staticDataDir, wi1.ConfirmedSiacoinBalance, wi1.ConfirmedSiacoinBalance.Add(wi1.UnconfirmedIncomingSiacoins).Sub(wi1.UnconfirmedOutgoingSiacoins), wi1.UnconfirmedOutgoingSiacoins, wi1.UnconfirmedIncomingSiacoins)
 			//xxx end
 			hjr.managedSetAnnounced(true)
 
-			// Wait till host announcement transaction is in blockchain
-			err = hjr.managedWaitAnnounceTransactionInBlockchain()
-			if err != nil {
-				j.staticLogger.Errorf("%v: waiting for host announcement transaction failed: %v", j.staticDataDir, err)
-				hjr.managedSetAnnounced(false)
-				continue
-			}
+			// Wait till host announcement transaction is in blockchain // xxx put back
+			// err = hjr.managedWaitAnnounceTransactionInBlockchain()
+			// if err != nil {
+			// 	j.staticLogger.Errorf("%v: waiting for host announcement transaction failed: %v", j.staticDataDir, err)
+			// 	hjr.managedSetAnnounced(false)
+			// 	continue
+			// }
 		}
 
-		// Check announce host transaction is not re-orged
-		found, err := hjr.announcementTransactionInBlock(hjr.managedAnnouncedBlockHeight())
-		if err != nil {
-			j.staticLogger.Errorf("%v: checking host announcement transaction failed: %v", j.staticDataDir, err)
-			select {
-			case <-j.StaticTG.StopChan():
-				return
-			case <-time.After(hostAPIErrorFrequency):
-				continue
-			}
-		}
-		if !found {
-			j.staticLogger.Debugf("%v: host announcement transaction was not found, it was probably re-orged", j.staticDataDir)
-			hjr.managedSetAnnounced(false)
-			continue
-		}
+		// Check announce host transaction is not re-orged // xxx put back
+		// found, err := hjr.announcementTransactionInBlock(hjr.managedAnnouncedBlockHeight())
+		// if err != nil {
+		// 	j.staticLogger.Errorf("%v: checking host announcement transaction failed: %v", j.staticDataDir, err)
+		// 	select {
+		// 	case <-j.StaticTG.StopChan():
+		// 		return
+		// 	case <-time.After(hostAPIErrorFrequency):
+		// 		continue
+		// 	}
+		// }
+		// if !found {
+		// 	j.staticLogger.Debugf("%v: host announcement transaction was not found, it was probably re-orged", j.staticDataDir)
+		// 	hjr.managedSetAnnounced(false)
+		// 	continue
+		// }
 
 		// Check storage revenue didn't decreased
 		err = hjr.managedCheckStorageRevenueNotDecreased()
@@ -337,7 +351,7 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 		}
 		currentBH := cg.Height
 
-		// Set start block height for timeout
+		// Set start block height for timeout // xxx remove
 		if startBH == 0 {
 			startBH = currentBH
 		}

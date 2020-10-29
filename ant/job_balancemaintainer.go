@@ -184,8 +184,7 @@ balanceMaintainerLoop:
 			continue
 		}
 		startHeight := cg.Height
-		j.staticLogger.Debugf("xxx %v: payment request for: %v", j.staticDataDir, paymentRequest.amount)
-		j.staticLogger.Debugf("xxx %v: payment request to channel: %v", j.staticDataDir, j.staticAnt.staticMinerPaymentRequestChan)
+		j.staticLogger.Debugf("xxx %v: sending payment request for: %v", j.staticDataDir, paymentRequest.amount)
 		j.staticAnt.staticMinerPaymentRequestChan <- paymentRequest
 		j.staticLogger.Debugf("xxx %v: payment request received by miner", j.staticDataDir)
 
@@ -241,23 +240,6 @@ balanceMaintainerLoop:
 					continue
 				}
 			}
-
-			// 	// Check if payment transaction is confirmed // xxx remove
-			// paymentTxLoop:
-			// 	for _, paymentTxID := range paymentResponse.transactionIDs {
-			// 		for _, walletTx := range wtg.ConfirmedTransactions {
-			// 			if walletTx.TransactionID == paymentTxID {
-			// 				continue paymentTxLoop
-			// 			}
-			// 		}
-			// 		// Payment transaction is not yet between confirmed wallet transactions
-			// 		select {
-			// 		case <-j.StaticTG.StopChan():
-			// 			return
-			// 		case <-time.After(balanceMaintainerConfirmationCheckFrequency):
-			// 			continue waitForConfirmationLoop
-			// 		}
-			// 	}
 
 			// Check that payment transaction (one of the miner transactions in
 			// the response) is confirmed

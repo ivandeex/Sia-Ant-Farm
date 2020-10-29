@@ -165,6 +165,7 @@ func (mjr *minerJobRunner) paymentSender() {
 		case <-mjr.StaticTG.StopChan():
 			return
 		case pr = <-mjr.staticAnt.staticMinerPaymentRequestChan:
+			mjr.staticLogger.Debugf("xxx %v: miner received payment request", mjr.staticDataDir)
 		}
 
 		// Wait till wallet balance reaches desired amount
@@ -176,7 +177,7 @@ func (mjr *minerJobRunner) paymentSender() {
 		}
 
 		// Send SiaCoins
-		wsp, err := mjr.staticClient.WalletSiacoinsPost(pr.amount, pr.walletAddress, false)
+		wsp, err := mjr.staticClient.WalletSiacoinsPost(pr.amount, pr.walletAddress, true)
 		if err != nil {
 			er := errors.AddContext(err, "miner can't send siacoins")
 			mjr.staticLogger.Errorf("%v: %v", mjr.staticDataDir, er)

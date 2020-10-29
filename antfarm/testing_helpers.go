@@ -128,7 +128,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 1000000,
+				DesiredCurrency: 100000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -138,7 +138,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 1000000,
+				DesiredCurrency: 100000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -148,7 +148,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 1000000,
+				DesiredCurrency: 100000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -158,7 +158,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 1000000,
+				DesiredCurrency: 100000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
@@ -168,7 +168,7 @@ func NewDefaultRenterAntfarmTestingConfigXXX(dataDir string, allowLocalIPs bool)
 					SiadPath:                 test.TestSiadFilename,
 				},
 				Jobs:            []string{"host"},
-				DesiredCurrency: 1000000,
+				DesiredCurrency: 100000,
 			},
 			{
 				SiadConfig: ant.SiadConfig{
