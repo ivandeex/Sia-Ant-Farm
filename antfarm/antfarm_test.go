@@ -96,7 +96,11 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer logger1.Close()
+	defer func() {
+		if err := logger1.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	antConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
@@ -120,7 +124,11 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer logger2.Close()
+	defer func() {
+		if err := logger2.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	antConfig.SiadConfig.DataDir = test.AntDirs(antFarmDataDirs[1], 1)[0]
 	antConfig.RPCAddr = test.RandomLocalAddress()
