@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/errors"
@@ -53,7 +54,7 @@ type SiadConfig struct {
 // exec.Command.  An error is returned if starting siad fails, otherwise a
 // pointer to siad's os.Cmd object is returned.  The data directory `datadir`
 // is passed as siad's `--sia-directory`.
-func newSiad(config SiadConfig) (*exec.Cmd, error) {
+func newSiad(logger *persist.Logger, config SiadConfig) (*exec.Cmd, error) {
 	if err := checkSiadConstants(config.SiadPath); err != nil {
 		return nil, errors.AddContext(err, "error with siad constants")
 	}
@@ -124,7 +125,7 @@ func newSiad(config SiadConfig) (*exec.Cmd, error) {
 	}
 
 	// Wait until siad full setup is finished
-	err = waitForFullSetup(config, cmd, &buf)
+	err = waitForFullSetup(logger, config, cmd, &buf)
 	if err != nil {
 		return nil, errors.AddContext(err, "wait for siad full setup failed")
 	}
@@ -166,7 +167,7 @@ func siadFlagSupported(siadPath, flag string) (bool, error) {
 
 // stopSiad tries to stop the siad running at `apiAddr`, issuing a kill to its
 // `process` after a timeout.
-func stopSiad(apiAddr, apiPassword string, process *os.Process) {
+func stopSiad(logger *persist.Logger, dataDir string, apiAddr, apiPassword string, process *os.Process) {
 	opts, err := client.DefaultOptions()
 	if err != nil {
 		panic(err)
@@ -174,7 +175,10 @@ func stopSiad(apiAddr, apiPassword string, process *os.Process) {
 	opts.Address = apiAddr
 	opts.Password = apiPassword
 	if err := client.New(opts).DaemonStopGet(); err != nil {
-		process.Kill()
+		logger.Errorf("%v: can't stop siad daemon: %v", dataDir, err)
+		if er := process.Kill(); er != nil {
+			logger.Errorf("%v: can't kill siad process: %v", dataDir, er)
+		}
 	}
 
 	// wait for 120 seconds for siad to terminate, then issue a kill signal.
@@ -186,14 +190,16 @@ func stopSiad(apiAddr, apiPassword string, process *os.Process) {
 	select {
 	case <-done:
 	case <-time.After(stopSiadTimeout):
-		process.Kill()
+		if err := process.Kill(); err != nil {
+			logger.Errorf("%v: can't kill siad process: %v", dataDir, err)
+		}
 	}
 }
 
 // waitForFullSetup blocks until the Sia daemon finishes full setup. If siad
 // terminates while waiting for full setup or a timeout occurs, returns an
 // error. siadOutput expects to receive combined siad stdin and stderr output.
-func waitForFullSetup(config SiadConfig, siad *exec.Cmd, siadOutput *bytes.Buffer) error {
+func waitForFullSetup(logger *persist.Logger, config SiadConfig, siad *exec.Cmd, siadOutput *bytes.Buffer) error {
 	// Prepare channel if siad process terminates
 	exitChan := make(chan error)
 	go func() {
@@ -215,7 +221,7 @@ func waitForFullSetup(config SiadConfig, siad *exec.Cmd, siadOutput *bytes.Buffe
 
 		// Timeout
 		if time.Since(start) > waitForFullSetupTimeout {
-			stopSiad(config.APIAddr, config.APIPassword, siad.Process)
+			stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 			return fmt.Errorf("siad hasn't finished full setup within %v timeout", waitForFullSetupTimeout)
 		}
 

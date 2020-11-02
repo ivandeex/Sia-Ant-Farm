@@ -84,6 +84,7 @@ linters:
   disable-all: true
   fast: false
   enable:
+    - errcheck
     - gocritic
     - gofmt
     - golint

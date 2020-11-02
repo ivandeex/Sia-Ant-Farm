@@ -64,8 +64,12 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 
 // Stop signals all running jobs to stop and blocks until the jobs have
 // finished stopping.
-func (j *JobRunner) Stop() {
-	j.StaticTG.Stop()
+func (j *JobRunner) Stop() error {
+	err := j.StaticTG.Stop()
+	if err != nil {
+		return errors.AddContext(err, "can't stop thread group")
+	}
+	return nil
 }
 
 // waitForAntsSync returns true if wait has finished, false if jobRunner was

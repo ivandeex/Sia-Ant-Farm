@@ -303,6 +303,7 @@ func (j *JobRunner) NewRenterJob() RenterJob {
 func (j *JobRunner) renter(phase renterPreparationPhase) {
 	err := j.StaticTG.Add()
 	if err != nil {
+		j.staticLogger.Errorf("%v: can't add thread group: %v", j.staticDataDir, err)
 		return
 	}
 	defer j.StaticTG.Done()
@@ -310,6 +311,7 @@ func (j *JobRunner) renter(phase renterPreparationPhase) {
 	// Wait for ants to be synced
 	synced := j.waitForAntsSync()
 	if !synced {
+		j.staticLogger.Errorf("%v: waiting for ants to sync failed", j.staticDataDir)
 		return
 	}
 
@@ -458,7 +460,10 @@ func (r *RenterJob) managedDeleteRandom() error {
 	}
 
 	r.staticLogger.Printf("%v: successfully deleted file.\n", r.staticJR.staticDataDir)
-	os.Remove(r.Files[randindex].SourceFile)
+	err = os.Remove(r.Files[randindex].SourceFile)
+	if err != nil {
+		return errors.AddContext(err, "can't delete a source file")
+	}
 	r.Files = append(r.Files[:randindex], r.Files[randindex+1:]...)
 
 	return nil
@@ -541,7 +546,10 @@ func (r *RenterJob) managedDownloadRandomFile() error {
 		err = errors.Compose(err, f.Close())
 	}()
 	destPath, _ := filepath.Abs(f.Name())
-	os.Remove(destPath)
+	err = os.Remove(destPath)
+	if err != nil {
+		return errors.AddContext(err, "can't delete a destination file")
+	}
 
 	// Download the file
 	err = downloadFile(r, fileToDownload, destPath)
@@ -717,7 +725,11 @@ func (r *RenterJob) threadedUploader() {
 	defer r.staticJR.StaticTG.Done()
 
 	// Make the source files directory
-	os.Mkdir(filepath.Join(r.staticJR.staticDataDir, "renterSourceFiles"), 0700)
+	err = os.Mkdir(filepath.Join(r.staticJR.staticDataDir, "renterSourceFiles"), 0700)
+	if err != nil {
+		return
+	}
+
 	for {
 		// Wait a while between upload attempts.
 		select {

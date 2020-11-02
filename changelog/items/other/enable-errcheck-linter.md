@@ -1,0 +1,1 @@
+- Enable `errcheck` linter and fix all `errcheck` issues in the repository.

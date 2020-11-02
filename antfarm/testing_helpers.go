@@ -15,10 +15,13 @@ import (
 
 // NewDefaultRenterAntfarmTestingConfig creates default basic antfarm config
 // for running renter tests
-func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) AntfarmConfig {
+func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (AntfarmConfig, error) {
 	antFarmAddr := test.RandomLocalAddress()
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
-	antDirs := test.AntDirs(dataDir, 7)
+	antDirs, err := test.AntDirs(dataDir, 7)
+	if err != nil {
+		return AntfarmConfig{}, errors.AddContext(err, "can't create ant data directories")
+	}
 	config := AntfarmConfig{
 		ListenAddress: antFarmAddr,
 		DataDir:       antFarmDir,
@@ -98,7 +101,7 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) An
 		AutoConnect: true,
 		WaitForSync: true,
 	}
-	return config
+	return config, nil
 }
 
 // DownloadAndVerifyFiles downloads given files and compares calculated

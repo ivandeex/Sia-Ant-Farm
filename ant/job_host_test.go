@@ -21,13 +21,6 @@ func TestAnnounceHost(t *testing.T) {
 	dataDir := test.TestDir(t.Name())
 	config := newTestingSiadConfig(dataDir)
 
-	// Create siad process
-	siad, err := newSiad(config)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer stopSiad(config.APIAddr, config.APIPassword, siad.Process)
-
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
 	defer func() {
@@ -35,6 +28,13 @@ func TestAnnounceHost(t *testing.T) {
 			t.Fatal(err)
 		}
 	}()
+
+	// Create siad process
+	siad, err := newSiad(logger, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 
 	// Create ant
 	ant := &Ant{
@@ -47,7 +47,11 @@ func TestAnnounceHost(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer j.Stop()
+	defer func() {
+		if err := j.Stop(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Mine at least 50,000 SC for host announcement.
 	// Keep mining so that host announcement gets to blockchain.

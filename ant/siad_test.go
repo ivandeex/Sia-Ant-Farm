@@ -31,11 +31,19 @@ func TestNewSiad(t *testing.T) {
 	t.Parallel()
 
 	// Create testing config
-	datadir := test.TestDir(t.Name())
-	config := newTestingSiadConfig(datadir)
+	dataDir := test.TestDir(t.Name())
+	config := newTestingSiadConfig(dataDir)
+
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create the siad process
-	siad, err := newSiad(config)
+	siad, err := newSiad(logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,17 +62,17 @@ func TestNewSiad(t *testing.T) {
 	}
 
 	// Stop siad process
-	stopSiad(config.APIAddr, config.APIPassword, siad.Process)
+	stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 
 	// Test Creating siad with a blank config
-	_, err = newSiad(SiadConfig{})
+	_, err = newSiad(logger, SiadConfig{})
 	if err == nil {
 		t.Fatal("Shouldn't be able to create siad process with empty config")
 	}
 
 	// verify that NewSiad returns an error given invalid args
 	config.APIAddr = "this_is_an_invalid_address:1000000"
-	_, err = newSiad(config)
+	_, err = newSiad(logger, config)
 	if err == nil {
 		t.Fatal("expected newsiad to return an error with invalid args")
 	}
