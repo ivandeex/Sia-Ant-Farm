@@ -22,7 +22,10 @@ func TestStartAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := test.AntDirs(dataDir, 3)
+	antDirs, err := test.AntDirs(dataDir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -62,7 +65,10 @@ func TestStartAnts(t *testing.T) {
 	}
 	defer func() {
 		for _, ant := range ants {
-			ant.Close()
+			err := ant.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}()
 
@@ -107,7 +113,10 @@ func TestStartAntWithSiadPath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Create minimum configs
 			dataDir := test.TestDir(tt.name)
-			antDirs := test.AntDirs(dataDir, 1)
+			antDirs, err := test.AntDirs(dataDir, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
 			configs := []ant.AntConfig{
 				{
 					SiadConfig: ant.SiadConfig{
@@ -133,7 +142,10 @@ func TestStartAntWithSiadPath(t *testing.T) {
 			}
 			defer func() {
 				for _, ant := range ants {
-					ant.Close()
+					err := ant.Close()
+					if err != nil {
+						t.Error(err)
+					}
 				}
 			}()
 
@@ -175,7 +187,10 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			// Create minimum configs
 			dataDir := test.TestDir(t.Name())
-			antDirs := test.AntDirs(dataDir, 1)
+			antDirs, err := test.AntDirs(dataDir, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
 			configs := []ant.AntConfig{
 				{
 					SiadConfig: ant.SiadConfig{
@@ -207,7 +222,10 @@ func TestRenterDisableIPViolationCheck(t *testing.T) {
 			}
 			defer func() {
 				for _, ant := range ants {
-					ant.Close()
+					err := ant.Close()
+					if err != nil {
+						t.Error(err)
+					}
 				}
 			}()
 			renterAnt := ants[0]
@@ -248,7 +266,10 @@ func TestConnectAnts(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := test.AntDirs(dataDir, 5)
+	antDirs, err := test.AntDirs(dataDir, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -302,7 +323,10 @@ func TestConnectAnts(t *testing.T) {
 	}
 	defer func() {
 		for _, ant := range ants {
-			ant.Close()
+			err := ant.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}()
 
@@ -347,7 +371,10 @@ func TestAntConsensusGroups(t *testing.T) {
 
 	// Create minimum configs
 	dataDir := test.TestDir(t.Name())
-	antDirs := test.AntDirs(dataDir, 4)
+	antDirs, err := test.AntDirs(dataDir, 4)
+	if err != nil {
+		t.Fatal(err)
+	}
 	configs := []ant.AntConfig{
 		{
 			SiadConfig: ant.SiadConfig{
@@ -387,7 +414,10 @@ func TestAntConsensusGroups(t *testing.T) {
 	}
 	defer func() {
 		for _, ant := range ants {
-			ant.Close()
+			err := ant.Close()
+			if err != nil {
+				t.Error(err)
+			}
 		}
 	}()
 
@@ -404,7 +434,7 @@ func TestAntConsensusGroups(t *testing.T) {
 	}
 
 	// Start an ant that is desynced from the rest of the network
-	cfg, err := parseConfig(ant.AntConfig{
+	cfg, err := parseConfig(logger, ant.AntConfig{
 		Jobs: []string{"miner"},
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress: true,

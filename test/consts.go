@@ -32,17 +32,21 @@ func AbsoluteSiadPath() (string, error) {
 // AntDirs creates temporary test directories for numAnt directories. This
 // should only every be called once per test. Otherwise it will delete the
 // directories again.
-func AntDirs(dataDir string, numAnts int) []string {
+func AntDirs(dataDir string, numAnts int) ([]string, error) {
 	antDirs := []string{}
 	for i := 0; i < numAnts; i++ {
 		path := filepath.Join(dataDir, fmt.Sprintf("ant_%v", i))
 		antDirs = append(antDirs, path)
 
 		// Clean ant dirs
-		os.RemoveAll(path)
-		os.MkdirAll(path, 0700)
+		if err := os.RemoveAll(path); err != nil {
+			return []string{}, errors.AddContext(err, "can't remove ant data directory")
+		}
+		if err := os.MkdirAll(path, 0700); err != nil {
+			return []string{}, errors.AddContext(err, "can't create ant data directory")
+		}
 	}
-	return antDirs
+	return antDirs, nil
 }
 
 // RandomLocalAddress returns a random local 127.0.0.1 address

@@ -30,7 +30,9 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error decoding %v: %v\n", *configPath, err)
 		os.Exit(1)
 	}
-	f.Close()
+	if err = f.Close(); err != nil {
+		fmt.Fprintf(os.Stderr, "error closing antfarm config file: %v\n", err)
+	}
 
 	logger, err := antfarm.NewAntfarmLogger(antfarmConfig.DataDir)
 	if err != nil {
@@ -48,8 +50,16 @@ func main() {
 		fmt.Fprintf(os.Stderr, "error creating antfarm: %v\n", err)
 		os.Exit(1)
 	}
-	defer farm.Close()
-	go farm.ServeAPI()
+	defer func() {
+		if err := farm.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "error closing antfarm: %v\n", err)
+		}
+	}()
+	go func() {
+		if err := farm.ServeAPI(); err != nil {
+			fmt.Fprintf(os.Stderr, "error serving antfarm http API: %v\n", err)
+		}
+	}()
 	go farm.PermanentSyncMonitor()
 
 	fmt.Printf("Finished.  Running sia-antfarm with %v ants.\n", len(antfarmConfig.AntConfigs))

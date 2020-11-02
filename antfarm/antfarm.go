@@ -75,8 +75,14 @@ func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 		dataDir = config.DataDir
 	}
 
-	os.RemoveAll(dataDir)
-	os.MkdirAll(dataDir, 0700)
+	err := os.RemoveAll(dataDir)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't remove antfarm data directory")
+	}
+	err = os.MkdirAll(dataDir, 0700)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't create antfarm data directory")
+	}
 
 	farm := &AntFarm{
 		dataDir: dataDir,
@@ -184,7 +190,11 @@ func (af *AntFarm) connectExternalAntfarm(externalAddress string) error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			af.logger.Errorf("can't close response body: %v", err)
+		}
+	}()
 
 	var externalAnts []*ant.Ant
 	err = json.NewDecoder(res.Body).Decode(&externalAnts)
@@ -197,8 +207,7 @@ func (af *AntFarm) connectExternalAntfarm(externalAddress string) error {
 
 // ServeAPI serves the antFarm's http API.
 func (af *AntFarm) ServeAPI() error {
-	http.Serve(af.apiListener, af.router)
-	return nil
+	return http.Serve(af.apiListener, af.router)
 }
 
 // GetAntByName return the ant with the given name. If there is no ant with the
@@ -258,7 +267,9 @@ func (af *AntFarm) getAnts(w http.ResponseWriter, r *http.Request, _ httprouter.
 // Close signals all the ants to stop and waits for them to return.
 func (af *AntFarm) Close() error {
 	if af.apiListener != nil {
-		af.apiListener.Close()
+		if err := af.apiListener.Close(); err != nil {
+			af.logger.Errorf("can't close antfarm http API listener: %v", err)
+		}
 	}
 
 	// Speed up closing ants by calling concurrent goroutines

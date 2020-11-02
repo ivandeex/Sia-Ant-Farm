@@ -32,7 +32,7 @@ const (
 
 // getAddrs returns n free listening ports by leveraging the behaviour of
 // net.Listen(":0").  Addresses are returned in the format of ":port"
-func getAddrs(n int) ([]string, error) {
+func getAddrs(logger *persist.Logger, n int) ([]string, error) {
 	var addrs []string
 
 	for i := 0; i < n; i++ {
@@ -40,7 +40,11 @@ func getAddrs(n int) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer l.Close()
+		defer func() {
+			if err := l.Close(); err != nil {
+				logger.Errorf("can't close network listener: %v", err)
+			}
+		}()
 		addrs = append(addrs, fmt.Sprintf(":%v", l.Addr().(*net.TCPAddr).Port))
 	}
 	return addrs, nil
@@ -139,7 +143,7 @@ func startAnts(antsSyncWG *sync.WaitGroup, logger *persist.Logger, configs ...an
 
 	// Start an ant for each config
 	for i, config := range configs {
-		cfg, err := parseConfig(config)
+		cfg, err := parseConfig(logger, config)
 		if err != nil {
 			return ants, errors.AddContext(err, "unable to parse config")
 		}
@@ -228,7 +232,10 @@ func startJobs(antsSyncWG *sync.WaitGroup, ants ...*ant.Ant) error {
 	for _, ant := range ants {
 		for _, job := range ant.Config.Jobs {
 			if job == "bigspender" {
-				ant.StartJob(antsSyncWG, job)
+				err := ant.StartJob(antsSyncWG, job)
+				if err != nil {
+					return err
+				}
 			}
 			if job == "littlesupplier" && spenderAddress != nil {
 				err := ant.StartJob(antsSyncWG, job, *spenderAddress)
@@ -247,7 +254,7 @@ func startJobs(antsSyncWG *sync.WaitGroup, ants ...*ant.Ant) error {
 
 // parseConfig takes an input `config` and fills it with default values if
 // required.
-func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
+func parseConfig(logger *persist.Logger, config ant.AntConfig) (ant.AntConfig, error) {
 	if config.SiadConfig.DataDir == "" {
 		// If DataDir is not set, use default parent directory
 		dir := "./antfarm-data"
@@ -286,7 +293,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 		// UPnP is not enabled and we want hosts to communicate over external
 		// IPs (this requires manual port forwarding), i.e. we do not want
 		// local addresses for hosts in config
-		externalIPAddr, err := myExternalIP()
+		externalIPAddr, err := myExternalIP(logger)
 		if err != nil {
 			return ant.AntConfig{}, errors.AddContext(err, "upnp not enabled and failed to get myexternal IP")
 		}
@@ -294,7 +301,7 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 	}
 	// Automatically generate 5 free operating system ports for the Ant's api,
 	// rpc, host, siamux, and siamux websocket addresses
-	addrs, err := getAddrs(5)
+	addrs, err := getAddrs(logger, 5)
 	if err != nil {
 		return ant.AntConfig{}, err
 	}
@@ -319,14 +326,18 @@ func parseConfig(config ant.AntConfig) (ant.AntConfig, error) {
 
 // myExternalIP discovers the gateway's external IP by querying a centralized
 // service, http://myexternalip.com.
-func myExternalIP() (string, error) {
+func myExternalIP(logger *persist.Logger) (string, error) {
 	// timeout after 10 seconds
 	client := http.Client{Timeout: httpClientTimeout}
 	resp, err := client.Get("http://myexternalip.com/raw")
 	if err != nil {
 		return "", err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			logger.Errorf("can't close response body: %v", err)
+		}
+	}()
 	if resp.StatusCode != http.StatusOK {
 		errResp, _ := ioutil.ReadAll(resp.Body)
 		return "", errors.New(string(errResp))

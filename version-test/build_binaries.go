@@ -59,7 +59,11 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 	if err != nil {
 		return errors.AddContext(err, "can't get current working directory")
 	}
-	defer os.Chdir(startDir)
+	defer func() {
+		if err := os.Chdir(startDir); err != nil {
+			logger.Errorf("can't perform change directory to the original directory")
+		}
+	}()
 
 	// Clone Sia repository if it doesn't exist locally
 	goPath, ok := os.LookupEnv("GOPATH")
@@ -299,7 +303,11 @@ func gitCheckout(logger *persist.Logger, gitRepoPath, checkoutStr string) error 
 	if err != nil {
 		return errors.AddContext(err, "can't get current working directory")
 	}
-	defer os.Chdir(startDir)
+	defer func() {
+		if err := os.Chdir(startDir); err != nil {
+			logger.Errorf("can't perform change directory to the original directory")
+		}
+	}()
 
 	// Change working directory to the git repository
 	err = os.Chdir(gitRepoPath)
@@ -379,7 +387,11 @@ func querySiaRepoAPI(siaRepoEndpoint string) (bodies [][]byte, err error) {
 			msg := fmt.Sprintf("can't get response from %v", url)
 			return nil, errors.AddContext(err, msg)
 		}
-		defer resp.Body.Close()
+		defer func() {
+			if err = resp.Body.Close(); err != nil {
+				err = errors.AddContext(err, "can't close response body")
+			}
+		}()
 
 		if resp.StatusCode != http.StatusOK {
 			return nil, fmt.Errorf("response status from Gitlab is not '200 OK' but %v", resp.Status)

@@ -25,7 +25,10 @@ func TestNewAntfarm(t *testing.T) {
 	antAddr := test.RandomLocalAddress()
 	dataDir := test.TestDir(t.Name())
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
-	antDirs := test.AntDirs(dataDir, 1)
+	antDirs, err := test.AntDirs(dataDir, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	logger, err := NewAntfarmLogger(dataDir)
 	if err != nil {
@@ -59,15 +62,26 @@ func TestNewAntfarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer antfarm.Close()
-
-	go antfarm.ServeAPI()
+	defer func() {
+		if err := antfarm.Close(); err != nil {
+			logger.Errorf("can't close antfarm: %v", err)
+		}
+	}()
+	go func() {
+		if err := antfarm.ServeAPI(); err != nil {
+			logger.Errorf("can't serve antfarm http API: %v", err)
+		}
+	}()
 
 	res, err := http.DefaultClient.Get("http://" + antFarmAddr + "/ants")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer res.Body.Close()
+	defer func() {
+		if err := res.Body.Close(); err != nil {
+			logger.Errorf("can't close antfarm response body: %v", err)
+		}
+	}()
 
 	var ants []*ant.Ant
 	err = json.NewDecoder(res.Body).Decode(&ants)
@@ -113,7 +127,11 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		},
 	}
 
-	antConfig.SiadConfig.DataDir = test.AntDirs(antFarmDataDirs[0], 1)[0]
+	antDataDirs1, err := test.AntDirs(antFarmDataDirs[0], 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	antConfig.SiadConfig.DataDir = antDataDirs1[0]
 	config1 := AntfarmConfig{
 		ListenAddress: test.RandomLocalAddress(),
 		DataDir:       antFarmDataDirs[0],
@@ -130,7 +148,11 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		}
 	}()
 
-	antConfig.SiadConfig.DataDir = test.AntDirs(antFarmDataDirs[1], 1)[0]
+	antDataDirs2, err := test.AntDirs(antFarmDataDirs[1], 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	antConfig.SiadConfig.DataDir = antDataDirs2[0]
 	antConfig.RPCAddr = test.RandomLocalAddress()
 	config2 := AntfarmConfig{
 		ListenAddress: test.RandomLocalAddress(),
@@ -142,15 +164,31 @@ func TestConnectExternalAntfarm(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer farm1.Close()
-	go farm1.ServeAPI()
+	defer func() {
+		if err := farm1.Close(); err != nil {
+			logger1.Errorf("can't close antfarm: %v", err)
+		}
+	}()
+	go func() {
+		if err := farm1.ServeAPI(); err != nil {
+			logger1.Errorf("can't serve antfarm http API: %v", err)
+		}
+	}()
 
 	farm2, err := New(logger2, config2)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer farm2.Close()
-	go farm2.ServeAPI()
+	defer func() {
+		if err := farm2.Close(); err != nil {
+			logger2.Errorf("can't close antfarm: %v", err)
+		}
+	}()
+	go func() {
+		if err := farm2.ServeAPI(); err != nil {
+			logger2.Errorf("can't serve antfarm http API: %v", err)
+		}
+	}()
 
 	err = farm1.connectExternalAntfarm(config2.ListenAddress)
 	if err != nil {
@@ -207,12 +245,19 @@ func TestUploadDownloadFileData(t *testing.T) {
 		}
 	}()
 
-	config := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
+	config, err := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	farm, err := New(logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer farm.Close()
+	defer func() {
+		if err := farm.Close(); err != nil {
+			logger.Errorf("can't close antfarm: %v", err)
+		}
+	}()
 
 	// Timeout the test if the renter doesn't becomes upload ready
 	renterAnt, err := farm.GetAntByName(test.RenterAntName)
@@ -259,12 +304,19 @@ func TestUpdateRenter(t *testing.T) {
 		}
 	}()
 
-	config := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
+	config, err := NewDefaultRenterAntfarmTestingConfig(dataDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	farm, err := New(logger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer farm.Close()
+	defer func() {
+		if err := farm.Close(); err != nil {
+			logger.Errorf("can't close antfarm: %v", err)
+		}
+	}()
 
 	// Timeout the test if the renter doesn't become upload ready
 	renterAnt, err := farm.GetAntByName(test.RenterAntName)
@@ -278,7 +330,7 @@ func TestUpdateRenter(t *testing.T) {
 
 	// Restart the renter with given siad path (simulates an ant update
 	// process)
-	err = renterAnt.UpdateSiad(test.RelativeSiadPath())
+	err = renterAnt.UpdateSiad(logger, test.RelativeSiadPath())
 	if err != nil {
 		t.Fatal(err)
 	}

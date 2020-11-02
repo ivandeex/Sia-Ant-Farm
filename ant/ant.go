@@ -92,7 +92,10 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	// Create ant working dir if it doesn't exist
 	// (e.g. ant farm deleted the whole farm dir)
 	if _, err := os.Stat(config.DataDir); os.IsNotExist(err) {
-		os.MkdirAll(config.DataDir, 0700)
+		err = os.MkdirAll(config.DataDir, 0700)
+		if err != nil {
+			return nil, errors.AddContext(err, "can't create ant's data directory")
+		}
 	}
 
 	// Unforward the ports required for this ant
@@ -105,7 +108,7 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	}
 
 	// Construct the ant's Siad instance
-	siad, err := newSiad(config.SiadConfig)
+	siad, err := newSiad(logger, config.SiadConfig)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to create new siad process")
 	}
@@ -113,7 +116,7 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
 		if err != nil {
-			stopSiad(config.APIAddr, config.APIPassword, siad.Process)
+			stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 		}
 	}()
 
@@ -134,7 +137,12 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	ant.Jr = j
 
 	for _, job := range config.Jobs {
-		ant.StartJob(antsSyncWG, job)
+		// Here err should be reused (err =) instead of redeclared (err :=), so
+		// that defer can catch this error.
+		err = ant.StartJob(antsSyncWG, job)
+		if err != nil {
+			return nil, errors.AddContext(err, "can't start ant's job")
+		}
 	}
 
 	if config.DesiredCurrency != 0 {
@@ -167,9 +175,9 @@ func (a *Ant) BlockHeight() types.BlockHeight {
 // Close releases all resources created by the ant, including the Siad
 // subprocess.
 func (a *Ant) Close() error {
-	a.Jr.Stop()
-	stopSiad(a.APIAddr, a.Config.APIPassword, a.siad.Process)
-	return nil
+	err := a.Jr.Stop()
+	stopSiad(a.staticLogger, a.Config.DataDir, a.APIAddr, a.Config.APIPassword, a.siad.Process)
+	return err
 }
 
 // HasRenterTypeJob returns true if the ant has renter type of job (renter or
@@ -216,7 +224,7 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 }
 
 // UpdateSiad updates ant to use the given siad binary.
-func (a *Ant) UpdateSiad(siadPath string) error {
+func (a *Ant) UpdateSiad(logger *persist.Logger, siadPath string) error {
 	a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
 
 	// Stop ant
@@ -230,7 +238,7 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 
 	// Construct the ant's Siad instance
 	a.staticLogger.Printf("%v: starting new siad process using %v", a.Config.SiadConfig.DataDir, siadPath)
-	siad, err := newSiad(a.Config.SiadConfig)
+	siad, err := newSiad(logger, a.Config.SiadConfig)
 	if err != nil {
 		return errors.AddContext(err, "unable to create new siad process")
 	}
@@ -239,7 +247,7 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
 		if err != nil {
-			stopSiad(a.Config.APIAddr, a.Config.APIPassword, siad.Process)
+			stopSiad(a.staticLogger, a.Config.DataDir, a.Config.APIAddr, a.Config.APIPassword, siad.Process)
 		}
 	}()
 
@@ -265,7 +273,12 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	// Restart jobs
 	a.staticLogger.Debugf("%v: restarting ant's jobs", a.Config.SiadConfig.DataDir)
 	for _, job := range a.Config.Jobs {
-		a.StartJob(a.Jr.staticAntsSyncWG, job)
+		// Here err should be reused (err =) instead of redeclared (err :=), so
+		// that defer can catch this error.
+		err = a.StartJob(a.Jr.staticAntsSyncWG, job)
+		if err != nil {
+			return errors.AddContext(err, "can't restart ant's job")
+		}
 	}
 
 	// Start balance maintainer if desired currency was set

@@ -56,7 +56,10 @@ func TestClosingAnt(t *testing.T) {
 	}
 
 	// Close the ant
-	ant.Close()
+	err = ant.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Wait enough time for ant.Close(), stopSiad() to try to finish
 	timeout := stopSiadTimeout + 10*time.Second
@@ -115,7 +118,11 @@ func TestNewAnt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ant.Close()
+	defer func() {
+		if err := ant.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create Sia Client
 	opts, err := client.DefaultOptions()
@@ -155,7 +162,11 @@ func TestStartJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ant.Close()
+	defer func() {
+		if err := ant.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Nonexistent job should throw an error
 	err = ant.StartJob(&sync.WaitGroup{}, "thisjobdoesnotexist")
@@ -189,7 +200,11 @@ func TestUpdateAnt(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ant.Close()
+	defer func() {
+		if err := ant.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Create Sia Client
 	opts, err := client.DefaultOptions()
@@ -206,7 +221,10 @@ func TestUpdateAnt(t *testing.T) {
 
 	// Update ant
 	newSiadPath := test.RelativeSiadPath()
-	ant.UpdateSiad(newSiadPath)
+	err = ant.UpdateSiad(logger, newSiadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Test the updated ant works by calling ConsensusGet endpoint
 	if _, err = c.ConsensusGet(); err != nil {
@@ -238,7 +256,11 @@ func TestWalletAddress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ant.Close()
+	defer func() {
+		if err := ant.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
 	// Get wallet address
 	addr, err := ant.WalletAddress()
