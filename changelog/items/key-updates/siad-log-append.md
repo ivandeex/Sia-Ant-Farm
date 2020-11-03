@@ -1,1 +1,0 @@
-- Do not overwrite `sia-output.log` on siad upgrades.

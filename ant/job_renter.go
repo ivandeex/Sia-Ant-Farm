@@ -196,7 +196,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
 	}
 	r.staticLogger.Debugf("%v: downloading\n\tsiaFile: %v\n\tto local file: %v", r.staticJR.staticDataDir, siaPath, destPath)
-	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true)
+	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true, false)
 	if err != nil {
 		return errors.AddContext(err, "failed in call to /renter/download")
 	}

@@ -1,2 +1,0 @@
-- Fix closing ants when error during starting antfarm occurs.
-- Speedup closing antfarm by closing ants concurrently.

@@ -1,1 +1,0 @@
-- Fix closing ants' siad processes via API.

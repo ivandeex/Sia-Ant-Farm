@@ -1,1 +1,0 @@
-- Write antfarm execution logs and tests logs to file instead of to console.

@@ -1,3 +1,42 @@
+## Nov 3, 2020:
+### v1.0.2
+**Key Updates**
+- Updated building siad binaries for version tests. When for a Sia release
+  (e.g. `v1.4.8`) a git tag with `-antfarm` suffix exists (i.e.
+  `v1.4.8-antfarm`), version test doesn't build Sia release, but it's patched
+  version.
+- Fix setting ant external IP addresses. This fixes version tests for testing
+  from Sia version `v1.4.10` on.
+- Write antfarm execution logs and tests logs to file instead of to console.
+- Repost host announcement and host accepting contracts when the transactions
+  were dropped and the renter doesn't see the host(s) as active.
+- Do not overwrite `sia-output.log` on siad upgrades.
+- Enable upgrading/downgrading renter ant's siad binary. Renter if fully
+  functional after upgrade/downgrade.
+- Update Sia to the latest released version `v1.5.1`.
+- Update version tests to use the latest release as a base version (instead of
+  using the latest master).
+
+**Bugs Fixed**
+- Fix closing ants' siad processes via API.
+- Fix closing siad process in TestNewSiad.
+- Fix stale upload at 0% occurring occasionally after renter's siad process
+  restart or update.
+
+**Other**
+- Restructure Antfarm packages.
+- Fix cloning Sia repository for building binaries when `vX.X.X-antfarm` tag
+  was updated.
+- Fix closing ants when error during starting antfarm occurs.
+- Speedup closing antfarm by closing ants concurrently.
+- Disable UPnP router discovery and clearing ports via UPnP on Gitlab CI.
+- Enable `errcheck` linter and fix all `errcheck` issues in the repository.
+- Add make option to install `sia-antfarm-debug` with debug messages printed to
+  the log.
+- Simplify `WaitForRenterUploadReady` to be easily used by tests.
+- Define renter phases to be used in renter job to support alternative renter
+  configs.
+
 ## Aug 10, 2020:
 ### v1.0.1
 **Key Updates**
