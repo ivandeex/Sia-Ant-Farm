@@ -20,6 +20,12 @@ cd $GOPATH/src/gitlab.com/NebulousLabs/Sia-Ant-Farm
 make dependencies && make
 ```
 
+To install debug version of Sia Antfarm with debug logs enabled, execute:
+
+```shell
+make dependencies && make install-debug
+```
+
 # Running a sia-antfarm
 
 This repository contains one utility, `sia-antfarm`. `sia-antfarm` starts up
@@ -80,6 +86,19 @@ configure your system so that the ants' `RPCAddr` and `HostAddr` ports are
 accessible from the Internet, i.e. to forward ports from your public IP. You
 can run ant farm local IP range (then you do not need UPnP enabled router or
 manual port forwarding) if you set `AllowHostLocalNetAddress` to `true`.
+
+When you installed the Antfarm binary (see section Install) you can start the
+Antfarm executing e.g. with one of our configs:
+
+```shell
+sia-antfarm -config nebulous-configs/basic-renter-host-5.json
+```
+
+or with debug logs on:
+
+```shell
+sia-antfarm-debug -config nebulous-configs/basic-renter-host-5.json
+```
 
 ## Available configuration options:
 
