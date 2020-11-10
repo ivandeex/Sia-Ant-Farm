@@ -1,3 +1,8 @@
+## Nov 10, 2020:
+### v1.0.3
+**Key Updates**
+- Update Sia to the latest released version `v1.5.2`.
+
 ## Nov 3, 2020:
 ### v1.0.2
 **Key Updates**
