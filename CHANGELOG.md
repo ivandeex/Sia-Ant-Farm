@@ -10,6 +10,11 @@ Version History
 
 Latest:
 
+## Nov 11, 2020:
+### v1.0.4
+**Key Updates**
+- Update Sia to the latest released version `v1.5.3`.
+
 ## Nov 10, 2020:
 ### v1.0.3
 **Key Updates**

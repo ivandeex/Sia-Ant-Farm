@@ -6,5 +6,5 @@ const (
 	IssuesURL = "https://gitlab.com/NebulousLabs/Sia-Ant-Farm/issues"
 
 	// Version is the current version of Sia Antfarm.
-	Version = "1.0.3"
+	Version = "1.0.4"
 )
