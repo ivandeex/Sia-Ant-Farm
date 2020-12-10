@@ -18,7 +18,7 @@ type JobRunner struct {
 	staticAntsSyncWG *sync.WaitGroup
 	staticAnt        *Ant
 	staticClient     *client.Client
-	staticWalletSeed string
+	StaticWalletSeed string
 	staticDataDir    string
 	StaticTG         threadgroup.ThreadGroup
 }
@@ -44,17 +44,43 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 		staticClient:     c,
 		staticDataDir:    ant.Config.DataDir,
 	}
-	if existingWalletSeed == "" {
-		walletParams, err := jr.staticClient.WalletInitPost("", false)
-		if err != nil {
-			return nil, err
-		}
-		jr.staticWalletSeed = walletParams.PrimarySeed
-	} else {
-		jr.staticWalletSeed = existingWalletSeed
+
+	// Check if wallet is already encrypted
+	wg, err := jr.staticClient.WalletGet()
+	if err != nil {
+		return nil, errors.AddContext(err, "can't get wallet info")
 	}
 
-	err = jr.staticClient.WalletUnlockPost(jr.staticWalletSeed)
+	// Init the wallet when needed and save seed
+	if existingWalletSeed == "" {
+		// No wallet seed was specified. Initialize a new wallet.
+		walletParams, err := jr.staticClient.WalletInitPost("", false)
+		if err != nil {
+			er := errors.AddContext(err, "can't init wallet")
+			jr.staticLogger.Errorf("%v: %v", jr.staticDataDir, er)
+			return nil, er
+		}
+		jr.staticLogger.Debugf("%v: init wallet", jr.staticDataDir)
+		jr.StaticWalletSeed = walletParams.PrimarySeed
+	} else if !wg.Encrypted {
+		// A wallet seed was specified, but wallet is not encrypted. Initialize
+		// the wallet with the existing seed.
+		err := jr.staticClient.WalletInitSeedPost(existingWalletSeed, "", false)
+		if err != nil {
+			er := errors.AddContext(err, "can't init wallet using existing seed")
+			jr.staticLogger.Errorf("%v: %v", jr.staticDataDir, er)
+			return nil, er
+		}
+		jr.staticLogger.Debugf("%v: init wallet using existing seed", jr.staticDataDir)
+		jr.StaticWalletSeed = existingWalletSeed
+	} else {
+		// A wallet seed was specified, wallet is encrypted. Just save seed.
+		// Executed e.g. during siad upgrade with job runner re-creation.
+		jr.staticLogger.Debugf("%v: use existing initialized wallet", jr.staticDataDir)
+		jr.StaticWalletSeed = existingWalletSeed
+	}
+
+	err = jr.staticClient.WalletUnlockPost(jr.StaticWalletSeed)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +121,7 @@ func (j *JobRunner) waitForAntsSync() bool {
 // given job runner
 func recreateJobRunner(j *JobRunner) (*JobRunner, error) {
 	// Create new job runner
-	newJR, err := newJobRunner(j.staticLogger, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticDataDir, j.staticWalletSeed)
+	newJR, err := newJobRunner(j.staticLogger, j.staticAnt, j.staticAnt.APIAddr, j.staticAnt.Config.APIPassword, j.staticDataDir, j.StaticWalletSeed)
 	if err != nil {
 		return &JobRunner{}, errors.AddContext(err, "couldn't create an updated job runner")
 	}

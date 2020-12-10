@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
 )
@@ -30,6 +32,8 @@ type AntConfig struct {
 	Name            string `json:",omitempty"`
 	Jobs            []string
 	DesiredCurrency uint64
+
+	InitialWalletSeed string
 }
 
 // An Ant is a Sia Client programmed with network user stories. It executes
@@ -130,7 +134,7 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 		siad:             siad,
 	}
 
-	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, config.InitialWalletSeed)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
@@ -192,6 +196,16 @@ func (a *Ant) HasRenterTypeJob() bool {
 	return false
 }
 
+// NewClient creates and returns a new ant http client
+func (a *Ant) NewClient() (*client.Client, error) {
+	options, err := client.DefaultOptions()
+	if err != nil {
+		return &client.Client{}, errors.AddContext(err, "can't create client default options")
+	}
+	options.Address = a.APIAddr
+	return client.New(options), nil
+}
+
 // StartJob starts the job indicated by `job` after an ant has been
 // initialized. Arguments are passed to the job using args.
 func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface{}) error {
@@ -224,13 +238,14 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 }
 
 // UpdateSiad updates ant to use the given siad binary.
-func (a *Ant) UpdateSiad(logger *persist.Logger, siadPath string) error {
-	a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
-
+func (a *Ant) UpdateSiad(logger *persist.Logger, closeAnt bool, siadPath string) error {
 	// Stop ant
-	err := a.Close()
-	if err != nil {
-		return errors.AddContext(err, "can't stop running ant")
+	if closeAnt {
+		a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
+		err := a.Close()
+		if err != nil {
+			return errors.AddContext(err, "can't stop running ant")
+		}
 	}
 
 	// Update path to new siad binary
@@ -242,7 +257,7 @@ func (a *Ant) UpdateSiad(logger *persist.Logger, siadPath string) error {
 	if err != nil {
 		return errors.AddContext(err, "unable to create new siad process")
 	}
-	a.staticLogger.Debugf("%v: sSiad process started", a.Config.SiadConfig.DataDir)
+	a.staticLogger.Debugf("%v: siad process started", a.Config.SiadConfig.DataDir)
 
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
@@ -269,6 +284,17 @@ func (a *Ant) UpdateSiad(logger *persist.Logger, siadPath string) error {
 	case <-time.After(updateSiadWarmUpTime):
 	}
 	a.staticLogger.Debugf("%v: siad warm-up finished", a.Config.SiadConfig.DataDir)
+
+	// Allow renter to rent on hosts on the same IP subnets
+	if a.HasRenterTypeJob() && a.Config.SiadConfig.RenterDisableIPViolationCheck {
+		// Set checkforipviolation=false
+		values := url.Values{}
+		values.Set("checkforipviolation", "false")
+		err = a.Jr.staticClient.RenterPost(values)
+		if err != nil {
+			return errors.AddContext(err, "couldn't set checkforipviolation")
+		}
+	}
 
 	// Restart jobs
 	a.staticLogger.Debugf("%v: restarting ant's jobs", a.Config.SiadConfig.DataDir)
