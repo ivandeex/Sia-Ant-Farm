@@ -182,7 +182,9 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Add restore renter to the antfarm config
+	// Add restore renter to the antfarm config. The ant stays dormant for now,
+	// later it will be restarted with renter job, desired currency and with
+	// the backup renter seed.
 	restoreRenterAntName := "Restore-Renter"
 	restoreRenterAntConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
@@ -191,9 +193,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 			DataDir:                       filepath.Join(antfarmDataDir, "restore-renter"),
 			RenterDisableIPViolationCheck: true,
 		},
-		Jobs:            []string{"renter"},
-		DesiredCurrency: 100000,
-		Name:            restoreRenterAntName,
+		Name: restoreRenterAntName,
 	}
 	config.AntConfigs = append(config.AntConfigs, restoreRenterAntConfig)
 
@@ -212,17 +212,6 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 			logger.Errorf("can't close antfarm: %v", err)
 		}
 	}()
-
-	// Stop restore renter ant for now
-	time.Sleep(time.Second * 10)
-	restoreRenterAnt, err := farm.GetAntByName(restoreRenterAntName)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = restoreRenterAnt.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
 
 	// Timeout the test if the backup renter doesn't become upload ready
 	backupRenterAnt, err := farm.GetAntByName(test.RenterAntName)
@@ -317,7 +306,18 @@ backupWaitLoop:
 		t.Fatal(err)
 	}
 
-	// Start a restore renter from scratch using closed renter's seed
+	// Get restore renter ant
+	restoreRenterAnt, err := farm.GetAntByName(restoreRenterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start a restore renter from scratch using closed renter's seed. Add
+	// renter job and desired currency.
+	err = restoreRenterAnt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
 	dir := restoreRenterAnt.Config.DataDir
 	err = os.RemoveAll(dir)
 	if err != nil {
@@ -328,14 +328,22 @@ backupWaitLoop:
 		t.Fatal(err)
 	}
 	restoreRenterAnt.Jr.StaticWalletSeed = backupRenterAnt.Jr.StaticWalletSeed
+	restoreRenterAnt.Config.Jobs = []string{"renter"}
+	restoreRenterAnt.Config.DesiredCurrency = 100000
 	err = restoreRenterAnt.UpdateSiad(logger, false, siadBinaryPath(branch))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Reconnect the restore renter ant
+	// Remove closed renter from the antfarm to prevent connect ants and close
+	// antfarm errors
+	farm.Ants = farm.Ants[:len(farm.Ants)-2]
+	farm.Ants = append(farm.Ants, restoreRenterAnt)
+
+	// Reconnect the restore renter ant. Restore renter ant must be first,
+	// because reconnecting already connected ants returns an error.
 	antsToConnect := []*ant.Ant{restoreRenterAnt}
-	antsToConnect = append(antsToConnect, farm.Ants[:len(farm.Ants)-1]...)
+	antsToConnect = append(antsToConnect, farm.Ants[:len(farm.Ants)-2]...)
 	err = antfarm.ConnectAnts(antsToConnect...)
 	if err != nil {
 		t.Fatal(err)

@@ -105,7 +105,7 @@ func TestInitWalletExistingSeed(t *testing.T) {
 	// Create testing config with the existing seed
 	dataDir := test.TestDir(t.Name())
 	config := newTestingAntConfig(dataDir)
-	config.InitialWalletSeed = WalletSeed1
+	config.InitialWalletSeed = test.WalletSeed1
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
@@ -140,8 +140,8 @@ func TestInitWalletExistingSeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if wsg.PrimarySeed != WalletSeed1 {
-		t.Fatalf("unexpected wallet seed, want: %v, got: %v", WalletSeed1, wsg.PrimarySeed)
+	if wsg.PrimarySeed != test.WalletSeed1 {
+		t.Fatalf("unexpected wallet seed, want: %v, got: %v", test.WalletSeed1, wsg.PrimarySeed)
 	}
 
 	// Check wallet address
@@ -149,8 +149,8 @@ func TestInitWalletExistingSeed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if wag.Addresses[0].String() != WalletSeed1Address1 {
-		t.Fatalf("unexpected wallet address, want: %v, got: %v", WalletSeed1Address1, wag.Addresses[0])
+	if wag.Addresses[0].String() != test.WalletSeed1Address1 {
+		t.Fatalf("unexpected wallet address, want: %v, got: %v", test.WalletSeed1Address1, wag.Addresses[0])
 	}
 }
 
