@@ -14,6 +14,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 const (
@@ -47,7 +48,7 @@ const (
 	// on Gitlab CI and on machines without publicly accessible ports and
 	// without UPnP enabled router. When set to false, currently it allows to
 	// test with external IPs on network with UPnP enabled router.
-	allowLocalIPs = false
+	allowLocalIPs = true
 )
 
 // upgradeTestConfig is a struct to create configs for TestUpgrades subtests
@@ -235,42 +236,19 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 		}
 	}
 
-	// Get current contracts count
-	contractsCount := 5
+	// Wait for contracts to renew
+	contractsCount := len(config.GetHostAntConfigIndices())
+	contractRenewalTimeout := time.Minute * 5
+	err = backupRenterAnt.WaitForContractsToRenew(contractsCount, contractRenewalTimeout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a backup
 	backupRenterClient, err := backupRenterAnt.NewClient()
 	if err != nil {
 		t.Fatal(err)
 	}
-	rc, err := backupRenterClient.RenterAllContractsGet()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rc.ActiveContracts) != contractsCount {
-		t.Fatalf("count of active contracts: expected: %d, actual: %d", 5, len(rc.ActiveContracts))
-	}
-	expiredContracts := len(rc.ExpiredContracts)
-
-	// Wait for contracts to renew
-	contractRenewalTimeout := time.Minute * 5
-	start := time.Now()
-	for {
-		// Timeout
-		if time.Since(start) > contractRenewalTimeout {
-			t.Fatalf("contract renewal not reached within %v timeout", contractRenewalTimeout)
-		}
-
-		rec, err := backupRenterClient.RenterExpiredContractsGet()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if len(rec.ExpiredContracts) == expiredContracts+contractsCount {
-			break
-		}
-
-		time.Sleep(time.Second)
-	}
-
-	// Create a backup
 	backupName := "test-backup"
 	err = backupRenterClient.RenterCreateBackupPost(backupName)
 	if err != nil {
@@ -279,25 +257,30 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 
 	// Wait for backup to finish
 	backupUploadTimeout := time.Minute
-	start = time.Now()
-backupWaitLoop:
-	for {
-		// Timeout
-		if time.Since(start) > backupUploadTimeout {
-			t.Fatalf("backup upload was not finished within %v timeout", backupUploadTimeout)
-		}
-
+	backupUploadCheckFrequency := time.Second
+	tries := int(backupUploadTimeout / backupUploadCheckFrequency)
+	err = build.Retry(tries, backupUploadCheckFrequency, func() error {
 		ubs, err := backupRenterClient.RenterBackups()
 		if err != nil {
-			t.Fatal()
+			return errors.AddContext(err, "can't get renter backups")
 		}
+		var found bool
 		for _, ub := range ubs.Backups {
-			if ub.Name == backupName && ub.UploadProgress == 100 {
-				break backupWaitLoop
+			if ub.Name == backupName {
+				found = true
+				if ub.UploadProgress == 100 {
+					return nil
+				}
 			}
 		}
+		if !found {
+			return fmt.Errorf("backup with name %s was not found", backupName)
+		}
 
-		time.Sleep(time.Second)
+		return errors.New("backup hasn't finished")
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Close the renter
@@ -330,7 +313,7 @@ backupWaitLoop:
 	restoreRenterAnt.Jr.StaticWalletSeed = backupRenterAnt.Jr.StaticWalletSeed
 	restoreRenterAnt.Config.Jobs = []string{"renter"}
 	restoreRenterAnt.Config.DesiredCurrency = 100000
-	err = restoreRenterAnt.UpdateSiad(logger, false, siadBinaryPath(branch))
+	err = restoreRenterAnt.StartSiad(siadBinaryPath(branch))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,12 +344,28 @@ backupWaitLoop:
 		t.Fatal(err)
 	}
 
-	// Restore from backup on restore renter
-	restoreTimeout := time.Minute * 3
-	retryfrequency := time.Second
-	err = build.Retry(int(restoreTimeout/retryfrequency), retryfrequency, func() error {
-		return restoreRenterClient.RenterRecoverBackupPost(backupName)
+	// Wait for backup to apear in renter backups
+	backupAppearTimeout := time.Minute
+	backupAppearCheckFrequency := time.Second
+	tries = int(backupAppearTimeout / backupAppearCheckFrequency)
+	err = build.Retry(tries, backupAppearCheckFrequency, func() error {
+		ubs, err := restoreRenterClient.RenterBackups()
+		if err != nil {
+			return errors.AddContext(err, "can't get renter backups")
+		}
+		for _, b := range ubs.Backups {
+			if b.Name == backupName {
+				return nil
+			}
+		}
+		return errors.New("backup was not found")
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Restore from backup on restore renter ant
+	err = restoreRenterClient.RenterRecoverBackupPost(backupName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -466,7 +465,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			// Upgrade renter
 			if testConfig.upgradeRenter {
 				t.Logf("Upgrading renter to siad-dev version %v\n", version)
-				err = renterAnt.UpdateSiad(logger, true, siadBinaryPath(version))
+				err = renterAnt.UpdateSiad(siadBinaryPath(version))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -476,7 +475,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			if testConfig.upgradeHosts {
 				t.Logf("Upgrading hosts to siad-version %v\n", version)
 				for _, hostIndex := range hostIndices {
-					err := farm.Ants[hostIndex].UpdateSiad(logger, true, siadBinaryPath(version))
+					err := farm.Ants[hostIndex].UpdateSiad(siadBinaryPath(version))
 					if err != nil {
 						t.Fatal(err)
 					}

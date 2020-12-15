@@ -330,7 +330,7 @@ func TestUpdateRenter(t *testing.T) {
 
 	// Restart the renter with given siad path (simulates an ant update
 	// process)
-	err = renterAnt.UpdateSiad(logger, true, test.RelativeSiadPath())
+	err = renterAnt.UpdateSiad(test.RelativeSiadPath())
 	if err != nil {
 		t.Fatal(err)
 	}

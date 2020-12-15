@@ -281,7 +281,7 @@ func TestUpdateAnt(t *testing.T) {
 
 	// Update ant
 	newSiadPath := test.RelativeSiadPath()
-	err = ant.UpdateSiad(logger, true, newSiadPath)
+	err = ant.UpdateSiad(newSiadPath)
 	if err != nil {
 		t.Fatal(err)
 	}
