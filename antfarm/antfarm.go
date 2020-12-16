@@ -135,13 +135,13 @@ func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 
 	// if the AutoConnect flag is set, use connectAnts to bootstrap the network.
 	if config.AutoConnect {
-		if err = connectAnts(ants...); err != nil {
+		if err = ConnectAnts(ants...); err != nil {
 			return nil, errors.AddContext(err, "unable to connect ants")
 		}
 	}
 	// connect the external antFarms
 	for _, address := range config.ExternalFarms {
-		if err = farm.connectExternalAntfarm(address); err != nil {
+		if err = farm.ConnectExternalAntfarm(address); err != nil {
 			return nil, errors.AddContext(err, "unable to connect external ant farm")
 		}
 	}
@@ -183,9 +183,9 @@ func (af *AntFarm) allAnts() []*ant.Ant {
 	return append(af.Ants, af.externalAnts...)
 }
 
-// connectExternalAntfarm connects the current antfarm to an external antfarm,
+// ConnectExternalAntfarm connects the current antfarm to an external antfarm,
 // using the antfarm api at externalAddress.
-func (af *AntFarm) connectExternalAntfarm(externalAddress string) error {
+func (af *AntFarm) ConnectExternalAntfarm(externalAddress string) error {
 	res, err := http.DefaultClient.Get("http://" + externalAddress + "/ants")
 	if err != nil {
 		return err
@@ -202,7 +202,7 @@ func (af *AntFarm) connectExternalAntfarm(externalAddress string) error {
 		return err
 	}
 	af.externalAnts = append(af.externalAnts, externalAnts...)
-	return connectAnts(af.allAnts()...)
+	return ConnectAnts(af.allAnts()...)
 }
 
 // ServeAPI serves the antFarm's http API.

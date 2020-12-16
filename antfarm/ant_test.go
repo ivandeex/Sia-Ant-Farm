@@ -260,7 +260,7 @@ func TestConnectAnts(t *testing.T) {
 	t.Parallel()
 
 	// connectAnts should throw an error if only one ant is provided
-	if err := connectAnts(&ant.Ant{}); err == nil {
+	if err := ConnectAnts(&ant.Ant{}); err == nil {
 		t.Fatal("connectAnts didnt throw an error with only one ant")
 	}
 
@@ -331,7 +331,7 @@ func TestConnectAnts(t *testing.T) {
 	}()
 
 	// Connect the ants
-	err = connectAnts(ants...)
+	err = ConnectAnts(ants...)
 	if err != nil {
 		t.Fatal(err)
 	}

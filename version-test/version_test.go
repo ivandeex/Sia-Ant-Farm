@@ -2,8 +2,11 @@ package versiontest
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
@@ -11,6 +14,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 const (
@@ -44,7 +48,7 @@ const (
 	// on Gitlab CI and on machines without publicly accessible ports and
 	// without UPnP enabled router. When set to false, currently it allows to
 	// test with external IPs on network with UPnP enabled router.
-	allowLocalIPs = false
+	allowLocalIPs = true
 )
 
 // upgradeTestConfig is a struct to create configs for TestUpgrades subtests
@@ -129,7 +133,7 @@ func TestUpgrades(t *testing.T) {
 		{testName: "TestHostsUpgradesWithBaseLatestMaster", upgradeHosts: true, upgradePath: upgradePathVersions, baseVersion: "master"},
 	}
 
-	// Check UPnP enabled router to spped up subtests
+	// Check UPnP enabled router to speed up subtests
 	upnpStatus := upnprouter.CheckUPnPEnabled()
 	logger.Debugln(upnpStatus)
 
@@ -138,6 +142,238 @@ func TestUpgrades(t *testing.T) {
 		t.Run(tt.testName, func(t *testing.T) {
 			upgradeTest(t, tt)
 		})
+	}
+}
+
+// TestRenewContractBackupRestoreSnapshot tests snapshot backup and restore.
+// Renter uploads some files, waits for contracts to renew, creates a backup
+// that is posted to hosts, and shuts down. A new renter with the same seed is
+// started, it restores the backup, downloads and verifies restored files.
+func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
+	if !build.VLONG {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Prepare data directory and logger
+	dataDir := test.TestDir(t.Name())
+	logger, err := antfarm.NewAntfarmLogger(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Build binary to test
+	branch := "master"
+	if rebuildMaster {
+		err := buildSiad(logger, binariesDir, branch)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create antfarm config
+	antfarmDataDir := filepath.Join(dataDir, "antfarm-data")
+	config, err := antfarm.NewDefaultRenterAntfarmTestingConfig(antfarmDataDir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Add restore renter to the antfarm config. The ant stays dormant for now,
+	// later it will be restarted with renter job, desired currency and with
+	// the backup renter seed.
+	restoreRenterAntName := "Restore-Renter"
+	restoreRenterAntConfig := ant.AntConfig{
+		SiadConfig: ant.SiadConfig{
+			AllowHostLocalNetAddress:      true,
+			APIAddr:                       test.RandomLocalAddress(),
+			DataDir:                       filepath.Join(antfarmDataDir, "restore-renter"),
+			RenterDisableIPViolationCheck: true,
+		},
+		Name: restoreRenterAntName,
+	}
+	config.AntConfigs = append(config.AntConfigs, restoreRenterAntConfig)
+
+	// Update antfarm config with the binary
+	for i := range config.AntConfigs {
+		config.AntConfigs[i].SiadConfig.SiadPath = siadBinaryPath(branch)
+	}
+
+	// Create an antfarm
+	farm, err := antfarm.New(logger, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := farm.Close(); err != nil {
+			logger.Errorf("can't close antfarm: %v", err)
+		}
+	}()
+
+	// Timeout the test if the backup renter doesn't become upload ready
+	backupRenterAnt, err := farm.GetAntByName(test.RenterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = backupRenterAnt.Jr.WaitForRenterUploadReady()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Upload some files
+	renterJob := backupRenterAnt.Jr.NewRenterJob()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 10; i++ {
+		_, err = renterJob.Upload(modules.SectorSize)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Wait for contracts to renew
+	contractsCount := len(config.GetHostAntConfigIndices())
+	contractRenewalTimeout := time.Minute * 5
+	err = backupRenterAnt.WaitForContractsToRenew(contractsCount, contractRenewalTimeout)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Create a backup
+	backupRenterClient, err := backupRenterAnt.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+	backupName := "test-backup"
+	err = backupRenterClient.RenterCreateBackupPost(backupName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for backup to finish
+	backupUploadTimeout := time.Minute
+	backupUploadCheckFrequency := time.Second
+	tries := int(backupUploadTimeout / backupUploadCheckFrequency)
+	err = build.Retry(tries, backupUploadCheckFrequency, func() error {
+		ubs, err := backupRenterClient.RenterBackups()
+		if err != nil {
+			return errors.AddContext(err, "can't get renter backups")
+		}
+		var found bool
+		for _, ub := range ubs.Backups {
+			if ub.Name == backupName {
+				found = true
+				if ub.UploadProgress == 100 {
+					return nil
+				}
+			}
+		}
+		if !found {
+			return fmt.Errorf("backup with name %s was not found", backupName)
+		}
+
+		return errors.New("backup hasn't finished")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Close the renter
+	err = backupRenterAnt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get restore renter ant
+	restoreRenterAnt, err := farm.GetAntByName(restoreRenterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start a restore renter from scratch using closed renter's seed. Add
+	// renter job and desired currency.
+	err = restoreRenterAnt.Close()
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := restoreRenterAnt.Config.DataDir
+	err = os.RemoveAll(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = os.MkdirAll(dir, 0700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	restoreRenterAnt.Jr.StaticWalletSeed = backupRenterAnt.Jr.StaticWalletSeed
+	restoreRenterAnt.Config.Jobs = []string{"renter"}
+	restoreRenterAnt.Config.DesiredCurrency = 100000
+	err = restoreRenterAnt.StartSiad(siadBinaryPath(branch))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Remove closed renter from the antfarm to prevent connect ants and close
+	// antfarm errors
+	farm.Ants = farm.Ants[:len(farm.Ants)-2]
+	farm.Ants = append(farm.Ants, restoreRenterAnt)
+
+	// Reconnect the restore renter ant. Restore renter ant must be first,
+	// because reconnecting already connected ants returns an error.
+	antsToConnect := []*ant.Ant{restoreRenterAnt}
+	antsToConnect = append(antsToConnect, farm.Ants[:len(farm.Ants)-2]...)
+	err = antfarm.ConnectAnts(antsToConnect...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Timeout the test if the restore renter doesn't become upload ready
+	err = restoreRenterAnt.Jr.WaitForRenterUploadReady()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get restore renter client
+	restoreRenterClient, err := restoreRenterAnt.NewClient()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Wait for backup to apear in renter backups
+	backupAppearTimeout := time.Minute
+	backupAppearCheckFrequency := time.Second
+	tries = int(backupAppearTimeout / backupAppearCheckFrequency)
+	err = build.Retry(tries, backupAppearCheckFrequency, func() error {
+		ubs, err := restoreRenterClient.RenterBackups()
+		if err != nil {
+			return errors.AddContext(err, "can't get renter backups")
+		}
+		for _, b := range ubs.Backups {
+			if b.Name == backupName {
+				return nil
+			}
+		}
+		return errors.New("backup was not found")
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Restore from backup on restore renter ant
+	err = restoreRenterClient.RenterRecoverBackupPost(backupName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// DownloadAndVerifyFiles
+	err = antfarm.DownloadAndVerifyFiles(t, restoreRenterAnt, renterJob.Files)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -229,7 +465,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			// Upgrade renter
 			if testConfig.upgradeRenter {
 				t.Logf("Upgrading renter to siad-dev version %v\n", version)
-				err = renterAnt.UpdateSiad(logger, siadBinaryPath(version))
+				err = renterAnt.UpdateSiad(siadBinaryPath(version))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -239,7 +475,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			if testConfig.upgradeHosts {
 				t.Logf("Upgrading hosts to siad-version %v\n", version)
 				for _, hostIndex := range hostIndices {
-					err := farm.Ants[hostIndex].UpdateSiad(logger, siadBinaryPath(version))
+					err := farm.Ants[hostIndex].UpdateSiad(siadBinaryPath(version))
 					if err != nil {
 						t.Fatal(err)
 					}

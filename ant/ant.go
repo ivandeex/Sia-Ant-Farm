@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -12,11 +13,17 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
+	"gitlab.com/NebulousLabs/Sia/build"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
 )
 
 const (
+	// contractsRenewalCheckFrequency defines frequency to check for contracts
+	// to be renewed.
+	contractsRenewalCheckFrequency = time.Second
+
 	// updateSiadWarmUpTime defines initial warm-up sleep time for an ant after
 	// siad update
 	updateSiadWarmUpTime = time.Second * 10
@@ -30,6 +37,8 @@ type AntConfig struct {
 	Name            string `json:",omitempty"`
 	Jobs            []string
 	DesiredCurrency uint64
+
+	InitialWalletSeed string
 }
 
 // An Ant is a Sia Client programmed with network user stories. It executes
@@ -130,7 +139,7 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 		siad:             siad,
 	}
 
-	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, config.InitialWalletSeed)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
@@ -192,6 +201,16 @@ func (a *Ant) HasRenterTypeJob() bool {
 	return false
 }
 
+// NewClient creates and returns a new ant http client
+func (a *Ant) NewClient() (*client.Client, error) {
+	options, err := client.DefaultOptions()
+	if err != nil {
+		return &client.Client{}, errors.AddContext(err, "can't create client default options")
+	}
+	options.Address = a.APIAddr
+	return client.New(options), nil
+}
+
 // StartJob starts the job indicated by `job` after an ant has been
 // initialized. Arguments are passed to the job using args.
 func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface{}) error {
@@ -223,26 +242,19 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 	return nil
 }
 
-// UpdateSiad updates ant to use the given siad binary.
-func (a *Ant) UpdateSiad(logger *persist.Logger, siadPath string) error {
-	a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
-
-	// Stop ant
-	err := a.Close()
-	if err != nil {
-		return errors.AddContext(err, "can't stop running ant")
-	}
-
+// StartSiad starts ant using the given siad binary on the previously closed
+// ant.
+func (a *Ant) StartSiad(siadPath string) error {
 	// Update path to new siad binary
 	a.Config.SiadConfig.SiadPath = siadPath
 
 	// Construct the ant's Siad instance
 	a.staticLogger.Printf("%v: starting new siad process using %v", a.Config.SiadConfig.DataDir, siadPath)
-	siad, err := newSiad(logger, a.Config.SiadConfig)
+	siad, err := newSiad(a.staticLogger, a.Config.SiadConfig)
 	if err != nil {
 		return errors.AddContext(err, "unable to create new siad process")
 	}
-	a.staticLogger.Debugf("%v: sSiad process started", a.Config.SiadConfig.DataDir)
+	a.staticLogger.Debugf("%v: siad process started", a.Config.SiadConfig.DataDir)
 
 	// Ensure siad is always stopped if an error is returned.
 	defer func() {
@@ -270,6 +282,17 @@ func (a *Ant) UpdateSiad(logger *persist.Logger, siadPath string) error {
 	}
 	a.staticLogger.Debugf("%v: siad warm-up finished", a.Config.SiadConfig.DataDir)
 
+	// Allow renter to rent on hosts on the same IP subnets
+	if a.HasRenterTypeJob() && a.Config.SiadConfig.RenterDisableIPViolationCheck {
+		// Set checkforipviolation=false
+		values := url.Values{}
+		values.Set("checkforipviolation", "false")
+		err = a.Jr.staticClient.RenterPost(values)
+		if err != nil {
+			return errors.AddContext(err, "couldn't set checkforipviolation")
+		}
+	}
+
 	// Restart jobs
 	a.staticLogger.Debugf("%v: restarting ant's jobs", a.Config.SiadConfig.DataDir)
 	for _, job := range a.Config.Jobs {
@@ -287,6 +310,57 @@ func (a *Ant) UpdateSiad(logger *persist.Logger, siadPath string) error {
 	}
 
 	return nil
+}
+
+// UpdateSiad updates ant to use the given siad binary.
+func (a *Ant) UpdateSiad(siadPath string) error {
+	// Stop ant
+	a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
+	err := a.Close()
+	if err != nil {
+		return errors.AddContext(err, "unable to close ant")
+	}
+
+	// Start siad
+	err = a.StartSiad(siadPath)
+	if err != nil {
+		return errors.AddContext(err, "can't start ant's siad")
+	}
+
+	return nil
+}
+
+// WaitForContractsToRenew blocks until renter contracts are renewed.
+func (a *Ant) WaitForContractsToRenew(contractsCount int, timeout time.Duration) error {
+	// Check ant is renter
+	if !a.HasRenterTypeJob() {
+		return errors.New("The ant doesn't have renter job")
+	}
+	a.staticLogger.Debugf("%v: waiting for renter contracts to renew", a.Config.SiadConfig.DataDir)
+
+	// Get current contracts count
+	rc, err := a.Jr.staticClient.RenterAllContractsGet()
+	if err != nil {
+		return errors.AddContext(err, "can't get renter contracts")
+	}
+	if len(rc.ActiveContracts) != contractsCount {
+		return fmt.Errorf("count of active contracts: expected: %d, actual: %d", contractsCount, len(rc.ActiveContracts))
+	}
+	expiredContracts := len(rc.ExpiredContracts)
+
+	// Wait for contracts to renew
+	tries := int(timeout / contractsRenewalCheckFrequency)
+	return build.Retry(tries, contractsRenewalCheckFrequency, func() error {
+		rec, err := a.Jr.staticClient.RenterExpiredContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get renter expired contracts")
+		}
+		if len(rec.ExpiredContracts) == expiredContracts+contractsCount {
+			a.staticLogger.Debugf("%v: renter contracts were renewed", a.Config.SiadConfig.DataDir)
+			return nil
+		}
+		return fmt.Errorf("actual count of expired contracts: %d doesn't equal initial contracts count: %d + initial expired contracts count: %d", len(rec.ExpiredContracts), contractsCount, expiredContracts)
+	})
 }
 
 // WalletAddress returns a wallet address that this ant can receive coins on.

@@ -94,6 +94,66 @@ checkingLoop:
 	}
 }
 
+// TestInitWalletExistingSeed tests starting ant and initializing its wallet
+// with an existing seed
+func TestInitWalletExistingSeed(t *testing.T) {
+	if testing.Short() {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Create testing config with the existing seed
+	dataDir := test.TestDir(t.Name())
+	config := newTestingAntConfig(dataDir)
+	config.InitialWalletSeed = test.WalletSeed1
+
+	// Create logger
+	logger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := logger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Create Ant
+	ant, err := New(&sync.WaitGroup{}, logger, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := ant.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Create Sia Client
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Address = config.APIAddr
+	opts.Password = config.APIPassword
+	c := client.New(opts)
+
+	// Check wallet seed
+	wsg, err := c.WalletSeedsGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wsg.PrimarySeed != test.WalletSeed1 {
+		t.Fatalf("unexpected wallet seed, want: %v, got: %v", test.WalletSeed1, wsg.PrimarySeed)
+	}
+
+	// Check wallet address
+	wag, err := c.WalletAddressesGet()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wag.Addresses[0].String() != test.WalletSeed1Address1 {
+		t.Fatalf("unexpected wallet address, want: %v, got: %v", test.WalletSeed1Address1, wag.Addresses[0])
+	}
+}
+
 // TestNewAnt tests creating an Ant
 func TestNewAnt(t *testing.T) {
 	if testing.Short() {
@@ -221,7 +281,7 @@ func TestUpdateAnt(t *testing.T) {
 
 	// Update ant
 	newSiadPath := test.RelativeSiadPath()
-	err = ant.UpdateSiad(logger, newSiadPath)
+	err = ant.UpdateSiad(newSiadPath)
 	if err != nil {
 		t.Fatal(err)
 	}

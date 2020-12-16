@@ -50,9 +50,9 @@ func getAddrs(logger *persist.Logger, n int) ([]string, error) {
 	return addrs, nil
 }
 
-// connectAnts connects two or more ants to the first ant in the slice,
+// ConnectAnts connects two or more ants to the first ant in the slice,
 // effectively bootstrapping the antfarm.
-func connectAnts(ants ...*ant.Ant) error {
+func ConnectAnts(ants ...*ant.Ant) error {
 	if len(ants) < 2 {
 		return errors.New("you must call connectAnts with at least two ants")
 	}

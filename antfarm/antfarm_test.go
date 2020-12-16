@@ -190,7 +190,7 @@ func TestConnectExternalAntfarm(t *testing.T) {
 		}
 	}()
 
-	err = farm1.connectExternalAntfarm(config2.ListenAddress)
+	err = farm1.ConnectExternalAntfarm(config2.ListenAddress)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +330,7 @@ func TestUpdateRenter(t *testing.T) {
 
 	// Restart the renter with given siad path (simulates an ant update
 	// process)
-	err = renterAnt.UpdateSiad(logger, test.RelativeSiadPath())
+	err = renterAnt.UpdateSiad(test.RelativeSiadPath())
 	if err != nil {
 		t.Fatal(err)
 	}
