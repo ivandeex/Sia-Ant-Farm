@@ -45,15 +45,28 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 		staticDataDir:    ant.Config.DataDir,
 	}
 
-	// Check if wallet is already encrypted
+	// Get the wallet
 	wg, err := jr.staticClient.WalletGet()
 	if err != nil {
 		return nil, errors.AddContext(err, "can't get wallet info")
 	}
+	if wg.Unlocked && existingWalletSeed == "" {
+		// Set the wallet seed in the jobrunner and return. This case happens
+		// when newJobRunner() is called multiple times (by purpose or by
+		// mistake) on the ant.
+		wsg, err := jr.staticClient.WalletSeedsGet()
+		if err != nil {
+			return nil, errors.AddContext(err, "can't get wallet seeds")
+		}
+		jr.StaticWalletSeed = wsg.PrimarySeed
+		return jr, nil
+	}
 
 	// Init the wallet when needed and save seed
-	if existingWalletSeed == "" {
-		// No wallet seed was specified. Initialize a new wallet.
+	var checkSeed bool
+	if existingWalletSeed == "" && !wg.Encrypted {
+		// No wallet seed was specified and wallet is encrypted. Initialize a
+		// new wallet.
 		walletParams, err := jr.staticClient.WalletInitPost("", false)
 		if err != nil {
 			er := errors.AddContext(err, "can't init wallet")
@@ -62,7 +75,9 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 		}
 		jr.staticLogger.Debugf("%v: init wallet", jr.staticDataDir)
 		jr.StaticWalletSeed = walletParams.PrimarySeed
-	} else if !wg.Encrypted {
+	} else if existingWalletSeed == "" && wg.Encrypted {
+		// Nothing to do. Not sure if or when this case can happen.
+	} else if existingWalletSeed != "" && !wg.Encrypted {
 		// A wallet seed was specified, but wallet is not encrypted. Initialize
 		// the wallet with the existing seed.
 		err := jr.staticClient.WalletInitSeedPost(existingWalletSeed, "", false)
@@ -73,16 +88,29 @@ func newJobRunner(logger *persist.Logger, ant *Ant, apiaddr string, authpassword
 		}
 		jr.staticLogger.Debugf("%v: init wallet using existing seed", jr.staticDataDir)
 		jr.StaticWalletSeed = existingWalletSeed
-	} else {
+	} else if existingWalletSeed != "" && wg.Encrypted {
 		// A wallet seed was specified, wallet is encrypted. Just save seed.
 		// Executed e.g. during siad upgrade with job runner re-creation.
+		checkSeed = true
 		jr.staticLogger.Debugf("%v: use existing initialized wallet", jr.staticDataDir)
 		jr.StaticWalletSeed = existingWalletSeed
 	}
 
+	// Unlock the wallet
 	err = jr.staticClient.WalletUnlockPost(jr.StaticWalletSeed)
 	if err != nil {
 		return nil, err
+	}
+
+	// Check that actual seed equals existingWalletSeed.
+	if checkSeed {
+		wsg, err := jr.staticClient.WalletSeedsGet()
+		if err != nil {
+			return nil, errors.AddContext(err, "can't get wallet seeds")
+		}
+		if wsg.PrimarySeed != existingWalletSeed {
+			return nil, errors.New("wallet primary seed doesn't equal expected existing seed")
+		}
 	}
 
 	return jr, nil
