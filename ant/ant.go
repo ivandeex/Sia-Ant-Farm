@@ -318,7 +318,7 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	a.staticLogger.Debugf("%v: %v", a.Config.DataDir, "closing ant before siad update")
 	err := a.Close()
 	if err != nil {
-		return errors.AddContext(err, "can't stop running ant")
+		return errors.AddContext(err, "unable to close ant")
 	}
 
 	// Start siad
@@ -334,7 +334,7 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 func (a *Ant) WaitForContractsToRenew(contractsCount int, timeout time.Duration) error {
 	// Check ant is renter
 	if !a.HasRenterTypeJob() {
-		return errors.New("The and doesn't have renter job")
+		return errors.New("The ant doesn't have renter job")
 	}
 	a.staticLogger.Debugf("%v: waiting for renter contracts to renew", a.Config.SiadConfig.DataDir)
 
