@@ -43,6 +43,10 @@ const (
 	// build binary.
 	rebuildMaster = true
 
+	// upgradePathVersionsLimit defines number of versions to include in
+	// version tests. It includes the master version.
+	upgradePathVersionsLimit = 5
+
 	// allowLocalIPs defines whether we allow ants to use localhost IPs.
 	// Default is true. When set to true it is possible to test from Sia v1.5.0
 	// on Gitlab CI and on machines without publicly accessible ports and
@@ -95,6 +99,11 @@ func TestUpgrades(t *testing.T) {
 	// Exclude unwanted releases
 	exclVersions := strings.Split(excludeReleasedVersions, ",")
 	upgradePathVersions = excludeVersions(upgradePathVersions, exclVersions)
+
+	// Limit number of versions. '+1' represents the master version
+	if len(upgradePathVersions)+1 > upgradePathVersionsLimit {
+		upgradePathVersions = upgradePathVersions[len(upgradePathVersions)-upgradePathVersionsLimit+1:]
+	}
 
 	// Get latest release
 	latestVersion := upgradePathVersions[len(upgradePathVersions)-1]
@@ -155,14 +164,22 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	}
 	t.Parallel()
 
-	// Prepare data directory and logger
+	// Prepare test logger
 	dataDir := test.TestDir(t.Name())
-	logger, err := antfarm.NewAntfarmLogger(dataDir)
+	testLogger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := testLogger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Prepare data directory and logger
+	antfarmLogger, err := antfarm.NewAntfarmLogger(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := logger.Close(); err != nil {
+		if err := antfarmLogger.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -170,7 +187,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	// Build binary to test
 	branch := "master"
 	if rebuildMaster {
-		err := buildSiad(logger, binariesDir, branch)
+		err := buildSiad(testLogger, binariesDir, branch)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -204,13 +221,13 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	}
 
 	// Create an antfarm
-	farm, err := antfarm.New(logger, config)
+	farm, err := antfarm.New(antfarmLogger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		if err := farm.Close(); err != nil {
-			logger.Errorf("can't close antfarm: %v", err)
+			antfarmLogger.Errorf("can't close antfarm: %v", err)
 		}
 	}()
 
@@ -230,6 +247,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	for i := 0; i < 10; i++ {
+		// There is no need for timeout, upload itself has its own timeout.
 		_, err = renterJob.Upload(modules.SectorSize)
 		if err != nil {
 			t.Fatal(err)
@@ -371,7 +389,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	}
 
 	// DownloadAndVerifyFiles
-	err = antfarm.DownloadAndVerifyFiles(t, restoreRenterAnt, renterJob.Files)
+	err = antfarm.DownloadAndVerifyFiles(testLogger, restoreRenterAnt, renterJob.Files)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -379,21 +397,28 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 
 // upgradeTest executes configured renter or hosts upgrade test
 func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
+	// Prepare test logger
+	dataDir := test.TestDir(t.Name())
+	testLogger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := testLogger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
 	// Log upgrade path
 	upgradePath := testConfig.upgradePath
 	msg := "Upgrade path: "
 	msg += strings.Join(upgradePath, " -> ")
-	t.Log(msg)
+	testLogger.Println(msg)
 
 	// Get default Antfarm config
-	dataDir := test.TestDir(t.Name())
-
-	logger, err := antfarm.NewAntfarmLogger(dataDir)
+	antfarmLlogger, err := antfarm.NewAntfarmLogger(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := logger.Close(); err != nil {
+		if err := antfarmLlogger.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -407,8 +432,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 	var farm *antfarm.AntFarm
 	renterIndex, err := antfarmConfig.GetAntConfigIndexByName(test.RenterAntName)
 	if err != nil {
-		t.Error(err)
-		return
+		t.Fatal(err)
 	}
 	hostIndices := antfarmConfig.GetHostAntConfigIndices()
 	var renterAnt *ant.Ant
@@ -431,7 +455,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			if testConfig.upgradeRenter {
 				// Set renter to initial tested version
 				antfarmConfig.AntConfigs[renterIndex].SiadConfig.SiadPath = siadBinaryPath(version)
-				t.Logf("Starting antfarm with renter's siad-dev version %v, all other ants' siad-dev version: %v\n", version, testConfig.baseVersion)
+				testLogger.Printf("Starting antfarm with renter's siad-dev version %v, all other ants' siad-dev version: %v\n", version, testConfig.baseVersion)
 			}
 			// Initial hosts setup
 			if testConfig.upgradeHosts {
@@ -439,11 +463,11 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 				for _, hostIndex := range hostIndices {
 					antfarmConfig.AntConfigs[hostIndex].SiadConfig.SiadPath = siadBinaryPath(version)
 				}
-				t.Logf("Starting antfarm with hosts' siad-dev version %v, all other ants' siad-dev version: %v\n", version, testConfig.baseVersion)
+				testLogger.Printf("Starting antfarm with hosts' siad-dev version %v, all other ants' siad-dev version: %v\n", version, testConfig.baseVersion)
 			}
 
 			// Start antfarm
-			newFarm, err := antfarm.New(logger, antfarmConfig)
+			newFarm, err := antfarm.New(antfarmLlogger, antfarmConfig)
 			farm = newFarm
 			if err != nil {
 				t.Fatal(err)
@@ -464,7 +488,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 
 			// Upgrade renter
 			if testConfig.upgradeRenter {
-				t.Logf("Upgrading renter to siad-dev version %v\n", version)
+				testLogger.Printf("Upgrading renter to siad-dev version %v\n", version)
 				err = renterAnt.UpdateSiad(siadBinaryPath(version))
 				if err != nil {
 					t.Fatal(err)
@@ -473,7 +497,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 
 			// Upgrade hosts
 			if testConfig.upgradeHosts {
-				t.Logf("Upgrading hosts to siad-version %v\n", version)
+				testLogger.Printf("Upgrading hosts to siad-version %v\n", version)
 				for _, hostIndex := range hostIndices {
 					err := farm.Ants[hostIndex].UpdateSiad(siadBinaryPath(version))
 					if err != nil {
@@ -503,7 +527,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		uploadedFiles = append(uploadedFiles, renterJob.Files[0])
 
 		// Download and verify files
-		err = antfarm.DownloadAndVerifyFiles(t, renterAnt, uploadedFiles)
+		err = antfarm.DownloadAndVerifyFiles(testLogger, renterAnt, uploadedFiles)
 		if err != nil {
 			t.Error(err)
 			continue

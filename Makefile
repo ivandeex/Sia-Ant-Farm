@@ -66,7 +66,7 @@ test-long: clean fmt vet lint-ci install-siad-dev
 
 test-vlong: clean fmt vet lint-ci install-siad-dev
 	@mkdir -p cover
-	go test -v -tags='testing debug vlong netgo' -timeout=3600s $(pkgs) -run=$(run) -count=$(count)
+	go test -v -tags='testing debug vlong netgo' -timeout=3600s $(pkgs) -run='$(run)' -count=$(count)
 
 # lint runs golangci-lint (which includes golint, a spellcheck of the codebase,
 # and other linters), the custom analyzers, and also a markdown spellchecker.
