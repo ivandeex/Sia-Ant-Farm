@@ -232,15 +232,22 @@ func TestUploadDownloadFileData(t *testing.T) {
 	}
 	t.Parallel()
 
-	// Start Antfarm
+	// Prepare test logger
 	dataDir := test.TestDir(t.Name())
+	testLogger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := testLogger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
 
-	logger, err := NewAntfarmLogger(dataDir)
+	// Start Antfarm
+	antfarmLogger, err := NewAntfarmLogger(dataDir)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
-		if err := logger.Close(); err != nil {
+		if err := antfarmLogger.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
@@ -249,13 +256,13 @@ func TestUploadDownloadFileData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	farm, err := New(logger, config)
+	farm, err := New(antfarmLogger, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() {
 		if err := farm.Close(); err != nil {
-			logger.Errorf("can't close antfarm: %v", err)
+			antfarmLogger.Errorf("can't close antfarm: %v", err)
 		}
 	}()
 
@@ -277,7 +284,7 @@ func TestUploadDownloadFileData(t *testing.T) {
 	}
 
 	// DownloadAndVerifyFiles
-	err = DownloadAndVerifyFiles(t, renterAnt, renterJob.Files)
+	err = DownloadAndVerifyFiles(testLogger, renterAnt, renterJob.Files)
 	if err != nil {
 		t.Fatal(err)
 	}

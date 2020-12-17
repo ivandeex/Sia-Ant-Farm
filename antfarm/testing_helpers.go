@@ -5,9 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"testing"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/errors"
@@ -106,7 +106,7 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 
 // DownloadAndVerifyFiles downloads given files and compares calculated
 // downloaded file hashes with recorded uploaded file hashes
-func DownloadAndVerifyFiles(t *testing.T, renterAnt *ant.Ant, files []ant.RenterFile) error {
+func DownloadAndVerifyFiles(logger *persist.Logger, renterAnt *ant.Ant, files []ant.RenterFile) error {
 	// Get renter job for downloads
 	renterJob := renterAnt.Jr.NewRenterJob()
 	destDir := renterAnt.Config.DataDir
@@ -130,10 +130,10 @@ func DownloadAndVerifyFiles(t *testing.T, renterAnt *ant.Ant, files []ant.Renter
 			return fmt.Errorf("can't download Sia file %v: %v", siaPath, err)
 		}
 
-		t.Logf("Comparing\n\tsource file: %v\n\twith downloaded file: %v\n\tusing binary: %v\n", f.SourceFile, destPath, renterAnt.Config.SiadPath)
+		logger.Printf("Comparing\n\tsource file: %v\n\twith downloaded file: %v\n\tusing binary: %v\n", f.SourceFile, destPath, renterAnt.Config.SiadPath)
 
 		// Compare file hashes
-		uploadedFileHash := f.MerkleRoot
+		sourceFileHash := f.MerkleRoot
 		downloadedFile, err := os.Open(destPath)
 		if err != nil {
 			return fmt.Errorf("can't open downloaded file %v", destPath)
@@ -145,8 +145,18 @@ func DownloadAndVerifyFiles(t *testing.T, renterAnt *ant.Ant, files []ant.Renter
 		if err != nil {
 			return fmt.Errorf("can't get hash for downloaded file %v", destPath)
 		}
-		if uploadedFileHash != downloadedFileHash {
-			return fmt.Errorf("file #%v uploaded file hash doesn't equal downloaded file hash", i)
+		if sourceFileHash != downloadedFileHash {
+			msg := fmt.Sprintf("file #%v downloaded file hash doesn't equal source file hash\n", i)
+			dfi, err := os.Stat(destPath)
+			if err != nil {
+				return errors.AddContext(err, "can't get downloaded file info")
+			}
+			sfi, err := os.Stat(f.SourceFile)
+			if err != nil {
+				return errors.AddContext(err, "can't get source file info")
+			}
+			msg += fmt.Sprintf("file #%v downloaded file length: %d, source file length: %d", i, dfi.Size(), sfi.Size())
+			return errors.New(msg)
 		}
 	}
 

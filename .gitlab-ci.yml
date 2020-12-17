@@ -60,6 +60,8 @@ lint:
     - export GOCACHE=$CI_PROJECT_DIR/.cache/gocache
     - make lint
     - make test
+  except:
+    - pipelines
 
 build:
   stage: lint
@@ -76,6 +78,8 @@ build:
       - mkdir -p "$CI_PROJECT_DIR/artifacts"
       - cp "$GOPATH/bin/siad-dev" "$CI_PROJECT_DIR/artifacts/."
       - cp "$GOPATH/bin/sia-antfarm" "$CI_PROJECT_DIR/artifacts/."
+  except:
+    - pipelines
 
 ant-tests:
   <<: *default_test_params
@@ -85,6 +89,9 @@ ant-tests:
       - .cache
   script:
     - make test-long pkgs="$ant_pkgs"
+  except:
+    - pipelines
+
 
 antfarm-tests:
   <<: *default_test_params
@@ -94,8 +101,10 @@ antfarm-tests:
       - .cache
   script:
     - make test-long pkgs="$antfarm_pkgs"
+  except:
+    - pipelines
 
-version-tests:
+antfarm-version-tests:
   <<: *default_test_params
   cache:
     key: version-tests-cache
@@ -103,3 +112,35 @@ version-tests:
       - .cache
   script:
     - make test-long pkgs="$version_test_pkgs"
+  except:
+    - pipelines
+
+# Short version/upgrade test triggered by Sia project merge to master
+short-version-tests:
+  <<: *default_test_params
+  cache:
+    key: version-tests-short-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run='TestUpgrades/(TestRenterUpgradesWithBaseLatestMaster|TestHostsUpgradesWithBaseLatestMaster)'
+  only:
+    refs:
+      - pipelines
+    variables: 
+      - $PARENT_CI_PIPELINE_SOURCE != "schedule"
+
+# Long version/upgrade test triggered by Sia project scheduled pipeline
+long-version-tests:
+  <<: *default_test_params
+  cache:
+    key: version-tests-long-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades
+  only:
+    refs:
+      - pipelines
+    variables: 
+      - $PARENT_CI_PIPELINE_SOURCE == "schedule"

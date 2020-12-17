@@ -1,0 +1,1 @@
+- Update version tests to log to test log file instead of to the console.
