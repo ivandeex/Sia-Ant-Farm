@@ -1,4 +1,4 @@
-package versiontest
+package binariesbuilder
 
 import (
 	"fmt"
@@ -30,7 +30,7 @@ func TestBuildBinaries(t *testing.T) {
 	}
 	t.Parallel()
 
-	releases, err := getReleases(minReleaseVersion)
+	releases, err := GetReleases(minReleaseVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,15 +46,14 @@ func TestBuildBinaries(t *testing.T) {
 	}()
 
 	// Build release binaries
-	binariesDir := "../upgrade-binaries"
-	err = buildSiad(logger, binariesDir, releases...)
+	err = buildSiad(logger, BinariesDir, releases...)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Check binary files
 	for _, release := range releases {
-		releasePath := filepath.Join(binariesDir, fmt.Sprintf("Sia-%v-linux-amd64", release), "siad-dev")
+		releasePath := filepath.Join(BinariesDir, fmt.Sprintf("Sia-%v-linux-amd64", release), "siad-dev")
 		_, err := os.Stat(releasePath)
 		if err != nil && os.IsNotExist(err) {
 			t.Errorf("Expected binary %v was not found\n", releasePath)
@@ -124,7 +123,7 @@ func TestGetReleases(t *testing.T) {
 	}
 	t.Parallel()
 
-	releases, err := getReleases(minReleaseVersion)
+	releases, err := GetReleases(minReleaseVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -148,7 +147,7 @@ func TestGetReleases(t *testing.T) {
 // excludeVersionsTest is a testing helper for TestExcludeVersions test group.
 // It tests excludeVersions function.
 func excludeVersionsTest(t *testing.T, tc excludeVersionTestConfig) {
-	gotVersions := excludeVersions(tc.givenVersions, tc.excludeVersions)
+	gotVersions := ExcludeVersions(tc.givenVersions, tc.excludeVersions)
 	got := fmt.Sprintf("%q", gotVersions)
 	exp := fmt.Sprintf("%q", tc.expectedVersions)
 	if got != exp {

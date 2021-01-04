@@ -1,4 +1,4 @@
-package versiontest
+package binariesbuilder
 
 import (
 	"encoding/json"
@@ -54,17 +54,6 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 	vs := strings.Join(versions, ", ")
 	logger.Debugf("preparing to build siad versions: %v", vs)
 
-	// Get current working directory and change back to it when done
-	startDir, err := os.Getwd()
-	if err != nil {
-		return errors.AddContext(err, "can't get current working directory")
-	}
-	defer func() {
-		if err := os.Chdir(startDir); err != nil {
-			logger.Errorf("can't perform change directory to the original directory")
-		}
-	}()
-
 	// Clone Sia repository if it doesn't exist locally
 	goPath, ok := os.LookupEnv("GOPATH")
 	if !ok {
@@ -74,21 +63,15 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 	gitlabSia := fmt.Sprintf("%v/Sia", gitlabNebulous)
 	siaPath := fmt.Sprintf("%v/src/%v", goPath, gitlabSia)
 	siaRepoURL := fmt.Sprintf("https://%v.git", gitlabSia)
-	err = gitClone(logger, siaRepoURL, siaPath)
+	err := gitClone(logger, siaRepoURL, siaPath)
 	if err != nil {
 		return errors.AddContext(err, "can't clone Sia repository")
-	}
-
-	// Set working dir to Sia repository
-	err = os.Chdir(siaPath)
-	if err != nil {
-		return errors.AddContext(err, "can't change to Sia directory")
 	}
 
 	// Git reset to clean git repository
 	cmd := command{
 		name: "git",
-		args: []string{"reset", "--hard", "HEAD"},
+		args: []string{"-C", siaPath, "reset", "--hard", "HEAD"},
 	}
 	_, err = cmd.execute(logger)
 	if err != nil {
@@ -98,7 +81,7 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 	// Git pull including tags to get latest state
 	cmd = command{
 		name: "git",
-		args: []string{"pull", "--tags", "--prune", "--force", "origin", "master"},
+		args: []string{"-C", siaPath, "pull", "--tags", "--prune", "--force", "origin", "master"},
 	}
 	_, err = cmd.execute(logger)
 	if err != nil {
@@ -114,7 +97,11 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		if filepath.IsAbs(binariesDir) {
 			binaryDir = filepath.Join(binariesDir, binarySubDir)
 		} else {
-			binaryDir = filepath.Join(startDir, binariesDir, binarySubDir)
+			wd, err := os.Getwd()
+			if err != nil {
+				return errors.AddContext(err, "can't get current working directory")
+			}
+			binaryDir = filepath.Join(wd, binariesDir, binarySubDir)
 		}
 
 		err := os.MkdirAll(binaryDir, 0700)
@@ -149,7 +136,7 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		// Get dependencies
 		cmd = command{
 			name: "go",
-			args: []string{"get", "-d", "./..."},
+			args: []string{"get", "-d", gitlabSia + "/..."},
 		}
 		_, err = cmd.execute(logger)
 		if err != nil {
@@ -157,7 +144,7 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		}
 
 		// Compile siad-dev binaries
-		pkg := "gitlab.com/NebulousLabs/Sia/cmd/siad"
+		pkg := filepath.Join(gitlabSia, "cmd/siad")
 		binaryName := "siad-dev"
 		binaryPath := filepath.Join(binaryDir, binaryName)
 
@@ -168,7 +155,7 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 			return errors.AddContext(err, "can't get build time")
 		}
 		buildTime = strings.TrimSpace(buildTime)
-		cmd = command{name: "git", args: []string{"rev-parse", "--short", "HEAD"}}
+		cmd = command{name: "git", args: []string{"-C", siaPath, "rev-parse", "--short", "HEAD"}}
 		gitRevision, err := cmd.execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't get git revision")
@@ -216,10 +203,10 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 	return nil
 }
 
-// excludeVersions takes as an input a slice of versions to be filtered and a
+// ExcludeVersions takes as an input a slice of versions to be filtered and a
 // slice of versions which should be excluded from the first slice. It returns
 // a slice of versions without excluded versions.
-func excludeVersions(versions, excludeVersions []string) []string {
+func ExcludeVersions(versions, excludeVersions []string) []string {
 	result := []string{}
 
 versionsLoop:
@@ -237,13 +224,13 @@ versionsLoop:
 	return result
 }
 
-// getReleases returns slice of git tags of Sia Gitlab releases greater than or
+// GetReleases returns slice of git tags of Sia Gitlab releases greater than or
 // equal to the given minimal version in ascending semantic version order. If
 // there is a patch tagged with "-antfarm" suffix for a Sia release, patch tag
 // instead release tag is added to the return slice.
 // NOTE: These patches are ONLY to enable the Sia Antfarm to run and are not
 // intended to address any underlying bugs in siad.
-func getReleases(minVersion string) ([]string, error) {
+func GetReleases(minVersion string) ([]string, error) {
 	// Get tags from Gitlab Sia repository. It can be multiple pages.
 	bodies, err := querySiaRepoAPI("repository/tags")
 	if err != nil {
@@ -298,29 +285,12 @@ func getReleases(minVersion string) ([]string, error) {
 // reset and git checkout by branch, tag or commit id specified in checkoutStr
 // and changes working directory back to original directory.
 func gitCheckout(logger *persist.Logger, gitRepoPath, checkoutStr string) error {
-	// Get current working directory and change back to it when done
-	startDir, err := os.Getwd()
-	if err != nil {
-		return errors.AddContext(err, "can't get current working directory")
-	}
-	defer func() {
-		if err := os.Chdir(startDir); err != nil {
-			logger.Errorf("can't perform change directory to the original directory")
-		}
-	}()
-
-	// Change working directory to the git repository
-	err = os.Chdir(gitRepoPath)
-	if err != nil {
-		return errors.AddContext(err, "can't change to merkletree directory")
-	}
-
 	// Reset git
 	cmd := command{
 		name: "git",
-		args: []string{"reset", "--hard", "HEAD"},
+		args: []string{"-C", gitRepoPath, "reset", "--hard", "HEAD"},
 	}
-	_, err = cmd.execute(logger)
+	_, err := cmd.execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't reset git repository")
 	}
@@ -328,7 +298,7 @@ func gitCheckout(logger *persist.Logger, gitRepoPath, checkoutStr string) error 
 	// Git checkout by branch, tag or commit id
 	cmd = command{
 		name: "git",
-		args: []string{"checkout", checkoutStr},
+		args: []string{"-C", gitRepoPath, "checkout", checkoutStr},
 	}
 	_, err = cmd.execute(logger)
 	if err != nil {
