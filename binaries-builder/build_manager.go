@@ -51,7 +51,7 @@ func (b *builder) BuildVersions(logger *persist.Logger, binariesDir string, vers
 	var chans []chan error
 	for _, v := range versions {
 		ch := make(chan error)
-		b.buildManager(logger, binariesDir, v, ch)
+		b.managedBuildVersion(logger, binariesDir, v, ch)
 		chans = append(chans, ch)
 	}
 
@@ -65,9 +65,9 @@ func (b *builder) BuildVersions(logger *persist.Logger, binariesDir string, vers
 	return nil
 }
 
-// buildManager returns already built version results or requests worker to
-// build the specific version.
-func (b *builder) buildManager(logger *persist.Logger, binariesDir string, version string, ch chan error) {
+// managedBuildVersion returns already built version results or requests worker
+// to build the specific version.
+func (b *builder) managedBuildVersion(logger *persist.Logger, binariesDir string, version string, ch chan error) {
 	b.Lock()
 	defer b.Unlock()
 
@@ -86,13 +86,13 @@ func (b *builder) buildManager(logger *persist.Logger, binariesDir string, versi
 	b.versionMap[version] = s
 
 	// Start the build worker.
-	go b.buildWorker(binariesDir)
+	go b.threadedUpdateBuilds(binariesDir)
 }
 
-// buildWorker selects the versions to be built from version map, builds the
-// versions and updates version build statuses. It makes sure that at most only
-// one build worker is running at any time.
-func (b *builder) buildWorker(binariesDir string) {
+// threadedUpdateBuilds selects the versions to be built from version map,
+// builds the versions and updates version build statuses. It makes sure that
+// at most only one build worker is running at any time.
+func (b *builder) threadedUpdateBuilds(binariesDir string) {
 	// Allow max 1 build worker to be active
 	b.Lock()
 	if b.building {

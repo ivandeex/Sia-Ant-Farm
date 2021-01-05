@@ -131,7 +131,7 @@ func TestRenterDownloader(t *testing.T) {
 	}
 
 	// Calculate storage size
-	fileSize := uint64(4096 * 4000)
+	fileSize := uint64(modules.SectorSize * 4000)
 
 	// Upload a file
 	renterJob := renterAnt.Jr.NewRenterJob()
@@ -213,7 +213,7 @@ func TestRenterUploader(t *testing.T) {
 	}
 
 	// Calculate storage size
-	fileSize := uint64(4096 * 4000)
+	fileSize := uint64(modules.SectorSize * 4000)
 	filesCount := 20
 	storageRatio := 1.1 // Add 10% more storage than exact file size * file count
 	storageSize := fileSize * uint64(float64(filesCount)*storageRatio)
