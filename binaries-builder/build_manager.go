@@ -17,7 +17,7 @@ const (
 // first.
 var StaticBuilder builder
 
-// builder defines a truct to be used by staticBuilder
+// builder defines a struct to be used by staticBuilder
 type builder struct {
 	sync.Mutex
 	// versionMap defines map with version strings as keys and version status
