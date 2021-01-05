@@ -58,7 +58,11 @@ const (
 
 	// uploadFileCheckFrequency defines how frequently the renter job checks if
 	// file upload has reached 100%
-	uploadFileCheckFrequency = time.Second * 20
+	uploadFileCheckFrequency = time.Second
+
+	// uploadFileCheckLogFrequency defines how frequently to log when upload
+	// gets stuck
+	uploadFileCheckLogFrequency = time.Second * 20
 
 	// renterAllowancePeriod defines the block duration of the renter's allowance
 	renterAllowancePeriod = 100
@@ -598,6 +602,9 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 	// Block until the upload has reached 100%
 	start := time.Now()
 	var lastUploadProgress float64
+	// Set lastUploadProgressLogTimestamp to past so the upload progress check
+	// is able to log immediately
+	lastUploadProgressLogTimestamp := time.Now().Add(-uploadFileCheckLogFrequency)
 	for {
 		select {
 		case <-r.staticJR.StaticTG.StopChan():
@@ -625,8 +632,10 @@ func (r *RenterJob) managedUpload(fileSize uint64) (siaPath modules.SiaPath, err
 		}
 
 		// If there is no progress in the upload log number of active hosts and
-		// contracts
-		if uploadProgress == lastUploadProgress {
+		// contracts. Repeat the contracts number log every according to the
+		// given frequency.
+		if uploadProgress == lastUploadProgress && time.Since(lastUploadProgressLogTimestamp) > uploadFileCheckLogFrequency {
+			lastUploadProgressLogTimestamp = time.Now()
 			// Log number of hostdb active hosts
 			hdag, err := r.staticJR.staticClient.HostDbActiveGet()
 			if err != nil {

@@ -12,6 +12,8 @@ variables:
     ./ant
   antfarm_pkgs: >-
     ./antfarm
+  binaries_builder_pkgs: >-
+    ./binaries-builder
   version_test_pkgs: >-
     ./version-test
 
@@ -104,18 +106,18 @@ antfarm-tests:
   except:
     - pipelines
 
-antfarm-version-tests:
+binaries-builder-tests:
   <<: *default_test_params
   cache:
-    key: version-tests-cache
+    key: binaries-builder-tests-cache
     paths:
       - .cache
   script:
-    - make test-long pkgs="$version_test_pkgs"
+    - make test-long pkgs="$binaries_builder_pkgs"
   except:
     - pipelines
 
-# Short version/upgrade test triggered by Sia project merge to master
+# Short version/upgrade tests triggered by Sia project merge to master
 short-version-tests:
   <<: *default_test_params
   cache:
@@ -130,7 +132,7 @@ short-version-tests:
     variables: 
       - $PARENT_CI_PIPELINE_SOURCE != "schedule"
 
-# Long version/upgrade test triggered by Sia project scheduled pipeline
+# Long version tests triggered by Sia project scheduled pipeline
 long-version-tests:
   <<: *default_test_params
   cache:
@@ -138,7 +140,7 @@ long-version-tests:
     paths:
       - .cache
   script:
-    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades
+    - make test-vlong pkgs="$version_test_pkgs"
   only:
     refs:
       - pipelines

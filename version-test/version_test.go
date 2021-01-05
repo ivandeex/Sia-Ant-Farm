@@ -10,19 +10,16 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
+	binariesbuilder "gitlab.com/NebulousLabs/Sia-Ant-Farm/binaries-builder"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/modules"
+	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/errors"
 )
 
 const (
-	// binariesDir defines path where build binaries should be stored. If the
-	// path is set as relative, it is relative to Sia-Ant-Farm/version-test
-	// directory.
-	binariesDir = "../upgrade-binaries"
-
 	// excludeReleasedVersions defines comma separated list of Sia releases to
 	// be excluded from the version test (TestUpgrades). v1.4.9 is also
 	// excluded from the version test, but v1.4.9 didn't have Sia Gitlab
@@ -73,6 +70,189 @@ func siadBinaryPath(version string) string {
 	return fmt.Sprintf("../upgrade-binaries/Sia-%v-linux-amd64/siad-dev", version)
 }
 
+// TestRenterDownloader tests continual downloading of files from the network.
+func TestRenterDownloader(t *testing.T) {
+	if !build.VLONG {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Prepare test logger
+	dataDir := test.TestDir(t.Name())
+	testLogger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := testLogger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Rebuild the master
+	master := "master"
+	if rebuildMaster {
+		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, binariesbuilder.BinariesDir, master)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create antfarm config
+	antfarmConfig, err := antfarm.NewDefaultRenterAntfarmTestingConfig(dataDir, allowLocalIPs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set antfarm config to use the specified branch
+	for aci := range antfarmConfig.AntConfigs {
+		antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = siadBinaryPath(master)
+	}
+
+	// Start antfarm
+	newFarm, err := antfarm.New(testLogger, antfarmConfig)
+	farm := newFarm
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := farm.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Get renter ant
+	renterAnt, err := farm.GetAntByName(test.RenterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Timeout the test if the renter doesn't become upload ready
+	err = renterAnt.Jr.WaitForRenterUploadReady()
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Calculate storage size
+	fileSize := uint64(modules.SectorSize * 4000)
+
+	// Upload a file
+	renterJob := renterAnt.Jr.NewRenterJob()
+	_, err = renterJob.Upload(fileSize)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Start downloading the file
+	downloadsCount := 200
+	for i := 0; i < downloadsCount; i++ {
+		err = antfarm.DownloadAndVerifyFiles(testLogger, renterAnt, renterJob.Files)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+	}
+}
+
+// TestRenterUploader tests continual uploading of files from a renter to the
+// network.
+func TestRenterUploader(t *testing.T) {
+	if !build.VLONG {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Prepare test logger
+	dataDir := test.TestDir(t.Name())
+	testLogger := test.NewTestLogger(t, dataDir)
+	defer func() {
+		if err := testLogger.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Rebuild the master
+	master := "master"
+	if rebuildMaster {
+		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, binariesbuilder.BinariesDir, master)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Create antfarm config
+	antfarmConfig, err := antfarm.NewDefaultRenterAntfarmTestingConfig(dataDir, allowLocalIPs)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Set antfarm config to use the specified branch
+	for aci := range antfarmConfig.AntConfigs {
+		antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = siadBinaryPath(master)
+	}
+
+	// Start antfarm
+	newFarm, err := antfarm.New(testLogger, antfarmConfig)
+	farm := newFarm
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if err := farm.Close(); err != nil {
+			t.Fatal(err)
+		}
+	}()
+
+	// Get renter ant
+	renterAnt, err := farm.GetAntByName(test.RenterAntName)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Timeout the test if the renter doesn't become upload ready
+	err = renterAnt.Jr.WaitForRenterUploadReady()
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Calculate storage size
+	fileSize := uint64(modules.SectorSize * 4000)
+	filesCount := 20
+	storageRatio := 1.1 // Add 10% more storage than exact file size * file count
+	storageSize := fileSize * uint64(float64(filesCount)*storageRatio)
+
+	// Increase hosts storage folders
+	for _, ai := range antfarmConfig.GetHostAntConfigIndices() {
+		// Get client
+		opts, err := client.DefaultOptions()
+		if err != nil {
+			t.Fatal(err)
+		}
+		opts.Address = farm.Ants[ai].APIAddr
+		c := client.New(opts)
+
+		// Get storage folder path
+		sg, err := c.HostStorageGet()
+		if err != nil {
+			t.Fatal(err)
+		}
+		path := sg.Folders[0].Path
+
+		// Resize storage folder
+		err = c.HostStorageFoldersResizePost(path, storageSize)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Start uploading files
+	renterJob := renterAnt.Jr.NewRenterJob()
+	for i := 0; i < filesCount; i++ {
+		_, err = renterJob.Upload(fileSize)
+		if err != nil {
+			t.Error(err)
+			continue
+		}
+	}
+}
+
 // TestUpgrades is test group which contains two types of version upgrade
 // subtests. TestRenterUpgrades is a version test type where renter starts with
 // the first siad-dev defined in upgradePathVersions, renter upgrades
@@ -91,14 +271,14 @@ func TestUpgrades(t *testing.T) {
 	t.Parallel()
 
 	// Get releases from Sia Gitlab repo.
-	upgradePathVersions, err := getReleases(minVersion)
+	upgradePathVersions, err := binariesbuilder.GetReleases(minVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Exclude unwanted releases
 	exclVersions := strings.Split(excludeReleasedVersions, ",")
-	upgradePathVersions = excludeVersions(upgradePathVersions, exclVersions)
+	upgradePathVersions = binariesbuilder.ExcludeVersions(upgradePathVersions, exclVersions)
 
 	// Limit number of versions. '+1' represents the master version
 	if len(upgradePathVersions)+1 > upgradePathVersionsLimit {
@@ -119,13 +299,13 @@ func TestUpgrades(t *testing.T) {
 
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
-		err := buildSiad(logger, binariesDir, upgradePathVersions...)
+		err := binariesbuilder.StaticBuilder.BuildVersions(logger, binariesbuilder.BinariesDir, upgradePathVersions...)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if rebuildMaster {
-		err := buildSiad(logger, binariesDir, "master")
+		err := binariesbuilder.StaticBuilder.BuildVersions(logger, binariesbuilder.BinariesDir, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -187,7 +367,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	// Build binary to test
 	branch := "master"
 	if rebuildMaster {
-		err := buildSiad(testLogger, binariesDir, branch)
+		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, binariesbuilder.BinariesDir, branch)
 		if err != nil {
 			t.Fatal(err)
 		}

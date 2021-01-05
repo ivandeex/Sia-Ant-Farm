@@ -154,7 +154,10 @@ func DownloadAndVerifyFiles(logger *persist.Logger, renterAnt *ant.Ant, files []
 			if err != nil {
 				return errors.AddContext(err, "can't get source file info")
 			}
-			return fmt.Errorf("file #%v downloaded file hash doesn't equal source file hash\ndownloaded file length: %d, source file length: %d", i, dfi.Size(), sfi.Size())
+			err = fmt.Errorf("file #%v downloaded file hash doesn't equal source file hash", i)
+			err = fmt.Errorf("%v\nfile #%v downloaded file length: %d, source file length: %d", err, i, dfi.Size(), sfi.Size())
+			logger.Errorln(err)
+			return err
 		}
 	}
 
