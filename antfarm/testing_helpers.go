@@ -104,6 +104,98 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 	return config, nil
 }
 
+// NewAntfarmConfig creates a new antfarm config. Ants of different types have
+// standardized names.
+func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int, renters int, generic int) (AntfarmConfig, error) {
+	antFarmAddr := test.RandomLocalAddress()
+	antFarmDir := filepath.Join(dataDir, "antfarm-data")
+	antCount := miners + hosts + renters + generic
+	antDirs, err := test.AntDirs(dataDir, antCount)
+	if err != nil {
+		return AntfarmConfig{}, errors.AddContext(err, "can't create ant data directories")
+	}
+
+	// Prepare ant configs
+	antConfigs := []ant.AntConfig{}
+	var doneAntConfigs int
+
+	// Add miners
+	for i := 0; i < miners; i++ {
+		ac := ant.AntConfig{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: allowLocalIPs,
+				APIAddr:                  test.RandomLocalAddress(),
+				DataDir:                  antDirs[doneAntConfigs],
+				SiadPath:                 test.TestSiadFilename,
+			},
+			Jobs: []string{"gateway", "miner"},
+			Name: ant.NameMiner(i),
+		}
+		antConfigs = append(antConfigs, ac)
+		doneAntConfigs++
+	}
+
+	// Add hosts
+	for i := 0; i < hosts; i++ {
+		ac := ant.AntConfig{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: allowLocalIPs,
+				APIAddr:                  test.RandomLocalAddress(),
+				DataDir:                  antDirs[doneAntConfigs],
+				SiadPath:                 test.TestSiadFilename,
+			},
+			Jobs:            []string{"host"},
+			Name:            ant.NameHost(i),
+			DesiredCurrency: 100000,
+		}
+		antConfigs = append(antConfigs, ac)
+		doneAntConfigs++
+	}
+
+	// Add renters
+	for i := 0; i < renters; i++ {
+		ac := ant.AntConfig{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress:      allowLocalIPs,
+				APIAddr:                       test.RandomLocalAddress(),
+				RenterDisableIPViolationCheck: true,
+				DataDir:                       antDirs[doneAntConfigs],
+				SiadPath:                      test.TestSiadFilename,
+			},
+			Jobs:            []string{"renter"},
+			Name:            ant.NameRenter(i),
+			DesiredCurrency: 100000,
+		}
+		antConfigs = append(antConfigs, ac)
+		doneAntConfigs++
+	}
+
+	// Add generic ants
+	for i := 0; i < generic; i++ {
+		ac := ant.AntConfig{
+			SiadConfig: ant.SiadConfig{
+				AllowHostLocalNetAddress: allowLocalIPs,
+				APIAddr:                  test.RandomLocalAddress(),
+				DataDir:                  antDirs[doneAntConfigs],
+				SiadPath:                 test.TestSiadFilename,
+			},
+			Jobs: []string{"generic"},
+			Name: ant.NameGeneric(i),
+		}
+		antConfigs = append(antConfigs, ac)
+		doneAntConfigs++
+	}
+
+	config := AntfarmConfig{
+		ListenAddress: antFarmAddr,
+		DataDir:       antFarmDir,
+		AntConfigs:    antConfigs,
+		AutoConnect:   true,
+		WaitForSync:   true,
+	}
+	return config, nil
+}
+
 // DownloadAndVerifyFiles downloads given files and compares calculated
 // downloaded file hashes with recorded uploaded file hashes
 func DownloadAndVerifyFiles(logger *persist.Logger, renterAnt *ant.Ant, files []ant.RenterFile) error {
