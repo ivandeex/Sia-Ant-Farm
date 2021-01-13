@@ -1,0 +1,1 @@
+- Update Sia to use `v1.5.4`.

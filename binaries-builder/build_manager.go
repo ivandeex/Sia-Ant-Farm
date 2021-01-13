@@ -138,6 +138,7 @@ func (b *builder) threadedUpdateBuilds(binariesDir string) {
 		b.Unlock()
 
 		// Build a version without a lock, so that callers can add new requests.
+		fmt.Println()
 		err := buildSiad(logger, binariesDir, versionToBuild)
 
 		b.Lock()

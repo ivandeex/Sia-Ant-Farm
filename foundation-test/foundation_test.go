@@ -17,9 +17,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
-	"gitlab.com/NebulousLabs/encoding"
 	"gitlab.com/NebulousLabs/errors"
 )
 
@@ -34,20 +32,21 @@ const (
 	// on Gitlab CI and on machines without publicly accessible ports and
 	// without UPnP enabled router. When set to false, currently it allows to
 	// test with external IPs on network with UPnP enabled router.
-	allowLocalIPs = true // xxx default false
+	allowLocalIPs = false
 
-	// binariesDir defines path where build binaries should be stored. If the
-	// path is set as relative, it is relative to Sia-Ant-Farm/foundation-test
-	// directory.
-	binariesDir = "../upgrade-binaries"
+	// forcePreHardforkBinaryRebuilding defines if pre-hardfork binary should
+	// be rebuilt even though it already exists. It saves time when repeating
+	// tests.
+	forcePreHardforkBinaryRebuilding = true
 
-	// forceBinaryRebuilding defines if binary should be rebuilt even though it
-	// already exists. It saves time when repeating tests.
-	forceBinaryRebuilding = true
+	// forceFoundationBinaryRebuilding defines if Foundation binary should be
+	// rebuilt even though it already exists. It saves time when repeating
+	// tests.
+	forceFoundationBinaryRebuilding = true
 
-	// foundationSiadFilename is the foundation siad file name in PATH used
-	// for foundation testing
-	foundationSiadFilename = "siad-foundation-dev" //xxx use builder
+	// foundationSiaVersion defines Sia version, that has implemented
+	// Foundation hardfork.
+	foundationSiaVersion = "v1.5.4"
 
 	// foundationSubsidyIntervalTimeout defines timeout for waiting between
 	// Foundation subsidy payouts.
@@ -110,6 +109,15 @@ func TestFoundationFailsafeAddressCanChangeUnlockHashes(t *testing.T) {
 		}
 	}()
 
+	// Build the Foundation binary
+	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
+	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
+		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	// Check UPnP enabled router
 	upnpStatus := upnprouter.CheckUPnPEnabled()
 	logger.Debugln(upnpStatus)
@@ -123,7 +131,7 @@ func TestFoundationFailsafeAddressCanChangeUnlockHashes(t *testing.T) {
 
 	// Update config to use foundation siad dev binaries
 	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadFilename
+		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
 	}
 
 	// Create antfarm
@@ -290,6 +298,15 @@ func TestFoundationPrimaryAddressCanChangeUnlockHashes(t *testing.T) {
 		}
 	}()
 
+	// Build the Foundation binary
+	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
+	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
+		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	// Check UPnP enabled router
 	upnpStatus := upnprouter.CheckUPnPEnabled()
 	logger.Debugln(upnpStatus)
@@ -303,7 +320,7 @@ func TestFoundationPrimaryAddressCanChangeUnlockHashes(t *testing.T) {
 
 	// Update config to use foundation siad dev binaries
 	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadFilename
+		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
 	}
 
 	// Create antfarm
@@ -416,6 +433,15 @@ func TestFoundationPrimaryAddressCanSendSiacoins(t *testing.T) {
 		}
 	}()
 
+	// Build the Foundation binary
+	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
+	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
+		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	// Check UPnP enabled router
 	upnpStatus := upnprouter.CheckUPnPEnabled()
 	logger.Debugln(upnpStatus)
@@ -428,7 +454,7 @@ func TestFoundationPrimaryAddressCanSendSiacoins(t *testing.T) {
 
 	// Update config to use foundation siad dev binaries
 	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadFilename
+		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
 	}
 
 	// Create antfarm
@@ -516,6 +542,15 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 		}
 	}()
 
+	// Build the Foundation binary
+	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
+	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
+		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
 	// Check UPnP enabled router
 	upnpStatus := upnprouter.CheckUPnPEnabled()
 	logger.Debugln(upnpStatus)
@@ -528,7 +563,7 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 
 	// Update config to use foundation siad dev binaries
 	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadFilename
+		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
 	}
 
 	// Create antfarm
@@ -714,10 +749,10 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 	}
 }
 
-// TestTransactionWithWrongReplayProtectionByteIsRejected tests that
-// transactions executed on the main (Foundation) blockchain can't be replied
-// on the legacy (non-Foundation) blockchain.
-func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
+// TestReplayProtection tests that transactions executed on the legacy (non-
+// Foundation-hardfork) blockchain can't be replayed on Foundation hardfork
+// blockchain.
+func TestReplayProtection(t *testing.T) {
 	if !build.VLONG {
 		t.SkipNow()
 	}
@@ -737,29 +772,46 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		}
 	}()
 
-	// Check UPnP enabled router
-	upnpStatus := upnprouter.CheckUPnPEnabled()
-	logger.Debugln(upnpStatus)
-
 	// Build the pre-hardfork binary
-	if _, err := os.Stat(binariesbuilder.SiadBinaryPath(nonHardforkSiaVersion)); err != nil || forceBinaryRebuilding {
+	nonHardforkSiadPath := binariesbuilder.SiadBinaryPath(nonHardforkSiaVersion)
+	if _, err := os.Stat(nonHardforkSiadPath); err != nil || forcePreHardforkBinaryRebuilding {
 		err = binariesbuilder.StaticBuilder.BuildVersions(logger, nonHardforkSiaVersion)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	// Create antfarm config with non-hardfork siad binaries
-	antfarmDataDir := filepath.Join(dataDir, "antfarm-data")
-	legacyBlockchainAntfarmDataDir := antfarmDataDir + "-legacy-blockchain"
-
-	// legacyBlockchainAntDirs must be set before antfarm data is copied,
-	// otherwise the data is deleted by test.AntDirs
-	legacyBlockchainAntDirs, err := test.AntDirs(legacyBlockchainAntfarmDataDir, 3)
-	if err != nil {
-		t.Fatalf("can't create legacy blockchain ant data directories: %v", err)
+	// Build the Foundation binary
+	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
+	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
+		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	nonHardforkSiadPath := binariesbuilder.SiadBinaryPath(nonHardforkSiaVersion)
+
+	// Check UPnP enabled router
+	upnpStatus := upnprouter.CheckUPnPEnabled()
+	logger.Debugln(upnpStatus)
+
+	// Set antfarm data dirs
+	antfarmDataDir := filepath.Join(dataDir, "antfarm-data-preparation")
+	legacyBlockChainAntfarmDataDir := filepath.Join(dataDir, "antfarm-data-legacy")
+	hardforkBlockChainAntfarmDataDir := filepath.Join(dataDir, "antfarm-data-hardfork")
+
+	// Set ants' data dirs
+	antDirs, err := test.AntDirs(antfarmDataDir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	legacyBlockChainAntDirs, err := test.AntDirs(legacyBlockChainAntfarmDataDir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
+	hardforkBlockChainAntDirs, err := test.AntDirs(hardforkBlockChainAntfarmDataDir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Config antfarm with a miner and 2 generic ants
 	antfarmConfig, err := antfarm.NewAntfarmConfig(antfarmDataDir, allowLocalIPs, 1, 0, 0, 2)
@@ -767,8 +819,9 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Update config to use foundation siad dev binaries //xxx not right
+	// Update config to use preparation ant dirs and non-hardfork siad dev binaries
 	for i := range antfarmConfig.AntConfigs {
+		antfarmConfig.AntConfigs[i].DataDir = antDirs[i]
 		antfarmConfig.AntConfigs[i].SiadPath = nonHardforkSiadPath
 	}
 
@@ -796,12 +849,13 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 	// Wait till miner has Siacoins
 	value1 := types.SiacoinPrecision.Mul64(3)
 	value2 := types.SiacoinPrecision.Mul64(4)
-	err = m.WaitConfirmedSiacoinBalance(ant.BalanceGreater, value1.Add(value2), minerFundedTimeout)
+	totalValue := value1.Add(value2)
+	err = m.WaitConfirmedSiacoinBalance(ant.BalanceGreater, totalValue, minerFundedTimeout)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Get generic ant 1, client and address
+	// Get generic ant1, client and address
 	g1, err := farm.GetAntByName(ant.NameGeneric(0))
 	if err != nil {
 		t.Fatal(err)
@@ -815,25 +869,23 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Send Siacoins for pre-hardfork replay transaction
+	// Create spendable outputs
 	_, err = mc.WalletSiacoinsPost(value1, *g1Address, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Send Siacoins for post-hardfork replay transaction
 	_, err = mc.WalletSiacoinsPost(value2, *g1Address, false)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Wait till an1 receives Siacoins
-	err = g1.WaitConfirmedSiacoinBalance(ant.BalanceEquals, value1.Add(value2), transactionConfirmationTimeout)
+	// Wait till ant1 receives Siacoins
+	err = g1.WaitConfirmedSiacoinBalance(ant.BalanceEquals, totalValue, transactionConfirmationTimeout)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Stop ants before saving ant's data directories and Foundation upgrade
+	// Stop ants before saving ant's data directories
 	for _, a := range farm.Ants {
 		err := a.Close()
 		if err != nil {
@@ -844,21 +896,32 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 	// Copy ants' data for legacy (non-hardfork) blockchain
 	cmd := binariesbuilder.Command{
 		Name: "cp",
-		Args: []string{"-r", antfarmDataDir + "/.", legacyBlockchainAntfarmDataDir},
+		Args: []string{"-r", antfarmDataDir + "/.", legacyBlockChainAntfarmDataDir},
 	}
 	out, err := cmd.Execute(logger)
 	if err != nil {
 		t.Fatalf("can't copy antfarm datadir: %v\n%v", err, out)
 	}
 
-	// Update ants to use Foundation siad binary. Update them concurrently so
-	// that we have them up and running before hardfork.
+	// Copy ants' data for Foundation hardfork blockchain
+	cmd = binariesbuilder.Command{
+		Name: "cp",
+		Args: []string{"-r", antfarmDataDir + "/.", hardforkBlockChainAntfarmDataDir},
+	}
+	out, err = cmd.Execute(logger)
+	if err != nil {
+		t.Fatalf("can't copy antfarm datadir: %v\n%v", err, out)
+	}
+
+	// Update ants to use legacy data dirs and start them concurrently.
 	errChan := make(chan error, len(farm.Ants))
-	for _, a := range farm.Ants {
-		go func(logger *persist.Logger, a *ant.Ant, errChan chan error) {
-			err := a.StartSiad(foundationSiadFilename)
+	for i := range farm.Ants {
+		go func(logger *persist.Logger, i int, errChan chan error) {
+			a := farm.Ants[i]
+			a.Config.DataDir = legacyBlockChainAntDirs[i]
+			err := a.StartSiad(nonHardforkSiadPath)
 			errChan <- err
-		}(logger, a, errChan)
+		}(logger, i, errChan)
 	}
 	for range farm.Ants {
 		err := <-errChan
@@ -893,13 +956,13 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		t.Fatal("didn't found the expected outputs")
 	}
 
-	// Prepare unlock conditions
+	// Prepare unlock conditions 1
 	wucg1, err := c1.WalletUnlockConditionsGet(output1.UnlockHash)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Get generic ant 2, client and address
+	// Get generic ant2, client and address
 	g2, err := farm.GetAntByName(ant.NameGeneric(1))
 	if err != nil {
 		t.Fatal(err)
@@ -913,7 +976,7 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Create transaction for replay before hardfork
+	// Create transaction 1 for replay before hardfork
 	minerFee := types.SiacoinPrecision
 	txn1, err := createSendSiacoinsTransaction(c1, types.SiacoinOutputID(output1.ID), wucg1.UnlockConditions, output1.Value.Sub(minerFee), minerFee, *g2Address)
 	if err != nil {
@@ -927,29 +990,9 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 	}
 
 	// Wait for ant 2 to receive Siacoins before hardfork
-	start := time.Now()
-	for {
-		// Timeout
-		if time.Since(start) > transactionConfirmationTimeout {
-			t.Fatalf("waiting for transaction to become confirmed reached %v timeout", transactionConfirmationTimeout)
-		}
-
-		wg, err := c2.WalletGet()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Hardfork blockheight check
-		if wg.Height > types.FoundationHardforkHeight {
-			t.Fatal("waiting for transaction to become confirmed reached Foundation hardfork height")
-		}
-
-		// Done
-		if wg.ConfirmedSiacoinBalance.Cmp(value1.Sub(minerFee)) >= 0 {
-			break
-		}
-
-		time.Sleep(time.Second)
+	err = checkConfirmedBalanceBeforeBlockHeight(c2, types.FoundationHardforkHeight, transactionConfirmationTimeout, value1.Sub(minerFee))
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Wait for Foundation hardfork
@@ -982,7 +1025,7 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Stop ants before testing on legacy (non-hardfork) blockchain
+	// Stop ants before testing replay on Foundation hardfork blockchain
 	for _, a := range farm.Ants {
 		err := a.Close()
 		if err != nil {
@@ -990,18 +1033,16 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		}
 	}
 
-	// Update ants to use non-Foundation siad binary. Update them concurrently
-	// so that we have them up and running before the hardfork blockheight.
+	// Update ants to use Foundation binary with Foundation data dirs before
+	// hardfork and start them concurrently.
 	errChan = make(chan error, len(farm.Ants))
-	for i, a := range farm.Ants {
-		// Change ants data directory for legacy blockchain
-		a.Config.SiadConfig.DataDir = legacyBlockchainAntDirs[i]
-
-		// Wake up ants on legacy blockchain
-		go func(logger *persist.Logger, a *ant.Ant, errChan chan error) {
-			err := a.StartSiad(nonHardforkSiadPath)
+	for i := range farm.Ants {
+		go func(logger *persist.Logger, i int, errChan chan error) {
+			a := farm.Ants[i]
+			a.Config.DataDir = hardforkBlockChainAntDirs[i]
+			err := a.StartSiad(foundationSiadPath)
 			errChan <- err
-		}(logger, a, errChan)
+		}(logger, i, errChan)
 	}
 	for range farm.Ants {
 		err := <-errChan
@@ -1017,103 +1058,39 @@ func TestTransactionWithWrongReplayProtectionByteIsRejected(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reply transaction 1 sending Siacoins to ant 2 before hardfork height
+	// Replay transaction 1 sending Siacoins to ant 2 before hardfork height
 	err = c1.TransactionPoolRawPost(txn1, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Wait for ant 2 to receive Siacoins from reply transaction 1 before
-	// hardfork height on legacy blockchain
-	start = time.Now()
-	for {
-		// Timeout
-		if time.Since(start) > transactionConfirmationTimeout {
-			t.Fatalf("waiting for transaction to become confirmed reached %v timeout", transactionConfirmationTimeout)
-		}
-
-		wg, err := c2.WalletGet()
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		// Hardfork blockheight check
-		if wg.Height > types.FoundationHardforkHeight {
-			t.Fatal("waiting for transaction to become confirmed reached Foundation hardfork height")
-		}
-
-		// Done
-		if wg.ConfirmedSiacoinBalance.Cmp(value1.Sub(minerFee)) == 0 {
-			break
-		}
-
-		time.Sleep(time.Second)
+	// Wait for ant 2 to receive Siacoins from replay of transaction 1 from
+	// legacy blockchain before hardfork height on Foundation blockchain.
+	err = checkConfirmedBalanceBeforeBlockHeight(c2, types.FoundationHardforkHeight, transactionConfirmationTimeout, value1.Sub(minerFee))
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	// Wait for Foundation hardfork + maturity delay height on legacy
+	// Wait for Foundation hardfork + maturity delay height on hardfork
 	// blockchain.
 	err = g1.WaitForBlockHeight(hardforkMatureBH, hardforkMatureTimeout, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Try to reply transaction sending Siacoins to ant2 after hardfork height.
-	// The replay should fail because of Foundation hardfork replay protection.
+	// Try to replay transaction 2 from legacy blockchain sending Siacoins to
+	// ant2 after hardfork height. The replay should fail because of Foundation
+	// hardfork replay protection.
 	err = c1.TransactionPoolRawPost(txn2, nil)
 	// errors.Contains() doesn't work here, so we check error strings.
 	if err == nil || !strings.Contains(err.Error(), crypto.ErrInvalidSignature.Error()) {
 		t.Fatal(err)
 	}
-}
 
-// changeFoundationUnlockHashes creates and posts the transaction to change
-// Foundation primary and Foundation failsafe unlock hashes.
-func changeFoundationUnlockHashes(c *client.Client, siacoinInputParentID types.SiacoinOutputID, outputValue types.Currency, siacoinInputUnlockConditions types.UnlockConditions, keys []crypto.SecretKey, outputUH, newPrimaryUH, newFailsafeUH types.UnlockHash) error {
-	// Get current block height
-	cg, err := c.ConsensusGet()
-	if err != nil {
-		return errors.AddContext(err, "can't get consensus")
+	// Ant 2 should not receive Siacoins from replay of transaction 2 from
+	// legacy blockchain after hardfork height on Foundation blockchain.
+	err = g2.WaitConfirmedSiacoinBalance(ant.BalanceEquals, value1.Add(value2).Sub(minerFee.Mul64(2)), transactionConfirmationTimeout)
+	if err == nil {
+		t.Fatal(err)
 	}
-	currentHeight := cg.Height
-
-	// Create a transaction
-	txn := types.Transaction{
-		SiacoinInputs: []types.SiacoinInput{{
-			ParentID:         siacoinInputParentID,
-			UnlockConditions: siacoinInputUnlockConditions,
-		}},
-		SiacoinOutputs: []types.SiacoinOutput{
-			{
-				Value:      outputValue,
-				UnlockHash: outputUH,
-			},
-		},
-		ArbitraryData: [][]byte{encoding.MarshalAll(types.SpecifierFoundation, types.FoundationUnlockHashUpdate{
-			NewPrimary:  newPrimaryUH,
-			NewFailsafe: newFailsafeUH,
-		})},
-		TransactionSignatures: make([]types.TransactionSignature, siacoinInputUnlockConditions.SignaturesRequired),
-	}
-
-	// Sign the transaction
-	for i := range txn.TransactionSignatures {
-		txn.TransactionSignatures[i].ParentID = crypto.Hash(siacoinInputParentID)
-		txn.TransactionSignatures[i].CoveredFields = types.FullCoveredFields
-		txn.TransactionSignatures[i].PublicKeyIndex = uint64(i)
-		sig := crypto.SignHash(txn.SigHash(i, currentHeight), keys[i])
-		txn.TransactionSignatures[i].Signature = sig[:]
-	}
-
-	// Check transaction valid
-	err = txn.StandaloneValid(currentHeight)
-	if err != nil {
-		return errors.AddContext(err, "transaction is not valid")
-	}
-
-	// Post the transaction
-	err = c.TransactionPoolRawPost(txn, nil)
-	if err != nil {
-		return errors.AddContext(err, "error posting transaction")
-	}
-	return nil
 }
