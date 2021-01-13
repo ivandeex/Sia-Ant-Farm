@@ -1,6 +1,7 @@
 package binariesbuilder
 
 import (
+	"fmt"
 	"sync"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
@@ -41,17 +42,22 @@ func init() {
 	StaticBuilder.Unlock()
 }
 
+// SiadBinaryPath returns built siad-dev binary path from the given Sia version
+func SiadBinaryPath(version string) string {
+	return fmt.Sprintf("%s/Sia-%s-linux-amd64/siad-dev", BinariesDir, version)
+}
+
 // BuildVersions defines a static builder method to request to build siad
 // binaries and blocks until all the requested versions are built. This method
 // is thread safe and can be called concurrently from parallel running tests.
 // If several tests request to build the same siad version, the version is
 // built just once.
-func (b *builder) BuildVersions(logger *persist.Logger, binariesDir string, versions ...string) error {
+func (b *builder) BuildVersions(logger *persist.Logger, versions ...string) error {
 	// Request to build each version
 	var chans []chan error
 	for _, v := range versions {
 		ch := make(chan error)
-		b.managedBuildVersion(logger, binariesDir, v, ch)
+		b.managedBuildVersion(logger, BinariesDir, v, ch)
 		chans = append(chans, ch)
 	}
 
@@ -73,6 +79,8 @@ func (b *builder) managedBuildVersion(logger *persist.Logger, binariesDir string
 
 	// Return version build result if the version is already built.
 	if s, ok := b.versionMap[version]; ok && len(s.callerChans) == 0 {
+		// Return status in a goroutine, so that parallel tests do not block
+		// each other.
 		go func(ch chan error) {
 			ch <- s.err
 		}(ch)
@@ -82,7 +90,10 @@ func (b *builder) managedBuildVersion(logger *persist.Logger, binariesDir string
 	// Add logger and waiting channel to the version status
 	s := b.versionMap[version]
 	s.callerChans = append(s.callerChans, ch)
-	s.logger = logger
+	// If it is the first caller for the version, set the logger
+	if len(s.callerChans) == 1 {
+		s.logger = logger
+	}
 	b.versionMap[version] = s
 
 	// Start the build worker.
