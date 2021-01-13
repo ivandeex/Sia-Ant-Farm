@@ -266,6 +266,7 @@ func (af *AntFarm) getAnts(w http.ResponseWriter, r *http.Request, _ httprouter.
 
 // Close signals all the ants to stop and waits for them to return.
 func (af *AntFarm) Close() error {
+	af.logger.Println("starting to close antfarm")
 	if af.apiListener != nil {
 		if err := af.apiListener.Close(); err != nil {
 			af.logger.Errorf("can't close antfarm http API listener: %v", err)
