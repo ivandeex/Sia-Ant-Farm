@@ -36,14 +36,17 @@ type (
 	// semantic version.
 	bySemanticVersion []string
 
-	// command defines a struct for parameters to call execute method.
-	command struct {
+	// Command defines a struct for parameters to call execute method.
+	Command struct {
 		// Specific environment variables to set
-		envVars map[string]string
+		EnvVars map[string]string
 		// Name of the command
-		name string
+		Name string
 		// Command's subcommands or arguments
-		args []string
+		Args []string
+		// Working directory. Keep unset (empty string) to use default caller
+		// working directory
+		Dir string
 	}
 )
 
@@ -69,21 +72,21 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 	}
 
 	// Git reset to clean git repository
-	cmd := command{
-		name: "git",
-		args: []string{"-C", siaPath, "reset", "--hard", "HEAD"},
+	cmd := Command{
+		Name: "git",
+		Args: []string{"-C", siaPath, "reset", "--hard", "HEAD"},
 	}
-	_, err = cmd.execute(logger)
+	_, err = cmd.Execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't reset Sia git repository")
 	}
 
 	// Git pull including tags to get latest state
-	cmd = command{
-		name: "git",
-		args: []string{"-C", siaPath, "pull", "--tags", "--prune", "--force", "origin", "master"},
+	cmd = Command{
+		Name: "git",
+		Args: []string{"-C", siaPath, "pull", "--tags", "--prune", "--force", "origin", "master"},
 	}
-	_, err = cmd.execute(logger)
+	_, err = cmd.Execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't pull Sia git repository")
 	}
@@ -134,11 +137,12 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		}
 
 		// Get dependencies
-		cmd = command{
-			name: "go",
-			args: []string{"get", "-d", gitlabSia + "/..."},
+		cmd = Command{
+			Name: "go",
+			Args: []string{"get", "-d", gitlabSia + "/..."},
+			Dir:  siaPath,
 		}
-		_, err = cmd.execute(logger)
+		_, err = cmd.Execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't get dependencies")
 		}
@@ -149,14 +153,14 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		binaryPath := filepath.Join(binaryDir, binaryName)
 
 		// Set ldflags according to Sia/Makefile
-		cmd = command{name: "date"}
-		buildTime, err := cmd.execute(logger)
+		cmd = Command{Name: "date"}
+		buildTime, err := cmd.Execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't get build time")
 		}
 		buildTime = strings.TrimSpace(buildTime)
-		cmd = command{name: "git", args: []string{"-C", siaPath, "rev-parse", "--short", "HEAD"}}
-		gitRevision, err := cmd.execute(logger)
+		cmd = Command{Name: "git", Args: []string{"-C", siaPath, "rev-parse", "--short", "HEAD"}}
+		gitRevision, err := cmd.Execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't get git revision")
 		}
@@ -178,15 +182,18 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		args = append(args, binaryPath)
 		args = append(args, pkg)
 
-		cmd = command{
-			envVars: map[string]string{
+		// Need to set script's working directory to Sia repo so that
+		// 'go build' has access to Sia 'go.mod'.
+		cmd = Command{
+			EnvVars: map[string]string{
 				"GOOS":   goos,
 				"GOARCH": arch,
 			},
-			name: "go",
-			args: args,
+			Name: "go",
+			Args: args,
+			Dir:  siaPath,
 		}
-		_, err = cmd.execute(logger)
+		_, err = cmd.Execute(logger)
 		if err != nil {
 			return errors.AddContext(err, "can't build siad binary")
 		}
@@ -286,21 +293,21 @@ func GetReleases(minVersion string) ([]string, error) {
 // and changes working directory back to original directory.
 func gitCheckout(logger *persist.Logger, gitRepoPath, checkoutStr string) error {
 	// Reset git
-	cmd := command{
-		name: "git",
-		args: []string{"-C", gitRepoPath, "reset", "--hard", "HEAD"},
+	cmd := Command{
+		Name: "git",
+		Args: []string{"-C", gitRepoPath, "reset", "--hard", "HEAD"},
 	}
-	_, err := cmd.execute(logger)
+	_, err := cmd.Execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't reset git repository")
 	}
 
 	// Git checkout by branch, tag or commit id
-	cmd = command{
-		name: "git",
-		args: []string{"-C", gitRepoPath, "checkout", checkoutStr},
+	cmd = Command{
+		Name: "git",
+		Args: []string{"-C", gitRepoPath, "checkout", checkoutStr},
 	}
-	_, err = cmd.execute(logger)
+	_, err = cmd.Execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't perform git checkout")
 	}
@@ -328,11 +335,11 @@ func gitClone(logger *persist.Logger, repoURL, repoPath string) error {
 	}
 
 	// Clone repository
-	cmd := command{
-		name: "git",
-		args: []string{"clone", repoURL, repoPath},
+	cmd := Command{
+		Name: "git",
+		Args: []string{"clone", repoURL, repoPath},
 	}
-	_, err = cmd.execute(logger)
+	_, err = cmd.Execute(logger)
 	if err != nil {
 		return errors.AddContext(err, "can't clone repository")
 	}
@@ -396,15 +403,16 @@ func (s bySemanticVersion) Less(i, j int) bool {
 	return build.VersionCmp(s[i], s[j]) < 0
 }
 
-// execute executes a given shell command defined by command receiver.
+// Execute executes a given shell command defined by command receiver.
 // Command struct is used instead of passing the whole command as a string and
 // parsing string arguments because parsing arguments containing spaces would
 // make the parsing much complex.
-func (c command) execute(logger *persist.Logger) (string, error) {
-	cmd := exec.Command(c.name, c.args...) //nolint:gosec
+func (c Command) Execute(logger *persist.Logger) (string, error) {
+	cmd := exec.Command(c.Name, c.Args...) //nolint:gosec
 	cmd.Env = os.Environ()
+	cmd.Dir = c.Dir
 	var envVars = []string{}
-	for k, v := range c.envVars {
+	for k, v := range c.EnvVars {
 		ev := fmt.Sprintf("%v=%v", k, v)
 		envVars = append(envVars, ev)
 		cmd.Env = append(cmd.Env, ev)
@@ -414,8 +422,8 @@ func (c command) execute(logger *persist.Logger) (string, error) {
 
 	if err != nil {
 		readableEnvVars := strings.Join(envVars, " ")
-		readableArgs := strings.Join(c.args, " ")
-		readableCommand := fmt.Sprintf("%v %v %v", readableEnvVars, c.name, readableArgs)
+		readableArgs := strings.Join(c.Args, " ")
+		readableCommand := fmt.Sprintf("%v %v %v", readableEnvVars, c.Name, readableArgs)
 		wd, wdErr := os.Getwd()
 		if wdErr != nil {
 			return "", errors.AddContext(wdErr, "can't get working directory")

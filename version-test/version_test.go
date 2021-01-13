@@ -89,7 +89,7 @@ func TestRenterDownloader(t *testing.T) {
 	// Rebuild the master
 	master := "master"
 	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, binariesbuilder.BinariesDir, master)
+		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, master)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -171,7 +171,7 @@ func TestRenterUploader(t *testing.T) {
 	// Rebuild the master
 	master := "master"
 	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, binariesbuilder.BinariesDir, master)
+		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, master)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -299,13 +299,13 @@ func TestUpgrades(t *testing.T) {
 
 	// Build binaries to test.
 	if rebuildReleaseBinaries {
-		err := binariesbuilder.StaticBuilder.BuildVersions(logger, binariesbuilder.BinariesDir, upgradePathVersions...)
+		err := binariesbuilder.StaticBuilder.BuildVersions(logger, upgradePathVersions...)
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(logger, binariesbuilder.BinariesDir, "master")
+		err := binariesbuilder.StaticBuilder.BuildVersions(logger, "master")
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -367,7 +367,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	// Build binary to test
 	branch := "master"
 	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, binariesbuilder.BinariesDir, branch)
+		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, branch)
 		if err != nil {
 			t.Fatal(err)
 		}
