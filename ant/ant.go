@@ -184,6 +184,7 @@ func (a *Ant) BlockHeight() types.BlockHeight {
 // Close releases all resources created by the ant, including the Siad
 // subprocess.
 func (a *Ant) Close() error {
+	a.staticLogger.Printf("%v: starting to close ant", a.Config.SiadConfig.DataDir)
 	err := a.Jr.Stop()
 	stopSiad(a.staticLogger, a.Config.DataDir, a.APIAddr, a.Config.APIPassword, a.siad.Process)
 	return err
