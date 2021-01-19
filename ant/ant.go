@@ -29,6 +29,30 @@ const (
 	updateSiadWarmUpTime = time.Second * 10
 )
 
+// BalanceComparisonOperator defines type for comparison operators enum
+type BalanceComparisonOperator string
+
+// BalanceComparisonOperator constants define values for balance comparison
+// operators enum
+const (
+	BalanceLess           BalanceComparisonOperator = "less then"
+	BalanceLessOrEqual    BalanceComparisonOperator = "less then or equal"
+	BalanceEquals         BalanceComparisonOperator = "equal"
+	BalanceGreaterOrEqual BalanceComparisonOperator = "greater then or equal"
+	BalanceGreater        BalanceComparisonOperator = "greater then"
+)
+
+// Type defines type for ant Type enum
+type Type string
+
+// Type constants define values for ant Type enum
+const (
+	TypeHost    Type = "Host"
+	TypeMiner   Type = "Miner"
+	TypeRenter  Type = "Renter"
+	TypeGeneric Type = "Generic"
+)
+
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
 type AntConfig struct {
@@ -94,6 +118,35 @@ func clearPorts(config AntConfig) error {
 		return errors.AddContext(err, "can't clear ports")
 	}
 	return nil
+}
+
+// name returns standardized ant name by the given ant type and ant index.
+func name(t Type, i int) string {
+	return fmt.Sprintf("%s-%d", t, i)
+}
+
+// NameGeneric returns standardized ant name of generic ant type by the given
+// ant index.
+func NameGeneric(i int) string {
+	return name(TypeGeneric, i)
+}
+
+// NameHost returns standardized ant name of host ant type by the given ant
+// index.
+func NameHost(i int) string {
+	return name(TypeHost, i)
+}
+
+// NameMiner returns standardized ant name of miner ant type by the given ant
+// index.
+func NameMiner(i int) string {
+	return name(TypeMiner, i)
+}
+
+// NameRenter returns standardized ant name of renter ant type by the given ant
+// index.
+func NameRenter(i int) string {
+	return name(TypeRenter, i)
 }
 
 // New creates a new Ant using the configuration passed through `config`.
@@ -220,6 +273,8 @@ func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface
 	}
 
 	switch job {
+	case "generic":
+		go a.Jr.jobGeneric()
 	case "miner":
 		go a.Jr.blockMining()
 	case "host":
@@ -329,6 +384,64 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 	}
 
 	return nil
+}
+
+// WaitConfirmedSiacoinBalance waits until ant wallet confirmed Siacoins meet
+// comparison condition.
+func (a *Ant) WaitConfirmedSiacoinBalance(cmpOp BalanceComparisonOperator, value types.Currency, timeout time.Duration) error {
+	c, err := a.NewClient()
+	if err != nil {
+		return errors.AddContext(err, "can't get ant client")
+	}
+
+	frequency := time.Millisecond * 500
+	tries := int(timeout / frequency)
+	return build.Retry(tries, frequency, func() error {
+		wg, err := c.WalletGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get wallet info")
+		}
+		cmp := wg.ConfirmedSiacoinBalance.Cmp(value)
+		switch {
+		case cmpOp == BalanceLess && cmp < 0:
+			return nil
+		case cmpOp == BalanceLessOrEqual && cmp <= 0:
+			return nil
+		case cmpOp == BalanceEquals && cmp == 0:
+			return nil
+		case cmpOp == BalanceGreaterOrEqual && cmp >= 0:
+			return nil
+		case cmpOp == BalanceGreater && cmp > 0:
+			return nil
+		default:
+			return fmt.Errorf("actual balance %v is expected to be %v expected balance %v", wg.ConfirmedSiacoinBalance, cmpOp, value)
+		}
+	})
+}
+
+// WaitForBlockHeight blocks until the ant reaches the given block height or
+// the timeout is reached.
+func (a *Ant) WaitForBlockHeight(blockHeight types.BlockHeight, timeout, frequency time.Duration) error {
+	// Get client
+	c, err := a.NewClient()
+	if err != nil {
+		return errors.AddContext(err, "can't get client")
+	}
+
+	// Wait for block height
+	tries := int(timeout / frequency)
+	return build.Retry(tries, frequency, func() error {
+		cg, err := c.ConsensusGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get consensus")
+		}
+		bh := cg.Height
+		if bh >= blockHeight {
+			return nil
+		}
+
+		return fmt.Errorf("block height not reached. Current height: %v, expected height: %v", bh, blockHeight)
+	})
 }
 
 // WaitForContractsToRenew blocks until renter contracts are renewed.

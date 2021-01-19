@@ -65,11 +65,6 @@ type upgradeTestConfig struct {
 	baseVersion string
 }
 
-// siadBinaryPath returns built siad-dev binary path from the given Sia version
-func siadBinaryPath(version string) string {
-	return fmt.Sprintf("../upgrade-binaries/Sia-%v-linux-amd64/siad-dev", version)
-}
-
 // TestRenterDownloader tests continual downloading of files from the network.
 func TestRenterDownloader(t *testing.T) {
 	if !build.VLONG {
@@ -103,7 +98,7 @@ func TestRenterDownloader(t *testing.T) {
 
 	// Set antfarm config to use the specified branch
 	for aci := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = siadBinaryPath(master)
+		antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = binariesbuilder.SiadBinaryPath(master)
 	}
 
 	// Start antfarm
@@ -185,7 +180,7 @@ func TestRenterUploader(t *testing.T) {
 
 	// Set antfarm config to use the specified branch
 	for aci := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = siadBinaryPath(master)
+		antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = binariesbuilder.SiadBinaryPath(master)
 	}
 
 	// Start antfarm
@@ -397,7 +392,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 
 	// Update antfarm config with the binary
 	for i := range config.AntConfigs {
-		config.AntConfigs[i].SiadConfig.SiadPath = siadBinaryPath(branch)
+		config.AntConfigs[i].SiadConfig.SiadPath = binariesbuilder.SiadBinaryPath(branch)
 	}
 
 	// Create an antfarm
@@ -511,7 +506,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	restoreRenterAnt.Jr.StaticWalletSeed = backupRenterAnt.Jr.StaticWalletSeed
 	restoreRenterAnt.Config.Jobs = []string{"renter"}
 	restoreRenterAnt.Config.DesiredCurrency = 100000
-	err = restoreRenterAnt.StartSiad(siadBinaryPath(branch))
+	err = restoreRenterAnt.StartSiad(binariesbuilder.SiadBinaryPath(branch))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -628,20 +623,20 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			// Set all ants siad-dev to use the base version, below we set the
 			// renter or hosts to initial tested version
 			for aci := range antfarmConfig.AntConfigs {
-				antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = siadBinaryPath(testConfig.baseVersion)
+				antfarmConfig.AntConfigs[aci].SiadConfig.SiadPath = binariesbuilder.SiadBinaryPath(testConfig.baseVersion)
 			}
 
 			// Initial upgrade renter setup
 			if testConfig.upgradeRenter {
 				// Set renter to initial tested version
-				antfarmConfig.AntConfigs[renterIndex].SiadConfig.SiadPath = siadBinaryPath(version)
+				antfarmConfig.AntConfigs[renterIndex].SiadConfig.SiadPath = binariesbuilder.SiadBinaryPath(version)
 				testLogger.Printf("Starting antfarm with renter's siad-dev version %v, all other ants' siad-dev version: %v\n", version, testConfig.baseVersion)
 			}
 			// Initial hosts setup
 			if testConfig.upgradeHosts {
 				// Set hosts to initial tested version
 				for _, hostIndex := range hostIndices {
-					antfarmConfig.AntConfigs[hostIndex].SiadConfig.SiadPath = siadBinaryPath(version)
+					antfarmConfig.AntConfigs[hostIndex].SiadConfig.SiadPath = binariesbuilder.SiadBinaryPath(version)
 				}
 				testLogger.Printf("Starting antfarm with hosts' siad-dev version %v, all other ants' siad-dev version: %v\n", version, testConfig.baseVersion)
 			}
@@ -669,7 +664,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			// Upgrade renter
 			if testConfig.upgradeRenter {
 				testLogger.Printf("Upgrading renter to siad-dev version %v\n", version)
-				err = renterAnt.UpdateSiad(siadBinaryPath(version))
+				err = renterAnt.UpdateSiad(binariesbuilder.SiadBinaryPath(version))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -679,7 +674,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 			if testConfig.upgradeHosts {
 				testLogger.Printf("Upgrading hosts to siad-version %v\n", version)
 				for _, hostIndex := range hostIndices {
-					err := farm.Ants[hostIndex].UpdateSiad(siadBinaryPath(version))
+					err := farm.Ants[hostIndex].UpdateSiad(binariesbuilder.SiadBinaryPath(version))
 					if err != nil {
 						t.Fatal(err)
 					}
