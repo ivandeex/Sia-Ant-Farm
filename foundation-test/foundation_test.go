@@ -11,10 +11,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
 	binariesbuilder "gitlab.com/NebulousLabs/Sia-Ant-Farm/binaries-builder"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
-	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -90,55 +87,17 @@ var (
 // Foundation failsafe address can change primary and failsafe Foundation
 // addesses.
 func TestFoundationFailsafeAddressCanChangeUnlockHashes(t *testing.T) {
-	if !build.VLONG {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// Check that the test runs with dev build tag
-	if build.Release != "dev" {
-		t.Fatal("this test is expected to be executed with dev build tag to load dev constants from Sia")
-	}
-
-	// Prepare logger
-	dataDir := test.TestDir(t.Name())
-	logger := test.NewTestLogger(t, dataDir)
+	// Init Foundation test.
+	logger, dataDir := initFoundationTest(t)
 	defer func() {
 		if err := logger.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	// Build the Foundation binary
-	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
-	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Check UPnP enabled router
-	upnpStatus := upnprouter.CheckUPnPEnabled()
-	logger.Debugln(upnpStatus)
-
 	// Config antfarm with a miner and 3 generic ants. 2 of them become new
 	// Foundation primary and failsafe address ants.
-	antfarmConfig, err := antfarm.NewAntfarmConfig(dataDir, allowLocalIPs, 1, 0, 0, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Update config to use foundation siad dev binaries
-	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
-	}
-
-	// Create antfarm
-	farm, err := antfarm.New(logger, antfarmConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 3)
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -279,55 +238,17 @@ outputIDFinder:
 // Foundation primary address can change primary and failsafe Foundation
 // addesses.
 func TestFoundationPrimaryAddressCanChangeUnlockHashes(t *testing.T) {
-	if !build.VLONG {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// Check that the test runs with dev build tag
-	if build.Release != "dev" {
-		t.Fatal("this test is expected to be executed with dev build tag to load dev constants from Sia")
-	}
-
-	// Prepare logger
-	dataDir := test.TestDir(t.Name())
-	logger := test.NewTestLogger(t, dataDir)
+	// Init Foundation test.
+	logger, dataDir := initFoundationTest(t)
 	defer func() {
 		if err := logger.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	// Build the Foundation binary
-	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
-	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Check UPnP enabled router
-	upnpStatus := upnprouter.CheckUPnPEnabled()
-	logger.Debugln(upnpStatus)
-
-	// Config antfarm with a miner and 2 generic ants which become new
+	// Config antfarm with a miner and 3 generic ants. 2 of them become new
 	// Foundation primary and failsafe address ants.
-	antfarmConfig, err := antfarm.NewAntfarmConfig(dataDir, allowLocalIPs, 1, 0, 0, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Update config to use foundation siad dev binaries
-	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
-	}
-
-	// Create antfarm
-	farm, err := antfarm.New(logger, antfarmConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 3)
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -414,54 +335,16 @@ func TestFoundationPrimaryAddressCanChangeUnlockHashes(t *testing.T) {
 // TestFoundationPrimaryAddressCanSendSiacoins tests that the wallet owning
 // initial Foundation primary address can send Siacoins to another address.
 func TestFoundationPrimaryAddressCanSendSiacoins(t *testing.T) {
-	if !build.VLONG {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// Check that the test runs with dev build tag
-	if build.Release != "dev" {
-		t.Fatal("this test is expected to be executed with dev build tag to load dev constants from Sia")
-	}
-
-	// Prepare logger
-	dataDir := test.TestDir(t.Name())
-	logger := test.NewTestLogger(t, dataDir)
+	// Init Foundation test.
+	logger, dataDir := initFoundationTest(t)
 	defer func() {
 		if err := logger.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	// Build the Foundation binary
-	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
-	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Check UPnP enabled router
-	upnpStatus := upnprouter.CheckUPnPEnabled()
-	logger.Debugln(upnpStatus)
-
-	// Config antfarm with a miner and 2 generic ants
-	antfarmConfig, err := antfarm.NewAntfarmConfig(dataDir, allowLocalIPs, 1, 0, 0, 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Update config to use foundation siad dev binaries
-	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
-	}
-
-	// Create antfarm
-	farm, err := antfarm.New(logger, antfarmConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	//  Config antfarm with a miner and 2 generic ants.
+	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 2)
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -523,54 +406,16 @@ func TestFoundationPrimaryAddressCanSendSiacoins(t *testing.T) {
 // initial Foundation primary address receives exactly initial Foundation
 // subsidy and 2 regular monthly subsidies.
 func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
-	if !build.VLONG {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// Check that the test runs with dev build tag
-	if build.Release != "dev" {
-		t.Fatal("this test is expected to be executed with dev build tag to load dev constants from Sia")
-	}
-
-	// Prepare logger
-	dataDir := test.TestDir(t.Name())
-	logger := test.NewTestLogger(t, dataDir)
+	// Init Foundation test.
+	logger, dataDir := initFoundationTest(t)
 	defer func() {
 		if err := logger.Close(); err != nil {
 			t.Fatal(err)
 		}
 	}()
 
-	// Build the Foundation binary
-	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
-	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	// Check UPnP enabled router
-	upnpStatus := upnprouter.CheckUPnPEnabled()
-	logger.Debugln(upnpStatus)
-
-	// Config antfarm with a miner and 2 generic ants
-	antfarmConfig, err := antfarm.NewAntfarmConfig(dataDir, allowLocalIPs, 1, 0, 0, 2)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Update config to use foundation siad dev binaries
-	for i := range antfarmConfig.AntConfigs {
-		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
-	}
-
-	// Create antfarm
-	farm, err := antfarm.New(logger, antfarmConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	//  Config antfarm with a miner and 2 generic ants.
+	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 2)
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -603,9 +448,13 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 
 	// Check initial Foundation subsidy and 2 more months
 	start := time.Now()
+	var lastLogBH, lastCheckedBH types.BlockHeight
 	var subsidyID types.SiacoinOutputID
-	var lastCheckedBH types.BlockHeight
-	var sentInitialSubsidy, sentFirstRegularSubsidy, sentSecondRegularSubsidy bool
+	sendInitialSubsidy, sendRegularSubsidy := true, true
+	value1 := types.InitialFoundationSubsidy.Sub(types.SiacoinPrecision)
+	value2 := regularSubsidy.Sub(types.SiacoinPrecision)
+	totalValue := value1.Add(value2.Mul64(2))
+blockHeightLoop:
 	for {
 		// Get block height
 		cg, err := c1.ConsensusGet()
@@ -613,6 +462,12 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 			t.Fatal(err)
 		}
 		bh := cg.Height
+
+		// Log progress
+		if bh >= lastLogBH+5 {
+			logger.Debugf("Current block height: %v", bh)
+			lastLogBH = bh
+		}
 
 		// Timeout Foundation hardfork
 		if time.Since(start) > hardforkMatureTimeout && bh < hardforkMatureBH {
@@ -629,6 +484,7 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 			time.Sleep(time.Millisecond * 200)
 			continue
 		}
+		lastCheckedBH = bh
 
 		if bh >= types.MaturityDelay {
 			// Get foundation subsidyID
@@ -644,108 +500,42 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 		case bh >= types.MaturityDelay && bh < types.FoundationHardforkHeight+types.MaturityDelay:
 			// Verify foundation primary address has no Siacoins by trying to
 			// send out a hasting
-			err := sendSiacoinsFromFoundationPrimaryAddress(c1, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.NewCurrency64(1), types.NewCurrency64(1), address)
-			// errors.Contains() doesn't work and misses an error, need to
-			// compare strings
-			if !strings.Contains(err.Error(), errNonExistingOutput.Error()) {
-				t.Fatal("Foundation primary address contains unexpected Siacons before foundation hardfork and maturity delay")
-			}
+			forwardFoundationSubsidy(t, logger, c1, false, bh, types.BlockHeight(0), subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.SiacoinPrecision, address)
+
 		// After foundation hardfork and maturity delay, but before first
 		// regular monthly subsidy and maturity delay
 		case bh >= hardforkMatureBH && bh < firstRegularSubsidyMatureBH:
 			// Check the foundation primary address has initial subsidy by
-			// sending it to another address
-			if !sentInitialSubsidy {
-				// Fix subsidyID if we have skipped the exact hardfork mature
-				// block
-				if bh != hardforkMatureBH {
-					cbhg, err := c1.ConsensusBlocksHeightGet(types.FoundationHardforkHeight)
-					if err != nil {
-						t.Fatal(err)
-					}
-					subsidyID = cbhg.ID.FoundationSubsidyID()
-				}
-
-				// Send Siacoins
-				err = sendSiacoinsFromFoundationPrimaryAddress(c1, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.InitialFoundationSubsidy.Sub(types.SiacoinPrecision), types.SiacoinPrecision, address)
-				if err != nil {
-					t.Fatal("Foundation primary address doesn't contain expected Siacons after foundation hardfork and maturity delay")
-				}
-				sentInitialSubsidy = true
-			}
-			// Check there are no more Siacoins
-			err := sendSiacoinsFromFoundationPrimaryAddress(c1, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.NewCurrency64(1), types.NewCurrency64(1), address)
-			// errors.Contains() doesn't work and misses an error, need to
-			// compare strings
-			if !strings.Contains(err.Error(), errNonExistingOutput.Error()) {
-				t.Fatal("Foundation primary address contains unexpected Siacons after foundation hardfork and maturity delay")
-			}
-
+			// sending it to another address. Try sending it twice, but it
+			// should be sent and received just once.
+			forwardFoundationSubsidyTwiceCheckReceivedOnce(t, logger, c1, sendInitialSubsidy, bh, types.FoundationHardforkHeight, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value1, value1, address, g2)
+			sendInitialSubsidy = false
 		// After first regular monthly subsidy before the second one
 		case bh >= firstRegularSubsidyMatureBH && bh < secondRegularSubsidyMatureBH:
 			// Check the foundation primary address has the first regular
-			// subsidy by sending it to another address
-			if !sentFirstRegularSubsidy {
-				// Fix subsidyID if we have skipped the exact first regular
-				// subsidy mature block
-				if bh != firstRegularSubsidyMatureBH {
-					cbhg, err := c1.ConsensusBlocksHeightGet(types.FoundationHardforkHeight + types.FoundationSubsidyFrequency)
-					if err != nil {
-						t.Fatal(err)
-					}
-					subsidyID = cbhg.ID.FoundationSubsidyID()
-				}
-
-				// Send Siacoins
-				err := sendSiacoinsFromFoundationPrimaryAddress(c1, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, regularSubsidy.Sub(types.SiacoinPrecision), types.SiacoinPrecision, address)
-				if err != nil {
-					t.Fatal("Foundation primary address doesn't contain expected Siacons after first regular subsidy and maturity delay")
-				}
-				sentFirstRegularSubsidy = true
-			}
-			// Check there are no more Siacoins
-			err := sendSiacoinsFromFoundationPrimaryAddress(c1, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.NewCurrency64(1), types.NewCurrency64(1), address)
-			// errors.Contains() doesn't work and misses an error, need to
-			// compare strings
-			if !strings.Contains(err.Error(), errNonExistingOutput.Error()) {
-				t.Fatal("Foundation primary address contains unexpected Siacons after first regular subsidy and maturity delay")
-			}
-
+			// subsidy by sending it to another address. Try sending it twice,
+			// but it should be sent and received just once.
+			forwardFoundationSubsidyTwiceCheckReceivedOnce(t, logger, c1, sendRegularSubsidy, bh, types.FoundationHardforkHeight+types.FoundationSubsidyFrequency, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value2, value1.Add(value2), address, g2)
+			sendRegularSubsidy = false
 		// After second regular monthly subsidy
 		case bh >= secondRegularSubsidyMatureBH:
 			// Check the foundation primary address has the second regular
-			// subsidy by sending it to another address
-			if !sentSecondRegularSubsidy {
-				// Fix subsidyID if we have skipped the exact second regular
-				// subsidy mature block
-				if bh != secondRegularSubsidyMatureBH {
-					cbhg, err := c1.ConsensusBlocksHeightGet(types.FoundationHardforkHeight + 2*types.FoundationSubsidyFrequency)
-					if err != nil {
-						t.Fatal(err)
-					}
-					subsidyID = cbhg.ID.FoundationSubsidyID()
-				}
-
-				// Send Siacoins
-				err := sendSiacoinsFromFoundationPrimaryAddress(c1, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, regularSubsidy.Sub(types.SiacoinPrecision), types.SiacoinPrecision, address)
-				if err != nil {
-					t.Fatal("Foundation primary address doesn't contain expected Siacons after second regular subsidy and maturity delay")
-				}
-				sentSecondRegularSubsidy = true
-			}
-			// Check there are no more Siacoins
-			err := sendSiacoinsFromFoundationPrimaryAddress(c1, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.NewCurrency64(1), types.NewCurrency64(1), address)
-			// errors.Contains() doesn't work and misses an error, need to
-			// compare strings
-			if !strings.Contains(err.Error(), errNonExistingOutput.Error()) {
-				t.Fatal("Foundation primary address contains unexpected Siacons after second regular subsidy and maturity delay")
-			}
-
-			// We are done
-			return
+			// subsidy by sending it to another address. Try sending it twice,
+			// but it should be sent and received just once.
+			forwardFoundationSubsidyTwiceCheckReceivedOnce(t, logger, c1, true, bh, types.FoundationHardforkHeight+2*types.FoundationSubsidyFrequency, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value2, totalValue, address, g2)
+			break blockHeightLoop
 		}
-		lastCheckedBH = bh
-		time.Sleep(time.Millisecond * 200)
+	}
+
+	// Check final value of receiving ant wallet after a couple of blocks
+	waitBH := types.BlockHeight(20)
+	err = g2.WaitForBlockHeight(lastCheckedBH+waitBH, transactionConfirmationTimeout*2, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = g2.WaitConfirmedSiacoinBalance(ant.BalanceEquals, totalValue, time.Second)
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -753,19 +543,8 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 // Foundation-hardfork) blockchain can't be replayed on Foundation hardfork
 // blockchain.
 func TestReplayProtection(t *testing.T) {
-	if !build.VLONG {
-		t.SkipNow()
-	}
-	t.Parallel()
-
-	// Check that the test runs with dev build tag
-	if build.Release != "dev" {
-		t.Fatal("this test is expected to be executed with dev build tag to load dev constants from Sia")
-	}
-
-	// Prepare logger
-	dataDir := test.TestDir(t.Name())
-	logger := test.NewTestLogger(t, dataDir)
+	// Init Foundation test.
+	logger, dataDir := initFoundationTest(t)
 	defer func() {
 		if err := logger.Close(); err != nil {
 			t.Fatal(err)
@@ -789,10 +568,6 @@ func TestReplayProtection(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-
-	// Check UPnP enabled router
-	upnpStatus := upnprouter.CheckUPnPEnabled()
-	logger.Debugln(upnpStatus)
 
 	// Set antfarm data dirs
 	antfarmDataDir := filepath.Join(dataDir, "antfarm-data-preparation")
@@ -914,22 +689,7 @@ func TestReplayProtection(t *testing.T) {
 	}
 
 	// Update ants to use legacy data dirs and start them concurrently.
-	errChan := make(chan error, len(farm.Ants))
-	for i := range farm.Ants {
-		go func(logger *persist.Logger, i int, errChan chan error) {
-			a := farm.Ants[i]
-			a.Config.DataDir = legacyBlockChainAntDirs[i]
-			err := a.StartSiad(nonHardforkSiadPath)
-			errChan <- err
-		}(logger, i, errChan)
-	}
-	for range farm.Ants {
-		err := <-errChan
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	close(errChan)
+	updateAnts(t, farm, legacyBlockChainAntDirs, nonHardforkSiadPath)
 
 	// Wait for ASIC hardfork height so that we can replay the first transacion
 	// after ASIC hardfork, before Foundation hardfork.
@@ -1035,22 +795,7 @@ func TestReplayProtection(t *testing.T) {
 
 	// Update ants to use Foundation binary with Foundation data dirs before
 	// hardfork and start them concurrently.
-	errChan = make(chan error, len(farm.Ants))
-	for i := range farm.Ants {
-		go func(logger *persist.Logger, i int, errChan chan error) {
-			a := farm.Ants[i]
-			a.Config.DataDir = hardforkBlockChainAntDirs[i]
-			err := a.StartSiad(foundationSiadPath)
-			errChan <- err
-		}(logger, i, errChan)
-	}
-	for range farm.Ants {
-		err := <-errChan
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	close(errChan)
+	updateAnts(t, farm, hardforkBlockChainAntDirs, foundationSiadPath)
 
 	// Wait for ASIC hardfork height so that we can replay the first transacion
 	err = g1.WaitForBlockHeight(types.ASICHardforkHeight, asicHardforkTimeout, time.Second)
