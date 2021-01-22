@@ -97,7 +97,10 @@ func TestFoundationFailsafeAddressCanChangeUnlockHashes(t *testing.T) {
 
 	// Config antfarm with a miner and 3 generic ants. 2 of them become new
 	// Foundation primary and failsafe address ants.
-	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 3)
+	farm, err := initDefaultFoundationAntfarm(logger, dataDir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -248,7 +251,10 @@ func TestFoundationPrimaryAddressCanChangeUnlockHashes(t *testing.T) {
 
 	// Config antfarm with a miner and 3 generic ants. 2 of them become new
 	// Foundation primary and failsafe address ants.
-	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 3)
+	farm, err := initDefaultFoundationAntfarm(logger, dataDir, 3)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -344,7 +350,10 @@ func TestFoundationPrimaryAddressCanSendSiacoins(t *testing.T) {
 	}()
 
 	//  Config antfarm with a miner and 2 generic ants.
-	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 2)
+	farm, err := initDefaultFoundationAntfarm(logger, dataDir, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -415,7 +424,10 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 	}()
 
 	//  Config antfarm with a miner and 2 generic ants.
-	farm := initDefaultFoundationAntfarm(t, logger, dataDir, 2)
+	farm, err := initDefaultFoundationAntfarm(logger, dataDir, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
 	defer func() {
 		if err := farm.Close(); err != nil {
 			logger.Errorf("can't close antfarm: %v", err)
@@ -448,7 +460,7 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 
 	// Check initial Foundation subsidy and 2 more months
 	start := time.Now()
-	var lastLogBH, lastCheckedBH types.BlockHeight
+	var bh, lastLogBH types.BlockHeight
 	var subsidyID types.SiacoinOutputID
 	sendInitialSubsidy, sendRegularSubsidy := true, true
 	value1 := types.InitialFoundationSubsidy.Sub(types.SiacoinPrecision)
@@ -461,7 +473,12 @@ blockHeightLoop:
 		if err != nil {
 			t.Fatal(err)
 		}
-		bh := cg.Height
+		if cg.Height == bh {
+			// Nothing new, wait
+			time.Sleep(time.Millisecond * 200)
+			continue
+		}
+		bh = cg.Height
 
 		// Log progress
 		if bh >= lastLogBH+5 {
@@ -479,13 +496,6 @@ blockHeightLoop:
 			t.Fatalf("second regular monthly subsidy + maturity delay blockheight not reached within %v timeout. Current block height: %v, expected block height: %v", secondRegularSubsidyMatureTimeout, bh, secondRegularSubsidyMatureBH)
 		}
 
-		if bh == lastCheckedBH {
-			// Nothing new, wait
-			time.Sleep(time.Millisecond * 200)
-			continue
-		}
-		lastCheckedBH = bh
-
 		if bh >= types.MaturityDelay {
 			// Get foundation subsidyID
 			cbhg, err := c1.ConsensusBlocksHeightGet(bh - types.MaturityDelay)
@@ -500,7 +510,10 @@ blockHeightLoop:
 		case bh >= types.MaturityDelay && bh < types.FoundationHardforkHeight+types.MaturityDelay:
 			// Verify foundation primary address has no Siacoins by trying to
 			// send out a hasting
-			forwardFoundationSubsidy(t, logger, c1, false, bh, types.BlockHeight(0), subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.SiacoinPrecision, address)
+			err := forwardFoundationSubsidy(logger, c1, false, bh, types.BlockHeight(0), subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.SiacoinPrecision, address)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 		// After foundation hardfork and maturity delay, but before first
 		// regular monthly subsidy and maturity delay
@@ -508,28 +521,37 @@ blockHeightLoop:
 			// Check the foundation primary address has initial subsidy by
 			// sending it to another address. Try sending it twice, but it
 			// should be sent and received just once.
-			forwardFoundationSubsidyTwiceCheckReceivedOnce(t, logger, c1, sendInitialSubsidy, bh, types.FoundationHardforkHeight, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value1, value1, address, g2)
+			err := forwardFoundationSubsidyTwiceCheckReceivedOnce(logger, c1, sendInitialSubsidy, bh, types.FoundationHardforkHeight, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value1, value1, address, g2)
+			if err != nil {
+				t.Fatal(err)
+			}
 			sendInitialSubsidy = false
 		// After first regular monthly subsidy before the second one
 		case bh >= firstRegularSubsidyMatureBH && bh < secondRegularSubsidyMatureBH:
 			// Check the foundation primary address has the first regular
 			// subsidy by sending it to another address. Try sending it twice,
 			// but it should be sent and received just once.
-			forwardFoundationSubsidyTwiceCheckReceivedOnce(t, logger, c1, sendRegularSubsidy, bh, types.FoundationHardforkHeight+types.FoundationSubsidyFrequency, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value2, value1.Add(value2), address, g2)
+			err := forwardFoundationSubsidyTwiceCheckReceivedOnce(logger, c1, sendRegularSubsidy, bh, types.FoundationHardforkHeight+types.FoundationSubsidyFrequency, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value2, value1.Add(value2), address, g2)
+			if err != nil {
+				t.Fatal(err)
+			}
 			sendRegularSubsidy = false
 		// After second regular monthly subsidy
 		case bh >= secondRegularSubsidyMatureBH:
 			// Check the foundation primary address has the second regular
 			// subsidy by sending it to another address. Try sending it twice,
 			// but it should be sent and received just once.
-			forwardFoundationSubsidyTwiceCheckReceivedOnce(t, logger, c1, true, bh, types.FoundationHardforkHeight+2*types.FoundationSubsidyFrequency, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value2, totalValue, address, g2)
+			err := forwardFoundationSubsidyTwiceCheckReceivedOnce(logger, c1, true, bh, types.FoundationHardforkHeight+2*types.FoundationSubsidyFrequency, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value2, totalValue, address, g2)
+			if err != nil {
+				t.Fatal(err)
+			}
 			break blockHeightLoop
 		}
 	}
 
 	// Check final value of receiving ant wallet after a couple of blocks
 	waitBH := types.BlockHeight(20)
-	err = g2.WaitForBlockHeight(lastCheckedBH+waitBH, transactionConfirmationTimeout*2, time.Second)
+	err = g2.WaitForBlockHeight(bh+waitBH, transactionConfirmationTimeout*2, time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -689,7 +711,10 @@ func TestReplayProtection(t *testing.T) {
 	}
 
 	// Update ants to use legacy data dirs and start them concurrently.
-	updateAnts(t, farm, legacyBlockChainAntDirs, nonHardforkSiadPath)
+	err = updateAnts(farm, legacyBlockChainAntDirs, nonHardforkSiadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Wait for ASIC hardfork height so that we can replay the first transacion
 	// after ASIC hardfork, before Foundation hardfork.
@@ -795,7 +820,10 @@ func TestReplayProtection(t *testing.T) {
 
 	// Update ants to use Foundation binary with Foundation data dirs before
 	// hardfork and start them concurrently.
-	updateAnts(t, farm, hardforkBlockChainAntDirs, foundationSiadPath)
+	err = updateAnts(farm, hardforkBlockChainAntDirs, foundationSiadPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Wait for ASIC hardfork height so that we can replay the first transacion
 	err = g1.WaitForBlockHeight(types.ASICHardforkHeight, asicHardforkTimeout, time.Second)
