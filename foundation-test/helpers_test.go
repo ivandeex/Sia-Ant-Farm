@@ -2,8 +2,18 @@ package foundationtest
 
 import (
 	"fmt"
+	"os"
+	"strings"
+	"testing"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
+	binariesbuilder "gitlab.com/NebulousLabs/Sia-Ant-Farm/binaries-builder"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
+	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
@@ -170,6 +180,112 @@ func createSendSiacoinsTransaction(c *client.Client, siacoinOutputID types.Siaco
 	return signedTxn, nil
 }
 
+// forwardFoundationSubsidy sends the Foundation primary address received
+// subsidy to another address if sendSubsidy is true. Then it tries to send out
+// just one hasting which is expected to fail.
+func forwardFoundationSubsidy(logger *persist.Logger, c *client.Client, sendSubsidy bool, currentBH, subsidyBH types.BlockHeight, subsidyID types.SiacoinOutputID, foundationPrimaryUnlockConditions types.UnlockConditions, foundationPrimaryKeys []crypto.SecretKey, value types.Currency, address types.UnlockHash) error {
+	// Send expected subsidy
+	if sendSubsidy {
+		// Fix subsidyID if we have skipped the exact subsidy mature block
+		if currentBH != subsidyBH+types.MaturityDelay {
+			cbhg, err := c.ConsensusBlocksHeightGet(subsidyBH)
+			if err != nil {
+				return errors.AddContext(err, "can't get consensus blocks")
+			}
+			subsidyID = cbhg.ID.FoundationSubsidyID()
+		}
+
+		// Send Siacoins
+		logger.Debugf("sending %v from Foundation primary address at block height %v", value, currentBH)
+		err := sendSiacoinsFromFoundationPrimaryAddress(c, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, value, types.SiacoinPrecision, address)
+		if err != nil {
+			return fmt.Errorf("Foundation primary address doesn't contain expected Siacons\ncurrent block height: %v\nsubsidy block height: %v\nerror: %v", currentBH, subsidyBH, err)
+		}
+	}
+	// Check there are no more Siacoins
+	err := sendSiacoinsFromFoundationPrimaryAddress(c, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, types.NewCurrency64(1), types.NewCurrency64(1), address)
+	// errors.Contains() doesn't work and misses an error, we need to compare
+	// strings
+	if !strings.Contains(err.Error(), errNonExistingOutput.Error()) {
+		return fmt.Errorf("Foundation primary address contains unexpected Siacons\ncurrent block height: %v\nsubsidy block height: %v\nerror: %v", currentBH, subsidyBH, err)
+	}
+	return nil
+}
+
+// forwardFoundationSubsidyTwiceCheckReceivedOnce calls
+// forwardFoundationSubsidy twice and checks the receiving address receives the
+// exact value of Siacoins (once).
+func forwardFoundationSubsidyTwiceCheckReceivedOnce(logger *persist.Logger, c *client.Client, forwardSubsidy bool, currentBH, subsidyBH types.BlockHeight, subsidyID types.SiacoinOutputID, foundationPrimaryUnlockConditions types.UnlockConditions, foundationPrimaryKeys []crypto.SecretKey, valueToSend, expectedBalance types.Currency, address types.UnlockHash, receivingAnt *ant.Ant) error {
+	err := forwardFoundationSubsidy(logger, c, forwardSubsidy, currentBH, subsidyBH, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, valueToSend, address)
+	if err != nil {
+		return err
+	}
+	err = forwardFoundationSubsidy(logger, c, forwardSubsidy, currentBH, subsidyBH, subsidyID, foundationPrimaryUnlockConditions, foundationPrimaryKeys, valueToSend, address)
+	if err != nil {
+		return err
+	}
+	err = receivingAnt.WaitConfirmedSiacoinBalance(ant.BalanceEquals, expectedBalance, transactionConfirmationTimeout)
+	if err != nil {
+		return fmt.Errorf("receiving ant doesn't have expected Siacoin balance: %v, block height: %v", err, currentBH)
+	}
+	return nil
+}
+
+// initTest initializes Foundation test and returns a logger and an antfarm.
+func initDefaultFoundationAntfarm(logger *persist.Logger, dataDir string, genericAnts int) (*antfarm.AntFarm, error) {
+	// Build the Foundation binary
+	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
+	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
+		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
+		if err != nil {
+			return nil, errors.AddContext(err, "can't build Foundation siad binary")
+		}
+	}
+
+	// Config antfarm with a miner and generic ants.
+	antfarmConfig, err := antfarm.NewAntfarmConfig(dataDir, allowLocalIPs, 1, 0, 0, genericAnts)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't create antfarm config")
+	}
+
+	// Update config to use foundation siad dev binaries
+	for i := range antfarmConfig.AntConfigs {
+		antfarmConfig.AntConfigs[i].SiadPath = foundationSiadPath
+	}
+
+	// Create antfarm
+	farm, err := antfarm.New(logger, antfarmConfig)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't create antfarm")
+	}
+
+	return farm, nil
+}
+
+// initFoundationTest initializes Foundation test and returns a logger and an
+// antfarm datadir.
+func initFoundationTest(t *testing.T) (*persist.Logger, string) {
+	if !build.VLONG {
+		t.SkipNow()
+	}
+	t.Parallel()
+
+	// Check that the test runs with dev build tag
+	if build.Release != "dev" {
+		t.Fatal("this test is expected to be executed with dev build tag to load dev constants from Sia")
+	}
+
+	// Prepare logger
+	dataDir := test.TestDir(t.Name())
+	logger := test.NewTestLogger(t, dataDir)
+
+	// Check UPnP enabled router
+	upnpStatus := upnprouter.CheckUPnPEnabled()
+	logger.Debugln(upnpStatus)
+
+	return logger, dataDir
+}
+
 // sendSiacoinsFromFoundationPrimaryAddress sends Siacoins from the Foundation
 // primary multisig address.
 func sendSiacoinsFromFoundationPrimaryAddress(c *client.Client, siacoinOutputID types.SiacoinOutputID, foundationUnlockConditions types.UnlockConditions, foundationPrimaryKeys []crypto.SecretKey, amount, minerFee types.Currency, address types.UnlockHash) error {
@@ -218,6 +334,32 @@ func sendSiacoinsFromFoundationPrimaryAddress(c *client.Client, siacoinOutputID 
 	if err != nil {
 		return errors.AddContext(err, "error posting transaction")
 	}
+	return nil
+}
+
+// updateAnts updates ants data directories and starts ants in parallel using
+// the given siad path.
+func updateAnts(farm *antfarm.AntFarm, dataDirs []string, siadPath string) error {
+	if len(farm.Ants) != len(dataDirs) {
+		return fmt.Errorf("Number of ants %d doesn't match number of dataDirs %d", len(farm.Ants), len(dataDirs))
+	}
+	errChan := make(chan error, len(farm.Ants))
+	for i := range farm.Ants {
+		a := farm.Ants[i]
+		dir := dataDirs[i]
+		go func(a *ant.Ant, dataDir string, errChan chan error) {
+			a.Config.DataDir = dataDir
+			err := a.StartSiad(siadPath)
+			errChan <- err
+		}(a, dir, errChan)
+	}
+	for range farm.Ants {
+		err := <-errChan
+		if err != nil {
+			return errors.AddContext(err, "can't configure and start an ant")
+		}
+	}
+	close(errChan)
 	return nil
 }
 
