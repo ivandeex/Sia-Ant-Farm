@@ -62,24 +62,24 @@ test: fmt vet install install-siad-dev
 
 test-long: clean fmt vet lint-ci install-siad-dev
 	@mkdir -p cover
-	go test --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=3600s $(pkgs) -run="$(run)" -count=$(count)
+	go test --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
 
 test-vlong: clean fmt vet lint-ci install-siad-dev
 	@mkdir -p cover
-	go test -v -tags='testing debug vlong netgo' -timeout=3600s $(pkgs) -run="$(run)" -count=$(count)
+	go test -v -tags='testing debug vlong netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
 
 # Target to execute tests using 'dev' build tag, so that Sia Antfarm loads Sia
 # dev constants.
 test-vlong-dev: clean fmt vet lint-ci install-siad-dev
 	@mkdir -p cover
-	go test -v -tags='dev debug vlong netgo' -timeout=3600s $(pkgs) -run="$(run)" -count=$(count)
+	go test -v -tags='dev debug vlong netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
 
 # Target to execute Foundation hardfork tests using 'foundation-antfarm-fix'
 # branch and using 'dev' build tag, so that Sia Antfarm loads Sia dev
 # constants.
 test-vlong-foundation-dev: clean fmt vet lint-ci
 	@mkdir -p cover
-	go test -v -tags='dev debug vlong netgo' -timeout=3600s $(pkgs) -run="$(run)" -count=$(count)
+	go test -v -tags='dev debug vlong netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
 
 # lint runs golangci-lint (which includes golint, a spellcheck of the codebase,
 # and other linters), the custom analyzers, and also a markdown spellchecker.
