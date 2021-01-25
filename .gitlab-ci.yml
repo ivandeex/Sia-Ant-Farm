@@ -20,8 +20,10 @@ variables:
 default: &default_params
   ## Run tests with most recent golang version to take advantage of any perf
   ## improvements.
-  image: golang:1.13.8
+  image: nebulouslabs/sia-ci
   before_script:
+    - date
+    - go version
     - mkdir -p .cache/gocache
     - export PATH=$PATH:$CI_PROJECT_DIR/.cache/bin/
     - export GOPATH="$CI_PROJECT_DIR/.cache"
@@ -69,7 +71,7 @@ build:
   stage: lint
   needs: []
   ## go 1.13 is the minimum accepted version for building Sia.
-  image: golang:1.13
+  image: nebulouslabs/sia-ci
   artifacts:
     name: "Binaries"
     paths:
