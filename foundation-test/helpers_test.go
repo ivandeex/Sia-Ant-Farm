@@ -338,17 +338,23 @@ func sendSiacoinsFromFoundationPrimaryAddress(c *client.Client, siacoinOutputID 
 }
 
 // updateAnts updates ants data directories and starts ants in parallel using
-// the given siad path.
+// the given siad path. If dataDirs is nil, ants data directories are not
+// changed.
 func updateAnts(farm *antfarm.AntFarm, dataDirs []string, siadPath string) error {
-	if len(farm.Ants) != len(dataDirs) {
+	if dataDirs != nil && len(farm.Ants) != len(dataDirs) {
 		return fmt.Errorf("Number of ants %d doesn't match number of dataDirs %d", len(farm.Ants), len(dataDirs))
 	}
 	errChan := make(chan error, len(farm.Ants))
 	for i := range farm.Ants {
 		a := farm.Ants[i]
-		dir := dataDirs[i]
+		var dir string
+		if dataDirs != nil {
+			dir = dataDirs[i]
+		}
 		go func(a *ant.Ant, dataDir string, errChan chan error) {
-			a.Config.DataDir = dataDir
+			if dir != "" {
+				a.Config.DataDir = dataDir
+			}
 			err := a.StartSiad(siadPath)
 			errChan <- err
 		}(a, dir, errChan)
