@@ -38,7 +38,7 @@ func TestBuildManager(t *testing.T) {
 			}()
 
 			// Start building the versions.
-			err := StaticBuilder.BuildVersions(testLogger, tt.versions...)
+			err := StaticBuilder.BuildVersions(testLogger, true, tt.versions...)
 			if err != nil {
 				t.Fatal(err)
 			}

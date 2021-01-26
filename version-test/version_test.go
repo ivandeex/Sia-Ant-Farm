@@ -83,11 +83,9 @@ func TestRenterDownloader(t *testing.T) {
 
 	// Rebuild the master
 	master := "master"
-	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, master)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, rebuildMaster, master)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create antfarm config
@@ -165,11 +163,9 @@ func TestRenterUploader(t *testing.T) {
 
 	// Rebuild the master
 	master := "master"
-	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, master)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, rebuildMaster, master)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create antfarm config
@@ -293,17 +289,13 @@ func TestUpgrades(t *testing.T) {
 	}()
 
 	// Build binaries to test.
-	if rebuildReleaseBinaries {
-		err := binariesbuilder.StaticBuilder.BuildVersions(logger, upgradePathVersions...)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = binariesbuilder.StaticBuilder.BuildVersions(logger, rebuildReleaseBinaries, upgradePathVersions...)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(logger, "master")
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = binariesbuilder.StaticBuilder.BuildVersions(logger, rebuildMaster, "master")
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Add master to upgrade path
@@ -361,11 +353,9 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 
 	// Build binary to test
 	branch := "master"
-	if rebuildMaster {
-		err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, branch)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = binariesbuilder.StaticBuilder.BuildVersions(testLogger, rebuildMaster, branch)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Create antfarm config

@@ -2,6 +2,7 @@ package binariesbuilder
 
 import (
 	"fmt"
+	"os"
 	"sync"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
@@ -48,14 +49,25 @@ func SiadBinaryPath(version string) string {
 }
 
 // BuildVersions defines a static builder method to request to build siad
-// binaries and blocks until all the requested versions are built. This method
-// is thread safe and can be called concurrently from parallel running tests.
-// If several tests request to build the same siad version, the version is
-// built just once.
-func (b *builder) BuildVersions(logger *persist.Logger, versions ...string) error {
+// binaries and blocks until all the requested versions are built. If the force
+// flag is set to true, the binaries are always rebuilt, if is set to false,
+// the binaries are rebuild only if they are not present. This method is thread
+// safe and can be called concurrently from parallel running tests. If several
+// tests request to build the same siad version, the version is built just
+// once.
+func (b *builder) BuildVersions(logger *persist.Logger, force bool, versions ...string) error {
 	// Request to build each version
 	var chans []chan error
 	for _, v := range versions {
+		// Check if version was already built and we don't want to rebuild it.
+		siadPath := SiadBinaryPath(v)
+		if _, err := os.Stat(siadPath); err != nil && !os.IsNotExist(err) {
+			return errors.AddContext(err, "can't get file info")
+		} else if err == nil && !force {
+			logger.Debugf("requested version %v was already built and we are not forcing it to be rebuilt", v)
+			continue
+		}
+
 		ch := make(chan error)
 		b.managedBuildVersion(logger, BinariesDir, v, ch)
 		chans = append(chans, ch)
