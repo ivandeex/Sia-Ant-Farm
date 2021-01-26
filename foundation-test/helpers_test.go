@@ -2,7 +2,6 @@ package foundationtest
 
 import (
 	"fmt"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -235,11 +234,9 @@ func forwardFoundationSubsidyTwiceCheckReceivedOnce(logger *persist.Logger, c *c
 func initDefaultFoundationAntfarm(logger *persist.Logger, dataDir string, genericAnts int) (*antfarm.AntFarm, error) {
 	// Build the Foundation binary
 	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
-	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
-		if err != nil {
-			return nil, errors.AddContext(err, "can't build Foundation siad binary")
-		}
+	err := binariesbuilder.StaticBuilder.BuildVersions(logger, forceFoundationBinaryRebuilding, foundationSiaVersion)
+	if err != nil {
+		return nil, errors.AddContext(err, "can't build Foundation siad binary")
 	}
 
 	// Config antfarm with a miner and generic ants.

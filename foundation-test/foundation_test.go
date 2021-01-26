@@ -2,7 +2,6 @@
 package foundationtest
 
 import (
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -576,20 +575,16 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 
 	// Build the pre-hardfork binary
 	nonHardforkSiadPath := binariesbuilder.SiadBinaryPath(nonHardforkSiaVersion)
-	if _, err := os.Stat(nonHardforkSiadPath); err != nil || forcePreHardforkBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, nonHardforkSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err := binariesbuilder.StaticBuilder.BuildVersions(logger, forcePreHardforkBinaryRebuilding, nonHardforkSiaVersion)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Build the Foundation binary
 	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
-	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = binariesbuilder.StaticBuilder.BuildVersions(logger, forceFoundationBinaryRebuilding, foundationSiaVersion)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Config antfarm with a miner, 5 hosts, a renter and a generic ant
@@ -627,21 +622,36 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 		t.Error(err)
 	}
 
-	// Renter upload files before Foundation hardfork
+	// Prepare upload and download
 	fileSize := uint64(modules.SectorSize * 16)
 	filesCount := 5
-	// Start uploading files
 	renterJob := r.Jr.NewRenterJob()
-	for i := 0; i < filesCount; i++ {
-		_, err = renterJob.Upload(fileSize)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	uploadedFiles := renterJob.Files
+	uploadedFiles := []ant.RenterFile{}
 
-	// Renter download files before Foundation hardfork
-	err = antfarm.DownloadAndVerifyFiles(logger, r, uploadedFiles)
+	uploadDownload := func() error {
+		// Upload files
+		for i := 0; i < filesCount; i++ {
+			_, err = renterJob.Upload(fileSize)
+			if err != nil {
+				return errors.AddContext(err, "can't upload files")
+			}
+		}
+
+		// Update uploaded files. We keep track of the uploaded files in a
+		// separate variable, because renterJob.Files are reset after a new
+		// renterJob is created after hardfork.
+		uploadedFiles = append(uploadedFiles, renterJob.Files[len(renterJob.Files)-filesCount:]...)
+
+		// Download files
+		err = antfarm.DownloadAndVerifyFiles(logger, r, uploadedFiles)
+		if err != nil {
+			return errors.AddContext(err, "can't download files")
+		}
+		return nil
+	}
+
+	// Upload, download before Foundation hardfork
+	err = uploadDownload()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -687,15 +697,14 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Renter upload files after Foundation hardfork
+	// Get new renterJob after upgrade for upload and download
 	renterJob = r.Jr.NewRenterJob()
-	for i := 0; i < filesCount; i++ {
-		_, err = renterJob.Upload(fileSize)
-		if err != nil {
-			t.Fatal(err)
-		}
+
+	// Upload, download after Foundation hardfork
+	err = uploadDownload()
+	if err != nil {
+		t.Fatal(err)
 	}
-	uploadedFiles = append(uploadedFiles, renterJob.Files...)
 
 	// Get current block height
 	cg, err = rc.ConsensusGet()
@@ -703,14 +712,8 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Renter download files uploaded before and after the Foundation hardfork
-	err = antfarm.DownloadAndVerifyFiles(logger, r, uploadedFiles)
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	// Get receiving ant's client and address
-	receivingAnt, err := farm.GetAntByName(ant.NameGeneric(1))
+	receivingAnt, err := farm.GetAntByName(ant.NameGeneric(0))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -728,6 +731,13 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 	subsidyID := cbhg.ID.FoundationSubsidyID()
+
+	// Wait for Foundation hardfork mature so we can send out Siacoins from the
+	// Foundation primary address
+	err = r.WaitForBlockHeight(hardforkMatureBH, transactionConfirmationTimeout, time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Send Siacoins from Foundation primary address to receiving ant
 	amount := types.InitialFoundationSubsidy.Sub(types.SiacoinPrecision)
@@ -757,18 +767,8 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Renter upload files after the first renewal period
-	for i := 0; i < filesCount; i++ {
-		_, err = renterJob.Upload(fileSize)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	uploadedFiles = append(uploadedFiles, renterJob.Files...)
-
-	// Renter download files uploaded before and after the Foundation hardfork
-	// after the renewal period.
-	err = antfarm.DownloadAndVerifyFiles(logger, r, uploadedFiles)
+	// Upload, download after the first renewal period
+	err = uploadDownload()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -779,18 +779,8 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Renter upload files after the second renewal period
-	for i := 0; i < filesCount; i++ {
-		_, err = renterJob.Upload(fileSize)
-		if err != nil {
-			t.Fatal(err)
-		}
-	}
-	uploadedFiles = append(uploadedFiles, renterJob.Files...)
-
-	// Renter download files uploaded before and after the Foundation hardfork
-	// after the second renewal period.
-	err = antfarm.DownloadAndVerifyFiles(logger, r, uploadedFiles)
+	// Upload, download after the second renewal period
+	err = uploadDownload()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -810,20 +800,16 @@ func TestReplayProtection(t *testing.T) {
 
 	// Build the pre-hardfork binary
 	nonHardforkSiadPath := binariesbuilder.SiadBinaryPath(nonHardforkSiaVersion)
-	if _, err := os.Stat(nonHardforkSiadPath); err != nil || forcePreHardforkBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, nonHardforkSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err := binariesbuilder.StaticBuilder.BuildVersions(logger, forcePreHardforkBinaryRebuilding, nonHardforkSiaVersion)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Build the Foundation binary
 	foundationSiadPath := binariesbuilder.SiadBinaryPath(foundationSiaVersion)
-	if _, err := os.Stat(foundationSiadPath); err != nil || forceFoundationBinaryRebuilding {
-		err = binariesbuilder.StaticBuilder.BuildVersions(logger, foundationSiaVersion)
-		if err != nil {
-			t.Fatal(err)
-		}
+	err = binariesbuilder.StaticBuilder.BuildVersions(logger, forceFoundationBinaryRebuilding, foundationSiaVersion)
+	if err != nil {
+		t.Fatal(err)
 	}
 
 	// Set antfarm data dirs
