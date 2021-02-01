@@ -81,6 +81,16 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		return errors.AddContext(err, "can't reset Sia git repository")
 	}
 
+	// Git fetch to get new branches
+	cmd = Command{
+		Name: "git",
+		Args: []string{"-C", siaPath, "fetch"},
+	}
+	_, err = cmd.Execute(logger)
+	if err != nil {
+		return errors.AddContext(err, "can't fetch Sia git repository")
+	}
+
 	// Git pull including tags to get latest state
 	cmd = Command{
 		Name: "git",
