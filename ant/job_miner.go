@@ -2,12 +2,22 @@ package ant
 
 import (
 	"time"
+
+	"gitlab.com/NebulousLabs/Sia/types"
 )
 
 const (
-	// balanceIncreaseCheckInterval is how often the wallet will be checke for
-	// balance increases
-	balanceIncreaseCheckInterval = time.Second * 100
+	// balanceIncreaseCheckFrequency defines how often the wallet will be
+	// checked for balance increases
+	balanceIncreaseCheckFrequency = time.Second * 100
+
+	// balanceIncreaseCheckWarmup defines initial interval in which the miner
+	// balance will not yet be checked
+	balanceIncreaseCheckWarmup = time.Minute * 2
+
+	// blockCheckFrequency defines interval in which new block generation will
+	// be checked
+	blockCheckFrequency = time.Millisecond * 500
 )
 
 // blockMining indefinitely mines blocks.  If more than 100
@@ -34,31 +44,77 @@ func (j *JobRunner) blockMining() {
 		return
 	}
 
-	walletInfo, err := j.staticClient.WalletGet()
+	// Get block frequency and set miner sleep time.
+	cg, err := j.staticClient.ConsensusGet()
 	if err != nil {
-		j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
+		j.staticLogger.Errorf("%v: can't get consensus info: %v", j.staticDataDir, err)
 		return
 	}
-	lastBalance := walletInfo.ConfirmedSiacoinBalance
+	blockFrequency := cg.BlockFrequency // seconds per block
+	minerSleepTime := time.Second * time.Duration(blockFrequency/2)
 
-	// Every 100 seconds, verify that the balance has increased.
+	// After mining a block, sleep half block frequency time, so that mining is
+	// more consistent. Every 100 seconds, verify that the balance has
+	// increased.
+	var lastBH types.BlockHeight
+	var lastBalance types.Currency
+	lastBallanceCheck := time.Now()
+	start := time.Now()
 	for {
+		// Wait before check.
 		select {
 		case <-j.StaticTG.StopChan():
 			return
-		case <-time.After(balanceIncreaseCheckInterval):
+		case <-time.After(blockCheckFrequency):
 		}
 
-		walletInfo, err = j.staticClient.WalletGet()
+		// Get consensus to get block height.
+		cg, err := j.staticClient.ConsensusGet()
 		if err != nil {
-			j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
+			j.staticLogger.Errorf("%v: can't get consensus info: %v", j.staticDataDir, err)
 			continue
 		}
-		if walletInfo.ConfirmedSiacoinBalance.Cmp(lastBalance) > 0 {
-			j.staticLogger.Printf("%v: Blockmining job succeeded", j.staticDataDir)
-			lastBalance = walletInfo.ConfirmedSiacoinBalance
-		} else {
-			j.staticLogger.Errorf("%v: it took too long to receive new funds in miner job", j.staticDataDir)
+
+		// Check if we just mined a block
+		if cg.Height > lastBH {
+			lastBH = cg.Height
+
+			// Turn off the miner after mining a block.
+			err = j.staticClient.MinerStopGet()
+			if err != nil {
+				j.staticLogger.Errorf("%v: can't stop miner: %v", j.staticDataDir, err)
+				continue
+			}
+
+			// Sleep half of the block frequency interval.
+			select {
+			case <-j.StaticTG.StopChan():
+				return
+			case <-time.After(minerSleepTime):
+			}
+
+			// Turn on the miner.
+			err = j.staticClient.MinerStartGet()
+			if err != nil {
+				j.staticLogger.Errorf("%v: can't start miner: %v", j.staticDataDir, err)
+				continue
+			}
+		}
+
+		// Check that miner balance is increasing.
+		if time.Since(lastBallanceCheck) > balanceIncreaseCheckFrequency {
+			walletInfo, err := j.staticClient.WalletGet()
+			if err != nil {
+				j.staticLogger.Errorf("%v: can't get wallet info: %v", j.staticDataDir, err)
+				continue
+			}
+			if walletInfo.ConfirmedSiacoinBalance.Cmp(lastBalance) > 0 {
+				j.staticLogger.Printf("%v: Blockmining job succeeded", j.staticDataDir)
+				lastBalance = walletInfo.ConfirmedSiacoinBalance
+			} else if time.Since(start) > balanceIncreaseCheckWarmup {
+				j.staticLogger.Errorf("%v: it took too long to receive new funds in miner job", j.staticDataDir)
+			}
+			lastBallanceCheck = time.Now()
 		}
 	}
 }

@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/NebulousLabs/Sia/persist"
+	siapersist "gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/Sia/siatest"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/fastrand"
@@ -81,7 +81,7 @@ func TestDir(testName string) string {
 	if err != nil {
 		panic(err)
 	}
-	err = os.MkdirAll(path, persist.DefaultDiskPermissionsTest)
+	err = os.MkdirAll(path, siapersist.DefaultDiskPermissionsTest)
 	if err != nil {
 		panic(err)
 	}

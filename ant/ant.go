@@ -265,6 +265,126 @@ func (a *Ant) NewClient() (*client.Client, error) {
 	return client.New(options), nil
 }
 
+// PrintDebugInfo prints out helpful debug information, arguments define what
+// is printed.
+func (a *Ant) PrintDebugInfo(contractInfo, hostInfo, renterInfo bool) error {
+	var msg string
+	client, err := a.NewClient()
+	if err != nil {
+		return err
+	}
+	logger := a.staticLogger
+	if contractInfo {
+		rc, err := client.RenterAllContractsGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get all renter contracts")
+		}
+		msg += "Active Contracts\n"
+		for _, c := range rc.ActiveContracts {
+			msg += fmt.Sprintf("    ID %v\n", c.ID)
+			msg += fmt.Sprintf("    HostPublicKey %v\n", c.HostPublicKey)
+			msg += fmt.Sprintf("    GoodForUpload %v\n", c.GoodForUpload)
+			msg += fmt.Sprintf("    GoodForRenew %v\n", c.GoodForRenew)
+			msg += fmt.Sprintf("    EndHeight %v\n", c.EndHeight)
+		}
+		msg += "\n"
+		msg += "Passive Contracts\n"
+		for _, c := range rc.PassiveContracts {
+			msg += fmt.Sprintf("    ID %v\n", c.ID)
+			msg += fmt.Sprintf("    HostPublicKey %v\n", c.HostPublicKey)
+			msg += fmt.Sprintf("    GoodForUpload %v\n", c.GoodForUpload)
+			msg += fmt.Sprintf("    GoodForRenew %v\n", c.GoodForRenew)
+			msg += fmt.Sprintf("    EndHeight %v\n", c.EndHeight)
+		}
+		msg += "\n"
+		msg += "Refreshed Contracts\n"
+		for _, c := range rc.RefreshedContracts {
+			msg += fmt.Sprintf("    ID %v\n", c.ID)
+			msg += fmt.Sprintf("    HostPublicKey %v\n", c.HostPublicKey)
+			msg += fmt.Sprintf("    GoodForUpload %v\n", c.GoodForUpload)
+			msg += fmt.Sprintf("    GoodForRenew %v\n", c.GoodForRenew)
+			msg += fmt.Sprintf("    EndHeight %v\n", c.EndHeight)
+		}
+		msg += "\n"
+		msg += "Disabled Contracts\n"
+		for _, c := range rc.DisabledContracts {
+			msg += fmt.Sprintf("    ID %v\n", c.ID)
+			msg += fmt.Sprintf("    HostPublicKey %v\n", c.HostPublicKey)
+			msg += fmt.Sprintf("    GoodForUpload %v\n", c.GoodForUpload)
+			msg += fmt.Sprintf("    GoodForRenew %v\n", c.GoodForRenew)
+			msg += fmt.Sprintf("    EndHeight %v\n", c.EndHeight)
+		}
+		msg += "\n"
+		msg += "Expired Contracts\n"
+		for _, c := range rc.ExpiredContracts {
+			msg += fmt.Sprintf("    ID %v\n", c.ID)
+			msg += fmt.Sprintf("    HostPublicKey %v\n", c.HostPublicKey)
+			msg += fmt.Sprintf("    GoodForUpload %v\n", c.GoodForUpload)
+			msg += fmt.Sprintf("    GoodForRenew %v\n", c.GoodForRenew)
+			msg += fmt.Sprintf("    EndHeight %v\n", c.EndHeight)
+		}
+		msg += "\n"
+		msg += "Expired Refreshed Contracts\n"
+		for _, c := range rc.ExpiredRefreshedContracts {
+			msg += fmt.Sprintf("    ID %v\n", c.ID)
+			msg += fmt.Sprintf("    HostPublicKey %v\n", c.HostPublicKey)
+			msg += fmt.Sprintf("    GoodForUpload %v\n", c.GoodForUpload)
+			msg += fmt.Sprintf("    GoodForRenew %v\n", c.GoodForRenew)
+			msg += fmt.Sprintf("    EndHeight %v\n", c.EndHeight)
+		}
+		msg += "\n"
+	}
+
+	if hostInfo {
+		hdbag, err := client.HostDbAllGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get host db all")
+		}
+		msg += "Active Hosts from HostDB\n"
+		for _, host := range hdbag.Hosts {
+			hostInfo, err := client.HostDbHostsGet(host.PublicKey)
+			if err != nil {
+				return errors.AddContext(err, "can't get host db info")
+			}
+			msg += fmt.Sprintf("    Host: %v\n", host.NetAddress)
+			msg += fmt.Sprintf("        score %v\n", hostInfo.ScoreBreakdown.Score)
+			msg += fmt.Sprintf("        breakdown %v\n", hostInfo.ScoreBreakdown)
+			msg += fmt.Sprintf("        pk %v\n", host.PublicKey)
+			msg += fmt.Sprintf("        Accepting Contracts %v\n", host.HostExternalSettings.AcceptingContracts)
+			msg += fmt.Sprintf("        Filtered %v\n", host.Filtered)
+			msg += fmt.Sprintf("        LastIPNetChange %v\n", host.LastIPNetChange.String())
+			msg += "        Subnets\n"
+			for _, subnet := range host.IPNets {
+				msg += fmt.Sprintf("             %v\n", subnet)
+			}
+			msg += "\n"
+		}
+		msg += "\n"
+	}
+
+	if renterInfo {
+		msg += "Renter Info\n"
+		rg, err := client.RenterGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get all renter info")
+		}
+		msg += fmt.Sprintf("    CP: %v\n", rg.CurrentPeriod)
+		cg, err := client.ConsensusGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get consensus info")
+		}
+		msg += fmt.Sprintf("    BH: %v\n", cg.Height)
+		settings := rg.Settings
+		msg += fmt.Sprintf("    Allowance Funds: %v\n", settings.Allowance.Funds.HumanString())
+		fm := rg.FinancialMetrics
+		msg += fmt.Sprintf("    Unspent Funds: %v\n", fm.Unspent.HumanString())
+		msg += "\n"
+	}
+
+	logger.Debugln(msg)
+	return nil
+}
+
 // StartJob starts the job indicated by `job` after an ant has been
 // initialized. Arguments are passed to the job using args.
 func (a *Ant) StartJob(antsSyncWG *sync.WaitGroup, job string, args ...interface{}) error {
