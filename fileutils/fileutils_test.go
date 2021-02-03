@@ -37,7 +37,7 @@ func TestWaitForFileCompleteReady(t *testing.T) {
 	// Prepare file
 	fp := filepath.Join(dataDir, "ready-file")
 	data := [fileSize]byte{}
-	err := ioutil.WriteFile(fp, data[:], 0644)
+	err := ioutil.WriteFile(fp, data[:], 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -75,7 +75,7 @@ func TestWaitForFileCompleteSyncing(t *testing.T) {
 	// Prepare file
 	fp := filepath.Join(dataDir, "syncing-file")
 	data := [fileSize]byte{}
-	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestWaitForFileCompleteTimeout(t *testing.T) {
 	// Prepare file
 	fp := filepath.Join(dataDir, "timeout-file")
 	data := [fileSize]byte{}
-	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
 	}
