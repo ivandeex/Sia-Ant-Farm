@@ -9,11 +9,11 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/fileutils"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/merkletree"
 
-	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api"
@@ -261,28 +261,23 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 	}
 
 	// Wait for physical file become complete after download finished.
-	// Sometimes after download completes the file is not completely saved to
-	// disk, so there is a wait loop with timeout depending on the file size to
-	// wait for physical file being completely saved to disk.
-	expectedMinSavingSpeed := uint64(4e5) // bytes/second
-	downloadedFileOnDiskTimeout := time.Duration(fileToDownload.Filesize/expectedMinSavingSpeed+1) * time.Second
-	frequency := time.Millisecond * 100
-	tries := int(downloadedFileOnDiskTimeout / frequency)
-	start = time.Now()
-	err = build.Retry(tries, frequency, func() error {
-		fi, err := os.Stat(destPath)
-		if err != nil {
-			return errors.AddContext(err, "can't open destination path")
-		}
-		if fi.Size() != fileToDownload.Size() {
-			msg := fmt.Sprintf("local file size %v doesn't match expected file size %v, waiting for file to become complete", fi.Size(), fileToDownload.Size())
-			r.staticLogger.Printf("%v: %v", r.staticJR.staticDataDir, msg)
-			return fmt.Errorf(msg)
-		}
-		return nil
-	})
+	// Sometimes (especially during parallel test execution) after a download
+	// completes the file is not completely saved/synced to disk, so we wait
+	// for siad to sync the file.
+
+	// expectedMinSavingSpeed defines minimum expected speed in bytes/second we
+	// accept for saving/syncing the downloaded file.
+	expectedMinSavingSpeed := int64(4e5)
+
+	// timeout is proportional to the file size and 1 second is added as a
+	// safety buffer.
+	timeout := time.Duration(fileToDownload.Size()/expectedMinSavingSpeed+1) * time.Second
+
+	err = fileutils.WaitForFileComplete(destPath, fileToDownload.Size(), timeout)
 	if err != nil {
-		return fmt.Errorf("can't download complete file %v within timeout %v: %v", destPath, downloadedFileOnDiskTimeout, err)
+		msg := fmt.Sprintf("can't download complete file %v within timeout %v: %v", destPath, timeout, err)
+		r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, msg)
+		return errors.New(msg)
 	}
 
 	r.staticLogger.Printf("%v: successfully downloaded\n\tsiaFile: %v\n\tto local file: %v\n\tdownload completed in: %v", r.staticJR.staticDataDir, siaPath, destPath, time.Since(start))

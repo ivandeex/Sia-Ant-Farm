@@ -10,6 +10,7 @@ variables:
     ./version-test
   ant_pkgs: >-
     ./ant
+    ./fileutils
   antfarm_pkgs: >-
     ./antfarm
   binaries_builder_pkgs: >-

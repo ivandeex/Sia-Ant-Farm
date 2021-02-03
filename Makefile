@@ -15,6 +15,7 @@ pkgs = \
 	./ant \
 	./antfarm \
 	./cmd/sia-antfarm \
+	./fileutils \
 	./upnprouter \
 	./version-test
 
