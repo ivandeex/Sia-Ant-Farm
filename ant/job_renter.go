@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"gitlab.com/NebulousLabs/Sia-Ant-Farm/fileutils"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/merkletree"
@@ -239,7 +240,13 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		if err != nil {
 			return errors.AddContext(err, "error checking renter download queue")
 		}
-		if hasFile && info.Received == info.Filesize {
+		if info.Error != "" {
+			msg := fmt.Sprintf("can't complete download, downloadInfo.Error: %v", info.Error)
+			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, msg)
+			return errors.New(msg)
+		}
+		if hasFile && info.Completed {
+			r.staticLogger.Debugf("%v: File: %v\n\tCompleted: %v\n\tReceived: %v\n\tTotalDataTransferred: %v", r.staticJR.staticDataDir, fileToDownload.SiaPath, info.Completed, info.Received, info.TotalDataTransferred)
 			break
 		} else if !hasFile {
 			r.staticLogger.Errorf("%v: file unexpectedly missing from download list", r.staticJR.staticDataDir)
@@ -252,7 +259,28 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 			return errors.New(msg)
 		}
 	}
-	r.staticLogger.Printf("%v: successfully downloaded\n\tsiaFile: %v\n\tto local file:%v", r.staticJR.staticDataDir, siaPath, destPath)
+
+	// Wait for physical file become complete after download finished.
+	// Sometimes (especially during parallel test execution) after a download
+	// completes the file is not completely saved/synced to disk, so we wait
+	// for siad to sync the file.
+
+	// expectedMinSavingSpeed defines minimum expected speed in bytes/second we
+	// accept for saving/syncing the downloaded file.
+	expectedMinSavingSpeed := int64(4e5)
+
+	// timeout is proportional to the file size and 1 second is added as a
+	// safety buffer.
+	timeout := time.Duration(fileToDownload.Size()/expectedMinSavingSpeed+1) * time.Second
+
+	err = fileutils.WaitForFileComplete(destPath, fileToDownload.Size(), timeout)
+	if err != nil {
+		msg := fmt.Sprintf("can't download complete file %v within timeout %v: %v", destPath, timeout, err)
+		r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, msg)
+		return errors.New(msg)
+	}
+
+	r.staticLogger.Printf("%v: successfully downloaded\n\tsiaFile: %v\n\tto local file: %v\n\tdownload completed in: %v", r.staticJR.staticDataDir, siaPath, destPath, time.Since(start))
 	return nil
 }
 

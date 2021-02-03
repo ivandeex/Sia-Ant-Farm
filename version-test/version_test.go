@@ -100,6 +100,7 @@ func TestRenterDownloader(t *testing.T) {
 	}
 
 	// Start antfarm
+	antfarmStart := time.Now()
 	newFarm, err := antfarm.New(testLogger, antfarmConfig)
 	farm := newFarm
 	if err != nil {
@@ -112,13 +113,13 @@ func TestRenterDownloader(t *testing.T) {
 	}()
 
 	// Get renter ant
-	renterAnt, err := farm.GetAntByName(test.RenterAntName)
+	r, err := farm.GetAntByName(test.RenterAntName)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Timeout the test if the renter doesn't become upload ready
-	err = renterAnt.Jr.WaitForRenterUploadReady()
+	err = r.Jr.WaitForRenterUploadReady()
 	if err != nil {
 		t.Error(err)
 	}
@@ -127,18 +128,42 @@ func TestRenterDownloader(t *testing.T) {
 	fileSize := uint64(modules.SectorSize * 4000)
 
 	// Upload a file
-	renterJob := renterAnt.Jr.NewRenterJob()
+	uploadStart := time.Now()
+	renterJob := r.Jr.NewRenterJob()
 	_, err = renterJob.Upload(fileSize)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Start downloading the file
-	downloadsCount := 200
-	for i := 0; i < downloadsCount; i++ {
-		err = antfarm.DownloadAndVerifyFiles(testLogger, renterAnt, renterJob.Files)
+	var downloadCount int
+	duration := time.Minute * 20
+	downloadStart := time.Now()
+	for {
+		if time.Since(downloadStart) > duration {
+			return
+		}
+		err := r.PrintDebugInfo(true, true, true)
 		if err != nil {
-			t.Error(err)
+			t.Fatal(err)
+		}
+
+		err = antfarm.DownloadAndVerifyFiles(testLogger, r, renterJob.Files)
+		downloadCount++
+		if err != nil {
+			var msg string
+			msg += fmt.Sprintf("Error: %v\n", err)
+			msg += fmt.Sprintf("\tTime: %v\n", time.Now())
+			msg += fmt.Sprintf("\tElapsed from antfarm start: %v\n", time.Since(antfarmStart))
+			msg += fmt.Sprintf("\tElapsed from upload start: %v\n", time.Since(uploadStart))
+			msg += fmt.Sprintf("\tElapsed from downloads start: %v\n", time.Since(downloadStart))
+			msg += fmt.Sprintf("\tDownload number: %d", downloadCount)
+			testLogger.Errorln(msg)
+			t.Error(msg)
+			// Stop if renter crashed
+			if strings.Contains(err.Error(), "connect: connection refused") {
+				t.Fatal("renter crashed")
+			}
 			continue
 		}
 	}
@@ -192,13 +217,13 @@ func TestRenterUploader(t *testing.T) {
 	}()
 
 	// Get renter ant
-	renterAnt, err := farm.GetAntByName(test.RenterAntName)
+	r, err := farm.GetAntByName(test.RenterAntName)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Timeout the test if the renter doesn't become upload ready
-	err = renterAnt.Jr.WaitForRenterUploadReady()
+	err = r.Jr.WaitForRenterUploadReady()
 	if err != nil {
 		t.Error(err)
 	}
@@ -234,7 +259,7 @@ func TestRenterUploader(t *testing.T) {
 	}
 
 	// Start uploading files
-	renterJob := renterAnt.Jr.NewRenterJob()
+	renterJob := r.Jr.NewRenterJob()
 	for i := 0; i < filesCount; i++ {
 		_, err = renterJob.Upload(fileSize)
 		if err != nil {
