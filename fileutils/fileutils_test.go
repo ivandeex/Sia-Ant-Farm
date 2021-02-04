@@ -10,6 +10,7 @@ import (
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -36,7 +37,7 @@ func TestWaitForFileCompleteReady(t *testing.T) {
 
 	// Prepare file
 	fp := filepath.Join(dataDir, "ready-file")
-	data := [fileSize]byte{}
+	data := fastrand.Bytes(fileSize)
 	err := ioutil.WriteFile(fp, data[:], 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -74,7 +75,7 @@ func TestWaitForFileCompleteSyncing(t *testing.T) {
 
 	// Prepare file
 	fp := filepath.Join(dataDir, "syncing-file")
-	data := [fileSize]byte{}
+	data := fastrand.Bytes(fileSize)
 	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -125,7 +126,7 @@ func TestWaitForFileCompleteTimeout(t *testing.T) {
 
 	// Prepare file
 	fp := filepath.Join(dataDir, "timeout-file")
-	data := [fileSize]byte{}
+	data := fastrand.Bytes(fileSize)
 	f, err := os.OpenFile(fp, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0600)
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +134,7 @@ func TestWaitForFileCompleteTimeout(t *testing.T) {
 
 	stop := make(chan struct{})
 	defer func() {
-		stop <- struct{}{}
+		close(stop)
 		if err := f.Close(); err != nil {
 			logger.Errorf("can't close test file: %v", err)
 		}
