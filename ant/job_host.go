@@ -350,9 +350,9 @@ func (hjr *hostJobRunner) managedWaitAnnounceTransactionInBlockchain() error {
 
 		// Timeout waiting for host announcement transaction
 		if currentBH > startBH+hostAnnounceBlockHeightDelay {
-			msg := fmt.Sprintf("host announcement transaction was not found in blockchain within %v blocks, transaction was probably re-orged", hostAnnounceBlockHeightDelay)
-			hjr.staticLogger.Debugf("%v: %v", hjr.staticDataDir, msg)
-			return errors.New(msg)
+			er := fmt.Errorf("host announcement transaction was not found in blockchain within %v blocks, transaction was probably re-orged", hostAnnounceBlockHeightDelay)
+			hjr.staticLogger.Debugf("%v: %v", hjr.staticDataDir, er)
+			return er
 		}
 
 		// Wait for next iteration

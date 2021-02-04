@@ -241,9 +241,9 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 			return errors.AddContext(err, "error checking renter download queue")
 		}
 		if info.Error != "" {
-			msg := fmt.Sprintf("can't complete download, downloadInfo.Error: %v", info.Error)
-			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, msg)
-			return errors.New(msg)
+			er := fmt.Errorf("can't complete download, downloadInfo.Error: %v", info.Error)
+			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, er)
+			return er
 		}
 		if hasFile && info.Completed {
 			r.staticLogger.Debugf("%v: File: %v\n\tCompleted: %v\n\tReceived: %v\n\tTotalDataTransferred: %v", r.staticJR.staticDataDir, fileToDownload.SiaPath, info.Completed, info.Received, info.TotalDataTransferred)
@@ -254,9 +254,9 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 			r.staticLogger.Debugf("%v: currently downloading %v, received %v bytes", r.staticJR.staticDataDir, fileToDownload.SiaPath, info.Received)
 		}
 		if time.Since(start) > downloadFileTimeout {
-			msg := fmt.Sprintf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
-			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, msg)
-			return errors.New(msg)
+			er := fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
+			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, er)
+			return er
 		}
 	}
 
@@ -275,9 +275,9 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 
 	err = fileutils.WaitForFileComplete(destPath, fileToDownload.Size(), timeout)
 	if err != nil {
-		msg := fmt.Sprintf("can't download complete file %v within timeout %v: %v", destPath, timeout, err)
-		r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, msg)
-		return errors.New(msg)
+		er := fmt.Errorf("can't download complete file %v within timeout %v: %v", destPath, timeout, err)
+		r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, er)
+		return er
 	}
 
 	r.staticLogger.Printf("%v: successfully downloaded\n\tsiaFile: %v\n\tto local file: %v\n\tdownload completed in: %v", r.staticJR.staticDataDir, siaPath, destPath, time.Since(start))
