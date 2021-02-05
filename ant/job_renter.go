@@ -14,6 +14,7 @@ import (
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/merkletree"
 
+	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/crypto"
 	"gitlab.com/NebulousLabs/Sia/modules"
 	"gitlab.com/NebulousLabs/Sia/node/api"
@@ -431,30 +432,26 @@ func (j *JobRunner) WaitForRenterUploadReady() error {
 		return errors.New("this ant hasn't renter job")
 	}
 	// Block until renter is upload ready or till timeout is reached
-	start := time.Now()
-	j.staticLogger.Debugf("%v: waiting for renter to become upload ready.", j.staticDataDir)
-	for {
-		// Timeout
-		if time.Since(start) > renterUploadReadyTimeout {
-			j.staticLogger.Errorf("%v: renter is not upload ready within %v timeout.", j.staticDataDir, renterUploadReadyTimeout)
-		}
-
+	tries := int(renterUploadReadyTimeout/renterUploadReadyFrequency) + 1
+	err := build.Retry(tries, renterUploadReadyFrequency, func() error {
 		rur, err := j.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
 		if err != nil {
 			// Error getting RenterUploadReady
-			j.staticLogger.Errorf("%v: can't get renter upload ready status: %v", j.staticDataDir, err)
+			er := fmt.Errorf("can't get renter upload ready status: %v", err)
+			j.staticLogger.Errorf("%v: %v", j.staticDataDir, er)
+			return er
 		} else if rur.Ready {
 			// Success, we can exit the loop.
-			break
+			return nil
 		}
-
-		// Wait a bit before trying again.
-		select {
-		case <-j.StaticTG.StopChan():
-			return errors.New("ant was stopped")
-		case <-time.After(renterUploadReadyFrequency):
-		}
+		return fmt.Errorf("renter is not upload ready")
+	})
+	if err != nil {
+		er := fmt.Errorf("renter is not upload ready within %v timeout", renterUploadReadyTimeout)
+		j.staticLogger.Errorf("%v: %v", j.staticDataDir, er)
+		return er
 	}
+
 	j.staticLogger.Printf("%v: renter is upload ready.", j.staticDataDir)
 	return nil
 }
