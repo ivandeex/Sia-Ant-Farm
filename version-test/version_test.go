@@ -446,7 +446,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 
 	// Wait for contracts to renew
 	contractsCount := len(config.GetHostAntConfigIndices())
-	contractRenewalTimeout := time.Minute * 5
+	contractRenewalTimeout := time.Minute * 15
 	err = backupRenterAnt.WaitForContractsToRenew(contractsCount, contractRenewalTimeout)
 	if err != nil {
 		t.Fatal(err)
