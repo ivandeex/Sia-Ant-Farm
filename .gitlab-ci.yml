@@ -17,6 +17,7 @@ variables:
     ./binaries-builder
   version_test_pkgs: >-
     ./version-test
+  ANTFARM_JOBS_TO_RUN: "basic_jobs"
 
 default: &default_params
   ## Run tests with most recent golang version to take advantage of any perf
@@ -49,11 +50,15 @@ default: &default_params
   stage: test
   needs: []
 
-  ## disable default tests for scheduled pipelines (nightlies)
-  except:
-    - schedules
+## Define lint, build, basic antfarm test jobs filter
+.basic_jobs: &basic_jobs_filter
+  ## Execute jobs only if specific jobs/tests are not set
+  only:
+    variables:
+      - $ANTFARM_JOBS_TO_RUN == "basic_jobs"
 
 lint:
+  <<: *basic_jobs_filter
   stage: lint
   needs: []
   cache:
@@ -65,10 +70,9 @@ lint:
     - export GOCACHE=$CI_PROJECT_DIR/.cache/gocache
     - make lint
     - make test
-  except:
-    - pipelines
 
 build:
+  <<: *basic_jobs_filter
   stage: lint
   needs: []
   ## go 1.13 is the minimum accepted version for building Sia.
@@ -83,42 +87,36 @@ build:
       - mkdir -p "$CI_PROJECT_DIR/artifacts"
       - cp "$GOPATH/bin/siad-dev" "$CI_PROJECT_DIR/artifacts/."
       - cp "$GOPATH/bin/sia-antfarm" "$CI_PROJECT_DIR/artifacts/."
-  except:
-    - pipelines
 
 ant-tests:
   <<: *default_test_params
+  <<: *basic_jobs_filter
   cache:
     key: ant-tests-cache
     paths:
       - .cache
   script:
     - make test-long pkgs="$ant_pkgs"
-  except:
-    - pipelines
-
 
 antfarm-tests:
   <<: *default_test_params
+  <<: *basic_jobs_filter
   cache:
     key: antfarm-tests-cache
     paths:
       - .cache
   script:
     - make test-long pkgs="$antfarm_pkgs"
-  except:
-    - pipelines
 
 binaries-builder-tests:
   <<: *default_test_params
+  <<: *basic_jobs_filter
   cache:
     key: binaries-builder-tests-cache
     paths:
       - .cache
   script:
     - make test-long pkgs="$binaries_builder_pkgs"
-  except:
-    - pipelines
 
 # Short version/upgrade tests triggered by Sia project merge to master
 short-version-tests:
@@ -130,10 +128,8 @@ short-version-tests:
   script:
     - make test-vlong pkgs="$version_test_pkgs" run='TestUpgrades/(TestRenterUpgradesWithBaseLatestMaster|TestHostsUpgradesWithBaseLatestMaster)'
   only:
-    refs:
-      - pipelines
     variables: 
-      - $PARENT_CI_PIPELINE_SOURCE != "schedule"
+      - $ANTFARM_JOBS_TO_RUN == "short_version_tests"
 
 # Long version tests triggered by Sia project scheduled pipeline
 long-version-tests:
@@ -145,7 +141,5 @@ long-version-tests:
   script:
     - make test-vlong pkgs="$version_test_pkgs"
   only:
-    refs:
-      - pipelines
     variables: 
-      - $PARENT_CI_PIPELINE_SOURCE == "schedule"
+      - $ANTFARM_JOBS_TO_RUN == "long_version_tests"
