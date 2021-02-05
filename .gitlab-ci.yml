@@ -17,7 +17,7 @@ variables:
     ./binaries-builder
   version_test_pkgs: >-
     ./version-test
-  ANTFARM_TESTS_TO_RUN: "basic_tests"
+  ANTFARM_JOBS_TO_RUN: "basic_jobs"
 
 default: &default_params
   ## Run tests with most recent golang version to take advantage of any perf
@@ -50,12 +50,12 @@ default: &default_params
   stage: test
   needs: []
 
-## Define lint, build, basic antfarm tests filter
+## Define lint, build, basic antfarm test jobs filter
 .basic_jobs: &basic_jobs_filter
-  ## Execute only if specific tests are not set
+  ## Execute jobs only if specific jobs/tests are not set
   only:
     variables:
-      - $ANTFARM_TESTS_TO_RUN == "basic_tests"
+      - $ANTFARM_JOBS_TO_RUN == "basic_jobs"
 
 lint:
   <<: *basic_jobs_filter
@@ -129,7 +129,7 @@ short-version-tests:
     - make test-vlong pkgs="$version_test_pkgs" run='TestUpgrades/(TestRenterUpgradesWithBaseLatestMaster|TestHostsUpgradesWithBaseLatestMaster)'
   only:
     variables: 
-      - $ANTFARM_TESTS_TO_RUN == "short_version_tests"
+      - $ANTFARM_JOBS_TO_RUN == "short_version_tests"
 
 # Long version tests triggered by Sia project scheduled pipeline
 long-version-tests:
@@ -142,4 +142,4 @@ long-version-tests:
     - make test-vlong pkgs="$version_test_pkgs"
   only:
     variables: 
-      - $ANTFARM_TESTS_TO_RUN == "long_version_tests"
+      - $ANTFARM_JOBS_TO_RUN == "long_version_tests"
