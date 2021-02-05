@@ -20,10 +20,6 @@ import (
 )
 
 const (
-	// contractsRenewalCheckFrequency defines frequency to check for contracts
-	// to be renewed.
-	contractsRenewalCheckFrequency = time.Second
-
 	// updateSiadWarmUpTime defines initial warm-up sleep time for an ant after
 	// siad update
 	updateSiadWarmUpTime = time.Second * 10
@@ -549,8 +545,9 @@ func (a *Ant) WaitForBlockHeight(blockHeight types.BlockHeight, timeout, frequen
 	}
 
 	// Wait for block height
+	a.staticLogger.Debugf("%v: waiting for block height %v", a.Config.DataDir, blockHeight)
 	tries := int(timeout / frequency)
-	return build.Retry(tries, frequency, func() error {
+	err = build.Retry(tries, frequency, func() error {
 		cg, err := c.ConsensusGet()
 		if err != nil {
 			return errors.AddContext(err, "can't get consensus")
@@ -562,6 +559,13 @@ func (a *Ant) WaitForBlockHeight(blockHeight types.BlockHeight, timeout, frequen
 
 		return fmt.Errorf("block height not reached. Current height: %v, expected height: %v", bh, blockHeight)
 	})
+	if err != nil {
+		er := fmt.Errorf("waiting for block height failed: %v", err)
+		a.staticLogger.Debugf("%v: %v", a.Config.DataDir, er)
+		return er
+	}
+	a.staticLogger.Debugf("%v: waiting for block height %v finished", a.Config.DataDir, blockHeight)
+	return nil
 }
 
 // WaitForContractsToRenew blocks until renter contracts are renewed.
@@ -572,29 +576,53 @@ func (a *Ant) WaitForContractsToRenew(contractsCount int, timeout time.Duration)
 	}
 	a.staticLogger.Debugf("%v: waiting for renter contracts to renew", a.Config.SiadConfig.DataDir)
 
-	// Get current contracts count
-	rc, err := a.Jr.staticClient.RenterAllContractsGet()
+	// Get current active contracts
+	rc, err := a.Jr.staticClient.RenterContractsGet()
 	if err != nil {
 		return errors.AddContext(err, "can't get renter contracts")
 	}
 	if len(rc.ActiveContracts) != contractsCount {
 		return fmt.Errorf("count of active contracts: expected: %d, actual: %d", contractsCount, len(rc.ActiveContracts))
 	}
-	expiredContracts := len(rc.ExpiredContracts)
 
-	// Wait for contracts to renew
-	tries := int(timeout / contractsRenewalCheckFrequency)
-	return build.Retry(tries, contractsRenewalCheckFrequency, func() error {
-		rec, err := a.Jr.staticClient.RenterExpiredContractsGet()
+	// Get contracts end height
+	var contractsEndHeight types.BlockHeight
+	for _, c := range rc.ActiveContracts {
+		h := c.EndHeight
+		if h > contractsEndHeight {
+			contractsEndHeight = h
+		}
+	}
+
+	// Wait for block height after all active contracts end
+	start := time.Now()
+	err = a.WaitForBlockHeight(contractsEndHeight+1, timeout, time.Second)
+	if err != nil {
+		return errors.AddContext(err, "waiting for contracts end height failed")
+	}
+
+	// Wait for new contracts form
+	newContractsTimeout := timeout - time.Since(start)
+	frequency := time.Second
+	tries := int(newContractsTimeout/frequency) + 1
+	err = build.Retry(tries, frequency, func() error {
+		rc, err := a.Jr.staticClient.RenterContractsGet()
 		if err != nil {
-			return errors.AddContext(err, "can't get renter expired contracts")
+			return errors.AddContext(err, "can't get renter contracts")
 		}
-		if len(rec.ExpiredContracts) == expiredContracts+contractsCount {
-			a.staticLogger.Debugf("%v: renter contracts were renewed", a.Config.SiadConfig.DataDir)
-			return nil
+		if len(rc.ActiveContracts) != contractsCount {
+			return fmt.Errorf("count of active contracts: expected: %d, actual: %d", contractsCount, len(rc.ActiveContracts))
 		}
-		return fmt.Errorf("actual count of expired contracts: %d doesn't equal initial contracts count: %d + initial expired contracts count: %d", len(rec.ExpiredContracts), contractsCount, expiredContracts)
+		return nil
 	})
+	if err != nil {
+		er := fmt.Errorf("waiting for block contracts renew failed: %v", err)
+		a.staticLogger.Debugf("%v: %v", a.Config.DataDir, er)
+		return er
+	}
+
+	a.staticLogger.Debugf("%v: waiting for renter contracts to renew finished", a.Config.SiadConfig.DataDir)
+	return nil
 }
 
 // WalletAddress returns a wallet address that this ant can receive coins on.
