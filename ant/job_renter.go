@@ -437,9 +437,7 @@ func (j *JobRunner) WaitForRenterUploadReady() error {
 		rur, err := j.staticClient.RenterUploadReadyGet(renterDataPieces, renterParityPieces)
 		if err != nil {
 			// Error getting RenterUploadReady
-			er := fmt.Errorf("can't get renter upload ready status: %v", err)
-			j.staticLogger.Errorf("%v: %v", j.staticDataDir, er)
-			return er
+			return fmt.Errorf("can't get renter upload ready status: %v", err)
 		} else if rur.Ready {
 			// Success, we can exit the loop.
 			return nil
@@ -447,7 +445,7 @@ func (j *JobRunner) WaitForRenterUploadReady() error {
 		return fmt.Errorf("renter is not upload ready")
 	})
 	if err != nil {
-		er := fmt.Errorf("renter is not upload ready within %v timeout", renterUploadReadyTimeout)
+		er := fmt.Errorf("renter is not upload ready within %v timeout: %v", renterUploadReadyTimeout, err)
 		j.staticLogger.Errorf("%v: %v", j.staticDataDir, er)
 		return er
 	}
