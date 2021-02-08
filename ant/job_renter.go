@@ -247,7 +247,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 			return er
 		}
 		if hasFile && info.Completed {
-			r.staticLogger.Debugf("%v: File: %v\n\tCompleted: %v\n\tReceived: %v\n\tTotalDataTransferred: %v", r.staticJR.staticDataDir, fileToDownload.SiaPath, info.Completed, info.Received, info.TotalDataTransferred)
+			r.staticLogger.Debugf("%v: Download completed\n\tFile: %v\n\tCompleted: %v\n\tReceived: %v\n\tTotalDataTransferred: %v", r.staticJR.staticDataDir, fileToDownload.SiaPath, info.Completed, info.Received, info.TotalDataTransferred)
 			break
 		} else if !hasFile {
 			r.staticLogger.Errorf("%v: file unexpectedly missing from download list", r.staticJR.staticDataDir)
@@ -257,6 +257,10 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		if time.Since(start) > downloadFileTimeout {
 			er := fmt.Errorf("file %v hasn't been downloaded within %v timeout", siaPath, downloadFileTimeout)
 			r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, er)
+			err = r.staticJR.staticAnt.PrintDebugInfo(true, true, true)
+			if err != nil {
+				r.staticLogger.Errorf("%v: can't print ant debug info: %v", r.staticJR.staticDataDir, err)
+			}
 			return er
 		}
 	}
@@ -276,8 +280,12 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 
 	err = fileutils.WaitForFileComplete(destPath, fileToDownload.Size(), timeout)
 	if err != nil {
-		er := fmt.Errorf("can't download complete file %v within timeout %v: %v", destPath, timeout, err)
+		er := fmt.Errorf("downloaded local file %v is not complete (doesn't have expected file size) within timeout %v: %v", destPath, timeout, err)
 		r.staticLogger.Errorf("%v: %v", r.staticJR.staticDataDir, er)
+		err = r.staticJR.staticAnt.PrintDebugInfo(true, true, true)
+		if err != nil {
+			r.staticLogger.Errorf("%v: can't print ant debug info: %v", r.staticJR.staticDataDir, err)
+		}
 		return er
 	}
 
