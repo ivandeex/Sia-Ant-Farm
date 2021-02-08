@@ -121,7 +121,7 @@ func TestRenterDownloader(t *testing.T) {
 	// Timeout the test if the renter doesn't become upload ready
 	err = r.Jr.WaitForRenterUploadReady()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	// Calculate storage size
@@ -225,7 +225,7 @@ func TestRenterUploader(t *testing.T) {
 	// Timeout the test if the renter doesn't become upload ready
 	err = r.Jr.WaitForRenterUploadReady()
 	if err != nil {
-		t.Error(err)
+		t.Fatal(err)
 	}
 
 	// Calculate storage size
@@ -701,8 +701,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		// become upload ready
 		err = renterAnt.Jr.WaitForRenterUploadReady()
 		if err != nil {
-			t.Error(err)
-			continue
+			t.Fatal(err)
 		}
 
 		// Upload a file
