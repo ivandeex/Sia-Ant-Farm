@@ -263,6 +263,18 @@ versionsLoop:
 	return result
 }
 
+// ReleasesWithMinVersion returns releases that satisfy the given minimal
+// version.
+func ReleasesWithMinVersion(releases []string, minVersion string) []string {
+	var filteredReleases []string
+	for _, r := range releases {
+		if build.VersionCmp(r, minVersion) >= 0 {
+			filteredReleases = append(filteredReleases, r)
+		}
+	}
+	return filteredReleases
+}
+
 // GetReleases returns slice of git tags of Sia Gitlab releases greater than or
 // equal to the given minimal version in ascending semantic version order. If
 // there is a patch tagged with "-antfarm" suffix for a Sia release, patch tag

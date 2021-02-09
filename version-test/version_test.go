@@ -30,6 +30,10 @@ const (
 	// tested binaries.
 	minVersion = "v1.4.7"
 
+	// foundationHardforkMinVersion defines minimal release that implements
+	// Foundation hardfork.
+	foundationHardforkMinVersion = "v1.5.4"
+
 	// rebuildReleaseBinaries defines whether the release siad binaries should
 	// be rebuilt. It can be set to false when rerunning the test(s) on already
 	// built binaries.
@@ -296,9 +300,15 @@ func TestUpgrades(t *testing.T) {
 	exclVersions := strings.Split(excludeReleasedVersions, ",")
 	upgradePathVersions = binariesbuilder.ExcludeVersions(upgradePathVersions, exclVersions)
 
+	// Get releases supporting Foundation hardfork
+	foundationHardforkUpgradePathVersions := binariesbuilder.ReleasesWithMinVersion(upgradePathVersions, foundationHardforkMinVersion)
+
 	// Limit number of versions. '+1' represents the master version
 	if len(upgradePathVersions)+1 > upgradePathVersionsLimit {
 		upgradePathVersions = upgradePathVersions[len(upgradePathVersions)-upgradePathVersionsLimit+1:]
+	}
+	if len(foundationHardforkUpgradePathVersions)+1 > upgradePathVersionsLimit {
+		foundationHardforkUpgradePathVersions = foundationHardforkUpgradePathVersions[len(foundationHardforkUpgradePathVersions)-upgradePathVersionsLimit+1:]
 	}
 
 	// Get latest release
@@ -331,7 +341,7 @@ func TestUpgrades(t *testing.T) {
 		{testName: "TestRenterUpgradesWithBaseLatestRelease", upgradeRenter: true, upgradePath: upgradePathVersions, baseVersion: latestVersion},
 		{testName: "TestRenterUpgradesWithBaseLatestMaster", upgradeRenter: true, upgradePath: upgradePathVersions, baseVersion: "master"},
 		{testName: "TestHostsUpgradesWithBaseLatestRelease", upgradeHosts: true, upgradePath: upgradePathVersions, baseVersion: latestVersion},
-		{testName: "TestHostsUpgradesWithBaseLatestMaster", upgradeHosts: true, upgradePath: upgradePathVersions, baseVersion: "master"},
+		{testName: "TestHostsUpgradesWithBaseLatestMaster", upgradeHosts: true, upgradePath: foundationHardforkUpgradePathVersions, baseVersion: "master"},
 	}
 
 	// Check UPnP enabled router to speed up subtests
