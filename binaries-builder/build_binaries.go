@@ -263,6 +263,18 @@ versionsLoop:
 	return result
 }
 
+// ReleasesWithMaxVersion returns releases that satisfy the given maximal
+// version.
+func ReleasesWithMaxVersion(releases []string, maxVersion string) []string {
+	var filteredReleases []string
+	for _, r := range releases {
+		if build.VersionCmp(r, maxVersion) <= 0 {
+			filteredReleases = append(filteredReleases, r)
+		}
+	}
+	return filteredReleases
+}
+
 // ReleasesWithMinVersion returns releases that satisfy the given minimal
 // version.
 func ReleasesWithMinVersion(releases []string, minVersion string) []string {

@@ -34,19 +34,22 @@ const (
 	// Foundation hardfork.
 	foundationHardforkMinVersion = "v1.5.4"
 
-	// rebuildReleaseBinaries defines whether the release siad binaries should
-	// be rebuilt. It can be set to false when rerunning the test(s) on already
+	// latestVersionBeforeFoundationHardfork defines latest release not
+	// implementing Foundation hardfork
+	latestVersionBeforeFoundationHardfork = "v1.5.3"
+
+	// rebuildBinaries defines whether the tested siad binaries should be
+	// rebuilt. It can be set to false when rerunning the test(s) on already
 	// built binaries.
-	rebuildReleaseBinaries = true
+	rebuildBinaries = true
 
 	// rebuildMaster defines whether the newest Sia master siad binary should
 	// be rebuilt. It can be set to false when rerunning the test(s) on already
 	// build binary.
 	rebuildMaster = true
 
-	// upgradePathVersionsLimit defines number of versions to include in
-	// version tests. It includes the master version.
-	upgradePathVersionsLimit = 5
+	// versionsLimit defines number of versions to include in version tests.
+	versionsLimit = 5
 
 	// allowLocalIPs defines whether we allow ants to use localhost IPs.
 	// Default is true. When set to true it is possible to test from Sia v1.5.0
@@ -291,28 +294,65 @@ func TestUpgrades(t *testing.T) {
 	t.Parallel()
 
 	// Get releases from Sia Gitlab repo.
-	upgradePathVersions, err := binariesbuilder.GetReleases(minVersion)
+	versions, err := binariesbuilder.GetReleases(minVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Exclude unwanted releases
 	exclVersions := strings.Split(excludeReleasedVersions, ",")
-	upgradePathVersions = binariesbuilder.ExcludeVersions(upgradePathVersions, exclVersions)
+	versions = binariesbuilder.ExcludeVersions(versions, exclVersions)
 
-	// Get releases supporting Foundation hardfork
-	foundationHardforkUpgradePathVersions := binariesbuilder.ReleasesWithMinVersion(upgradePathVersions, foundationHardforkMinVersion)
+	// // Get releases supporting Foundation hardfork and newer
+	// upgradePathVersionsFromFoundationHardforkMinVersion := binariesbuilder.ReleasesWithMinVersion(versions, foundationHardforkMinVersion)
 
-	// Limit number of versions. '+1' represents the master version
-	if len(upgradePathVersions)+1 > upgradePathVersionsLimit {
-		upgradePathVersions = upgradePathVersions[len(upgradePathVersions)-upgradePathVersionsLimit+1:]
+	// // Get releases before Foundation hardfork
+	// upgradePathVersionsBeforeFoundationHardforkMinVersion := binariesbuilder.ReleasesWithMaxVersion(versions, latestVersionBeforeFoundationHardfork)
+
+	// // Limit number of versions. '+1' represents the master version
+	// if len(versions)+1 > upgradePathVersionsLimit {
+	// 	versions = versions[len(versions)-upgradePathVersionsLimit+1:]
+	// }
+	// if len(upgradePathVersionsFromFoundationHardforkMinVersion)+1 > upgradePathVersionsLimit {
+	// 	upgradePathVersionsFromFoundationHardforkMinVersion = upgradePathVersionsFromFoundationHardforkMinVersion[len(upgradePathVersionsBeforeFoundationHardforkMinVersion)-upgradePathVersionsLimit+1:]
+	// }
+	// if len(upgradePathVersionsBeforeFoundationHardforkMinVersion) > upgradePathVersionsLimit {
+	// 	upgradePathVersionsBeforeFoundationHardforkMinVersion = upgradePathVersionsBeforeFoundationHardforkMinVersion[len(upgradePathVersionsBeforeFoundationHardforkMinVersion)-upgradePathVersionsLimit:]
+	// }
+
+	// Get versions till latest release including
+	latestReleaseVersions := versions
+	if len(latestReleaseVersions) > versionsLimit {
+		latestReleaseVersions = latestReleaseVersions[len(latestReleaseVersions)-versionsLimit:]
 	}
-	if len(foundationHardforkUpgradePathVersions)+1 > upgradePathVersionsLimit {
-		foundationHardforkUpgradePathVersions = foundationHardforkUpgradePathVersions[len(foundationHardforkUpgradePathVersions)-upgradePathVersionsLimit+1:]
+
+	// Get versions till latest master including
+	latestMasterVersions := append(versions, "master")
+	if len(latestMasterVersions) > versionsLimit {
+		latestMasterVersions = latestMasterVersions[len(latestMasterVersions)-versionsLimit:]
+	}
+
+	// Get versions till latest release before Foundation hardfork including
+	beforeFoundationHardforkVersions := binariesbuilder.ReleasesWithMaxVersion(versions, latestVersionBeforeFoundationHardfork)
+	if len(beforeFoundationHardforkVersions) > versionsLimit {
+		beforeFoundationHardforkVersions = beforeFoundationHardforkVersions[len(beforeFoundationHardforkVersions)-versionsLimit:]
+	}
+
+	// Get versions implementing Foundation hardfork including latest release
+	foundationHardforkLatestReleaseVersions := binariesbuilder.ReleasesWithMinVersion(versions, foundationHardforkMinVersion)
+	if len(foundationHardforkLatestReleaseVersions) > versionsLimit {
+		foundationHardforkLatestReleaseVersions = foundationHardforkLatestReleaseVersions[len(foundationHardforkLatestReleaseVersions)-versionsLimit:]
+	}
+
+	// Get versions implementing Foundation hardfork including latest master
+	foundationHardforkLatestMasterVersions := foundationHardforkLatestReleaseVersions
+	foundationHardforkLatestMasterVersions = append(foundationHardforkLatestMasterVersions, "master")
+	if len(foundationHardforkLatestMasterVersions) > versionsLimit {
+		foundationHardforkLatestMasterVersions = foundationHardforkLatestMasterVersions[len(foundationHardforkLatestMasterVersions)-versionsLimit:]
 	}
 
 	// Get latest release
-	latestVersion := upgradePathVersions[len(upgradePathVersions)-1]
+	latestVersion := versions[len(versions)-1]
 
 	// Prepare logger
 	dataDir := test.TestDir(t.Name())
@@ -323,25 +363,13 @@ func TestUpgrades(t *testing.T) {
 		}
 	}()
 
-	// Build binaries to test.
-	err = binariesbuilder.StaticBuilder.BuildVersions(logger, rebuildReleaseBinaries, upgradePathVersions...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = binariesbuilder.StaticBuilder.BuildVersions(logger, rebuildMaster, "master")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Add master to upgrade path
-	upgradePathVersions = append(upgradePathVersions, "master")
-
 	// Configure tests
 	tests := []upgradeTestConfig{
-		{testName: "TestRenterUpgradesWithBaseLatestRelease", upgradeRenter: true, upgradePath: upgradePathVersions, baseVersion: latestVersion},
-		{testName: "TestRenterUpgradesWithBaseLatestMaster", upgradeRenter: true, upgradePath: upgradePathVersions, baseVersion: "master"},
-		{testName: "TestHostsUpgradesWithBaseLatestRelease", upgradeHosts: true, upgradePath: upgradePathVersions, baseVersion: latestVersion},
-		{testName: "TestHostsUpgradesWithBaseLatestMaster", upgradeHosts: true, upgradePath: foundationHardforkUpgradePathVersions, baseVersion: "master"},
+		{testName: "TestRenterUpgradesWithBaseLatestRelease", upgradeRenter: true, upgradePath: latestReleaseVersions, baseVersion: latestVersion},
+		{testName: "TestRenterUpgradesWithBaseLatestMaster", upgradeRenter: true, upgradePath: latestMasterVersions, baseVersion: "master"},
+		{testName: "TestHostsUpgradesWithBaseV153", upgradeHosts: true, upgradePath: beforeFoundationHardforkVersions, baseVersion: latestVersionBeforeFoundationHardfork},
+		{testName: "TestHostsUpgradesWithBaseLatestRelease", upgradeHosts: true, upgradePath: foundationHardforkLatestReleaseVersions, baseVersion: latestVersion},
+		{testName: "TestHostsUpgradesWithBaseLatestMaster", upgradeHosts: true, upgradePath: foundationHardforkLatestMasterVersions, baseVersion: "master"},
 	}
 
 	// Check UPnP enabled router to speed up subtests
@@ -612,6 +640,12 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 	msg += strings.Join(upgradePath, " -> ")
 	testLogger.Println(msg)
 
+	// Build binaries to test.
+	err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, rebuildBinaries, testConfig.upgradePath...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Get default Antfarm config
 	antfarmLlogger, err := antfarm.NewAntfarmLogger(dataDir)
 	if err != nil {
@@ -728,6 +762,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		// Download and verify files
 		err = antfarm.DownloadAndVerifyFiles(testLogger, renterAnt, uploadedFiles)
 		if err != nil {
+			testLogger.Errorln(err)
 			t.Error(err)
 			continue
 		}
