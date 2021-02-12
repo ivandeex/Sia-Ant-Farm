@@ -71,6 +71,12 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		return errors.AddContext(err, "can't clone Sia repository")
 	}
 
+	// Checkout the master
+	err = gitCheckout(logger, siaPath, "master")
+	if err != nil {
+		return errors.AddContext(err, "can't checkout specific Sia version")
+	}
+
 	// Git reset to clean git repository
 	cmd := Command{
 		Name: "git",
@@ -215,6 +221,22 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 				return errors.AddContext(err, "can't checkout merkletree master")
 			}
 		}
+
+		// Git reset to clean git repository
+		cmd := Command{
+			Name: "git",
+			Args: []string{"-C", siaPath, "reset", "--hard", "HEAD"},
+		}
+		_, err = cmd.Execute(logger)
+		if err != nil {
+			return errors.AddContext(err, "can't reset Sia git repository")
+		}
+	}
+
+	// Checkout the master
+	err = gitCheckout(logger, siaPath, "master")
+	if err != nil {
+		return errors.AddContext(err, "can't checkout specific Sia version")
 	}
 
 	return nil
