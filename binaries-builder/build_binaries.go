@@ -239,16 +239,6 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		return errors.AddContext(err, "can't checkout specific Sia version")
 	}
 
-	// Git reset to clean git repository
-	cmd = Command{
-		Name: "git",
-		Args: []string{"-C", siaPath, "reset", "--hard", "HEAD"},
-	}
-	_, err = cmd.Execute(logger)
-	if err != nil {
-		return errors.AddContext(err, "can't reset Sia git repository")
-	}
-
 	return nil
 }
 
