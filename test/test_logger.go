@@ -14,6 +14,6 @@ func NewTestLogger(t *testing.T, dataDir string) *persist.Logger {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Logf("antfarm-test %v: Test logs are stored at: %v", t.Name(), testLogPath)
+	t.Logf("Test logs are stored at: %v", testLogPath)
 	return testLogger
 }
