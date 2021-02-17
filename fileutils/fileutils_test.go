@@ -60,6 +60,7 @@ func TestWaitForFileCompleteSyncing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
+	t.Parallel()
 
 	// Get test dir
 	dataDir := test.TestDir(t.Name())
@@ -86,10 +87,13 @@ func TestWaitForFileCompleteSyncing(t *testing.T) {
 	}()
 
 	// Write the file slowly
-	go appendToFile(logger, f, speed, frequency, data[:], make(chan struct{}))
+	var start time.Time
+	go func() {
+		start = time.Now()
+		appendToFile(logger, f, speed, frequency, data[:], make(chan struct{}))
+	}()
 
 	// Wait
-	start := time.Now()
 	err = WaitForFileComplete(fp, fileSize, time.Second*11)
 	if err != nil {
 		t.Fatalf("error waiting for the file to become complete: %v", err)
