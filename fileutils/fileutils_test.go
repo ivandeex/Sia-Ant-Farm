@@ -60,7 +60,6 @@ func TestWaitForFileCompleteSyncing(t *testing.T) {
 	if testing.Short() {
 		t.SkipNow()
 	}
-	t.Parallel()
 
 	// Get test dir
 	dataDir := test.TestDir(t.Name())
