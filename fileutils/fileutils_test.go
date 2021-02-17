@@ -164,7 +164,7 @@ func appendToFile(logger *persist.Logger, f *os.File, speed int, frequency time.
 	// Calculate how many bytes to write per each iteration
 	b := speed * int(frequency) / int(time.Second)
 	l := len(data)
-	for i := 0; i < l; i += b {
+	for written := 0; written < l; written += b {
 		// Wait (limit appending speed)
 		select {
 		case <-stop:
@@ -172,20 +172,23 @@ func appendToFile(logger *persist.Logger, f *os.File, speed int, frequency time.
 		case <-time.After(frequency):
 		}
 
-		// Fix higher data slice bound
-		top := i + b
-		if top > l {
-			top = l
-		}
+		// Write to the file in a goroutine not to slowdown the timing
+		go func(written int) {
+			// Fix higher data slice bound
+			top := written + b
+			if top > l {
+				top = l
+			}
 
-		// Write some data
-		_, err := f.Write(data[i:top])
-		if err != nil {
-			logger.Errorf("cant write data to test file: %v", err)
-		}
-		err = f.Sync()
-		if err != nil {
-			logger.Errorf("can't sync test file: %v", err)
-		}
+			// Write some data
+			_, err := f.Write(data[written:top])
+			if err != nil {
+				logger.Errorf("cant write data to test file: %v", err)
+			}
+			err = f.Sync()
+			if err != nil {
+				logger.Errorf("can't sync test file: %v", err)
+			}
+		}(written)
 	}
 }
