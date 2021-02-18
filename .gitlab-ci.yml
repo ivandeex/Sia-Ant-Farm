@@ -61,7 +61,7 @@ default: &default_params
 .short_upgrade_test_jobs: &short_upgrade_test_jobs_filter
   only:
     variables: 
-      - $ANTFARM_JOBS_TO_RUN == "short_upgrade_tests"
+      - $ANTFARM_JOBS_TO_RUN == "short_upgrade_tests" || $ANTFARM_JOBS_TO_RUN == "basic_jobs"
 
 ## Define long upgrade test jobs filter
 .long_upgrade_test_jobs: &long_upgrade_test_jobs_filter
