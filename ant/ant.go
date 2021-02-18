@@ -625,7 +625,7 @@ func (a *Ant) WaitForContractsToRenew(contractsCount int, timeout time.Duration)
 	return nil
 }
 
-// WaitForRenterWorkersCooldown blocks until none of renter workers is on
+// WaitForRenterWorkersCooldown blocks until none of renter workers are on
 // cooldown.
 func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
 	a.staticLogger.Debugf("%v: waiting for renter workers cooldown...", a.Config.SiadConfig.DataDir)
