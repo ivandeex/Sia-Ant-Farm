@@ -326,6 +326,15 @@ func TestUpgrades(t *testing.T) {
 	logger.Debugln(upnpStatus)
 
 	// Configure tests
+	// We have split hosts upgrades to several subtests, because newer renter
+	// versions add penalty to older hosts and do not form contracts with older
+	// hosts. E.g. master to become v1.5.5 penalizes versions v1.5.3 and below
+	// and doesn't form contracts with them. Also when Foundation hardfork
+	// block height is reached the pre-hardfork ants stop to work with with
+	// post-hardfork ants, because their transaction signatures become invalid.
+	// Once the upgrade path for tests FromV154 becomes long and newer renters
+	// stop forming contracts with older hosts (v1.5.4), these subtests should
+	// be also divided to shorted upgrade paths.
 	hostsUpgradeTests := []upgradeTestConfig{
 		{testName: "FromV147ToV150WithBaseV1411", upgradeHosts: true, upgradePath: []string{"v1.4.7-antfarm", "v1.4.8-antfarm", "v1.4.11-antfarm", "v1.5.0"}, baseVersion: "v1.4.11-antfarm"},
 		{testName: "FromV150ToV153WithBaseV153", upgradeHosts: true, upgradePath: []string{"v1.5.0", "v1.5.1", "v1.5.2", "v1.5.3"}, baseVersion: "v1.5.3"},
@@ -333,6 +342,11 @@ func TestUpgrades(t *testing.T) {
 		{testName: "FromV154WithBaseLatestRelease", upgradeHosts: true, upgradePath: upgradePathFromFoundationHardfork, baseVersion: latestVersion},
 		{testName: "FromV154WithBaseLatestMaster", upgradeHosts: true, upgradePath: upgradePathFromFoundationHardfork, baseVersion: "master"},
 	}
+	// Both renter upgrades subtets start with renter at v1.4.7 up through the
+	// latest master commit. The tests are divided into two subtest, the first
+	// one where the base ants (miner and hosts) are at the latest released
+	// version and the second one where the base ants are at the latest master
+	// commit.
 	renterUpgradeTests := []upgradeTestConfig{
 		{testName: "WithBaseLatestRelease", upgradeRenter: true, upgradePath: upgradePath, baseVersion: latestVersion},
 		{testName: "WithBaseLatestMaster", upgradeRenter: true, upgradePath: upgradePath, baseVersion: "master"},
