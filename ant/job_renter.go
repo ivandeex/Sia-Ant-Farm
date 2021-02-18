@@ -305,9 +305,12 @@ func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.
 
 	hasFile := false
 	for _, download := range renterDownloads.Downloads {
+		// The latest downloads are listed first, so we must stop after the
+		// first match.
 		if download.SiaPath == file.SiaPath {
 			hasFile = true
 			dlinfo = download
+			break
 		}
 	}
 
