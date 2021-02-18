@@ -1,7 +1,6 @@
 package binariesbuilder
 
 import (
-	"fmt"
 	"os"
 	"sync"
 
@@ -41,11 +40,6 @@ func init() {
 	// Init static builder with an empty version map.
 	StaticBuilder.versionMap = map[string]versionStatus{}
 	StaticBuilder.Unlock()
-}
-
-// SiadBinaryPath returns built siad-dev binary path from the given Sia version
-func SiadBinaryPath(version string) string {
-	return fmt.Sprintf("%s/Sia-%s-linux-amd64/siad-dev", BinariesDir, version)
 }
 
 // BuildVersions defines a static builder method to request to build siad
