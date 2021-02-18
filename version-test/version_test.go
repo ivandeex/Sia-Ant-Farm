@@ -618,7 +618,9 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 	testLogger.Println(msg)
 
 	// Build binaries to test.
-	err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, rebuildBinaries, testConfig.upgradePath...)
+	binariesToBuild := testConfig.upgradePath
+	binariesToBuild = append(binariesToBuild, testConfig.baseVersion)
+	err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, rebuildBinaries, binariesToBuild...)
 	if err != nil {
 		t.Fatal(err)
 	}
