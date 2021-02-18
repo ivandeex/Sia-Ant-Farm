@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -25,10 +26,12 @@ const (
 	// Sia repository. E.g. Sia release v1.4.8 was updated for antfarm and the
 	// git commit was tagged v1.4.8-antfarm
 	antfarmTagSuffix = "-antfarm"
+)
 
-	// Build constants
-	goos = "linux"
-	arch = "amd64"
+var (
+	// Build variables
+	goos = runtime.GOOS
+	arch = runtime.GOARCH
 )
 
 type (
@@ -111,7 +114,7 @@ func buildSiad(logger *persist.Logger, binariesDir string, versions ...string) e
 		logger.Debugf("building a siad version: %v", version)
 
 		// Create directory to store each version siad binary
-		binarySubDir := fmt.Sprintf("Sia-%v-%v-%v", version, goos, arch)
+		binarySubDir := siadBinarySubDir(version)
 		var binaryDir string
 		if filepath.IsAbs(binariesDir) {
 			binaryDir = filepath.Join(binariesDir, binarySubDir)
@@ -418,6 +421,19 @@ func querySiaRepoAPI(siaRepoEndpoint string) (bodies [][]byte, err error) {
 		page++
 	}
 	return
+}
+
+// siadBinarySubDir returns a directory where built siad-dev of the given
+// version is stored.
+func siadBinarySubDir(version string) string {
+	return fmt.Sprintf("Sia-%s-%s-%s", version, goos, arch)
+}
+
+// SiadBinaryPath returns built siad-dev binary path from the given Sia
+// version.
+func SiadBinaryPath(version string) string {
+	subDir := siadBinarySubDir(version)
+	return fmt.Sprintf("%s/%s/siad-dev", BinariesDir, subDir)
 }
 
 // Len implements sort.Interface to sort by semantic version
