@@ -201,6 +201,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 	if err != nil {
 		return fmt.Errorf("error getting absolute path from %v: %v", destPath, err)
 	}
+	fromTime := time.Now()
 	r.staticLogger.Debugf("%v: downloading\n\tsiaFile: %v\n\tto local file: %v", r.staticJR.staticDataDir, siaPath, destPath)
 	_, err = r.staticJR.staticClient.RenterDownloadGet(siaPath, destPath, 0, fileToDownload.Filesize, true, true, false)
 	if err != nil {
@@ -216,7 +217,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		case <-time.After(fileApearInDownloadListFrequency):
 		}
 
-		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		hasFile, _, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload, fromTime)
 		if err != nil {
 			return errors.AddContext(err, "error checking renter download queue")
 		}
@@ -237,7 +238,7 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 		case <-time.After(downloadFileCheckFrequency):
 		}
 
-		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload)
+		hasFile, info, err := isFileInDownloads(r.staticJR.staticClient, fileToDownload, fromTime)
 		if err != nil {
 			return errors.AddContext(err, "error checking renter download queue")
 		}
@@ -293,10 +294,11 @@ func downloadFile(r *RenterJob, fileToDownload modules.FileInfo, destPath string
 	return nil
 }
 
-// isFileInDownloads grabs the files currently being downloaded by the
-// renter and returns bool `true` if fileToDownload exists in the
-// download list.  It also returns the DownloadInfo for the requested `file`.
-func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.DownloadInfo, error) {
+// isFileInDownloads grabs the files currently being downloaded by the renter
+// and returns bool `true` if file to download exists in the download list and
+// the download started after the given fromTime.  It also returns the
+// DownloadInfo for the requested `file`.
+func isFileInDownloads(client *client.Client, file modules.FileInfo, fromTime time.Time) (bool, api.DownloadInfo, error) {
 	var dlinfo api.DownloadInfo
 	renterDownloads, err := client.RenterDownloadsGet()
 	if err != nil {
@@ -305,9 +307,11 @@ func isFileInDownloads(client *client.Client, file modules.FileInfo) (bool, api.
 
 	hasFile := false
 	for _, download := range renterDownloads.Downloads {
-		// The latest downloads are listed first, so we must stop after the
-		// first match.
-		if download.SiaPath == file.SiaPath {
+		// Filter all downloads by file path and by time after which the file
+		// download is expected to start to remove previous downloads. The
+		// latest downloads are listed first, so we break after the first
+		// match.
+		if download.SiaPath == file.SiaPath && download.StartTime.After(fromTime) {
 			hasFile = true
 			dlinfo = download
 			break
