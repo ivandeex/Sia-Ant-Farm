@@ -1,1 +1,0 @@
-- Add version test targets/jobs to be triggered by Sia master updates.
