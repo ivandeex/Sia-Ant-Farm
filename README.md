@@ -99,38 +99,127 @@ or with debug logs on:
 ```shell
 sia-antfarm-debug -config nebulous-configs/basic-renter-host-5.json
 ```
+## Antfarm configuration options
 
-## Available configuration options:
-
-```
+```json
 {
-	'ListenAddress': the listen address that the `sia-antfarm` API listens on
-	'AntConfigs': an array of `AntConfig` objects, defining the ants to run on this antfarm
-	'AutoConnect': a boolean which automatically bootstraps the antfarm if provided
-	'ExternalFarms': an array of strings, where each string is the api address of an external antfarm to connect to.
-	'WaitForSync': wait with all jobs until all ants are in sync, defaults to false.
+	'ListenAddress': '<Address:Port>'
+	'AntConfigs': [
+		<Ant Config 1>,
+		<Ant Config 2>,
+		...
+	]
+	'AutoConnect': '<true/false>'
+	'ExternalFarms': [
+		'<Address:Port 1>',
+		'<Address:Port 2>',
+		...
+	]
+	'WaitForSync': '<true/false>'
 }
 ```
+
+**ListenAddress**  
+The listen address that the `sia-antfarm` API listens on.
+
+**AntConfigs**  
+An array of `AntConfig` objects, defining the ants to run on this antfarm. See
+below.
+
+**AutoConnect**  
+A boolean which automatically bootstraps the antfarm if provided.
+
+**ExternalFarms**  
+An array of strings, where each string is the api address of an external
+antfarm to connect to.
+
+**WaitForSync**  
+Wait with all jobs until all ants are in sync, defaults to false.
+
+## Ant configuration options
 
 `AntConfig`s have the following options:
-```
+```json
 {
-	'APIAddr': the api address for the ant to listen on, by default an unused localhost: bind address will be used.
-	'APIPassword': the password to be used for authenticating certain calls to the ant.
-	'RPCAddr': the RPC address for the ant to listen on, by default an unused bind address will be used.
-	'HostAddr': the Host address for the ant to listen on, by default an unused bind address will be used.
-	'SiamuxAddr': the SiaMux address for the ant to listen on, by default an unused bind address will be used.
-	'SiamuxWsAddr': the SiaMux websocket address for the ant to listen on, by default an unused bind address will be used.
-	'AllowHostLocalNetAddress': if set to true allows hosts to announce on local network without needing UPnP enabled router or manual port forwarding from public IP.
-	'RenterDisableIPViolationCheck': relevant only for renter, if set to true allows renter to rent on hosts on the same IP subnets by disabling the `IPViolationCheck` for the renter.
-	'SiaDirectory': the data directory to use for this ant, by default a unique directory in `./antfarm-data` will be generated and used.
-	'SiadPath': the path to the `siad` binary, by default the `siad-dev` in your path will be used.
-	'Jobs': an array of jobs for this ant to run. available jobs include: ['miner', 'host', 'noAllowanceRenter', 'renter', 'autoRenter', 'gateway']. 'noAllowanceRenter' job starts the renter and waits for renter wallet to be filled, 'renter' job starts the renter, sets default allowance and waits till the renter is upload ready, it doesn't starts any renter's background activity. 'autoRenter' does the same as 'renter' job and then starts renter's periodic file uploads, downloads, and deletions.
-	'DesiredCurrency': a minimum (integer) amount of SiaCoin that this Ant will attempt to maintain by mining currency. This is mutually exclusive with the `miner` job.
+	'APIAddr': '<Address:Port>'
+	'APIPassword': '<API Password>'
+	'RPCAddr': '<Address:Port>'
+	'HostAddr': '<Address:Port>'
+	'SiamuxAddr': '<Address:Port>'
+	'SiamuxWsAddr': '<Address:Port>'
+	'AllowHostLocalNetAddress': '<true/false>'
+	'RenterDisableIPViolationCheck': '<true/false>'
+	'SiaDirectory': '<Sia Working Directory>'
+	'SiadPath': '<Siad Path>'
+	'Jobs': [
+		'<Job 1>',
+		'<Job 2>',
+		...
+	]
+	'DesiredCurrency': <Siacoins Amount>
 }
 ```
+
+**APIAddr**  
+The API address for the ant to listen on, by default an unused localhost bind
+address will be used.
+
+**APIPassword**  
+The password to be used for authenticating certain calls to the ant.
+
+**RPCAddr**  
+The RPC address for the ant to listen on, by default an unused bind address
+will be used.
+
+**HostAddr**  
+The Host address for the ant to listen on, by default an unused bind address
+will be used.
+
+**SiamuxAddr**  
+The SiaMux address for the ant to listen on, by default an unused bind address
+will be used.
+
+**SiamuxWsAddr**  
+The SiaMux websocket address for the ant to listen on, by default an unused
+bind address will be used.
+
+**AllowHostLocalNetAddress**  
+If set to true allows hosts to announce on local network without Antfarm being
+hosted on host with public IP, port forwarding from public IP to host or need
+of UPnP enabled router with public IP.
+
+**RenterDisableIPViolationCheck**  
+Relevant only for renter, if set to true allows renter to rent on hosts on the
+same IP subnets by disabling the `IPViolationCheck` for the renter.
+
+**SiaDirectory**  
+The data directory to use for this ant, by default a unique directory in
+`./antfarm-data` will be generated and used.
+
+**SiadPath**  
+The path to the `siad` binary, by default the `siad-dev` in your path will be
+used.
+
+**Jobs**  
+An array of jobs for this ant to run. Available jobs include:
+- 'miner'
+- 'host'
+- 'noAllowanceRenter'
+- 'renter'
+- 'autoRenter'
+- 'gateway'
+
+'noAllowanceRenter' job starts the renter and waits for renter wallet to be
+filled.  
+'renter' job starts the renter, sets default allowance and waits till the
+renter is upload ready, it doesn't starts any renter's background activity.  
+'autoRenter' does the same as 'renter' job and then starts renter's periodic
+file uploads, downloads, and deletions.
+
+**DesiredCurrency**  
+A minimum amount (integer) of SiaCoins that this Ant will attempt to maintain
+by mining currency. This is mutually exclusive with the `miner` job.
 
 # License
 
 The MIT License (MIT)
-
