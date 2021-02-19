@@ -625,6 +625,35 @@ func (a *Ant) WaitForContractsToRenew(contractsCount int, timeout time.Duration)
 	return nil
 }
 
+// WaitForRenterWorkersCooldown blocks until none of renter workers are on
+// cooldown.
+func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
+	a.staticLogger.Debugf("%v: waiting for renter workers cooldown...", a.Config.SiadConfig.DataDir)
+	start := time.Now()
+
+	frequency := time.Second
+	tries := int(timeout/frequency) + 1
+	err := build.Retry(tries, frequency, func() error {
+		rwg, err := a.Jr.staticClient.RenterWorkersGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get renter workers info")
+		}
+		if rwg.TotalDownloadCoolDown+rwg.TotalMaintenanceCoolDown+rwg.TotalUploadCoolDown > 0 {
+			return fmt.Errorf("there are %d renter workers on download cooldown, %d on maintenance cooldown, %d on upload cooldown",
+				rwg.TotalDownloadCoolDown, rwg.TotalMaintenanceCoolDown, rwg.TotalUploadCoolDown)
+		}
+		return nil
+	})
+	if err != nil {
+		er := fmt.Errorf("waiting for renter workers cooldown reached %v timeout: %v", timeout, err)
+		a.staticLogger.Errorf("%v: %v", a.Config.SiadConfig.DataDir, er)
+		return er
+	}
+
+	a.staticLogger.Debugf("%v: waiting for renter workers cooldown finished in %v", a.Config.SiadConfig.DataDir, time.Since(start))
+	return nil
+}
+
 // WalletAddress returns a wallet address that this ant can receive coins on.
 func (a *Ant) WalletAddress() (*types.UnlockHash, error) {
 	if a.Jr == nil {
