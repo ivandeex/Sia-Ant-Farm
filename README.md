@@ -12,6 +12,27 @@ sia-antfarm is also available as a docker image `nebulouslabs/siaantfarm`:
 * [GitHub repository](https://github.com/NebulousLabs/docker-sia-ant-farm)
 * [Docker Hub](https://hub.docker.com/r/nebulouslabs/siaantfarm)
 
+# Requirements
+
+## Generic
+- Go installed. Sia Antfarm is tested extensively to run successfully on Go
+  `1.15` on Linux and should be running well also on MacOS.
+- `$GOPATH/bin` should be added to the `$PATH` so that built siad binary can be
+  found and executed.
+
+## Version Test Requirements
+
+Sia Antfarm is capable of building and testing different released and custom
+versions of siad. Examples are in directories `foundation-test` (for Foundation
+hardfork tests) and `version-test` (for basic version tests and for renter and
+hosts upgrade tests).
+
+Antfarm clones `Sia` repo if it doesn't already exist at
+`$GOPATH/src/gitlab.com/NebulousLabs/Sia`. The local `Sia` repo should be in a
+state that allows Antfarm to checkout different releases or custom branches,
+i.e. all changes should be committed. If there are any uncommitted, unstashed
+changes, they will be reset and lost.
+
 # Install
 
 ```shell
@@ -25,6 +46,9 @@ To install debug version of Sia Antfarm with debug logs enabled, execute:
 ```shell
 make dependencies && make install-debug
 ```
+
+If `siad` (at `$GOPATH/src/gitlab.com/NebulousLabs/Sia/cmd/siad`) is updated
+and should be used with Antfarm, `make dependencies` needs to be rerun.
 
 # Running a sia-antfarm
 
