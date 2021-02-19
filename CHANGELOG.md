@@ -10,6 +10,33 @@ Version History
 
 Latest:
 
+## Feb 19, 2021:
+### v1.1.0
+**Key Updates**
+- Add Foundation hardfork tests.
+- Add sleep to miner after mining a block to mimic real network and to fix
+  hosts out of sync errors happening on Antfarm.
+- Update Sia Antfarm to use Sia `v1.5.4`.
+
+**Bugs Fixed**
+- Fix binaries builder to build correct Sia versions (Sia working directory
+  added).
+- Checking the latest download status was fixed (it was checking incorrectly
+  the download status of the first download instead).
+
+**Other**
+- Update downloads to wait for file to be completely saved to disk in cases
+  when file is not immediately complete after async download is completed.
+- Log closing ant and antfarm.
+- Rearrange upgrade tests dividing them to 2 subgroups: `HostsUpgrades` and
+  `RenterUpgrades`.
+- Add `TestRenewContractBackupRestoreSnapshot` test to wait for contracts
+  renewal, backup to Sia, restore from Sia on the latest Sia master branch.
+- Add wait for renters workers cooldown to hosts upgrade tests to fix download
+  issues after hosts upgrades or just restarts.
+- Add version test targets/jobs to be triggered by Sia master updates.
+- Update version tests to log to test log file instead of to the console.
+
 ## Nov 11, 2020:
 ### v1.0.4
 **Key Updates**
