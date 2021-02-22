@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -30,19 +31,23 @@ const (
 	// tested binaries.
 	minVersion = "v1.4.7"
 
-	// rebuildReleaseBinaries defines whether the release siad binaries should
-	// be rebuilt. It can be set to false when rerunning the test(s) on already
+	// foundationHardforkMinVersion defines minimal release that implements
+	// Foundation hardfork.
+	foundationHardforkMinVersion = "v1.5.4"
+
+	// rebuildBinaries defines whether the tested siad binaries should be
+	// rebuilt. It can be set to false when rerunning the test(s) on already
 	// built binaries.
-	rebuildReleaseBinaries = true
+	rebuildBinaries = true
 
 	// rebuildMaster defines whether the newest Sia master siad binary should
 	// be rebuilt. It can be set to false when rerunning the test(s) on already
 	// build binary.
 	rebuildMaster = true
 
-	// upgradePathVersionsLimit defines number of versions to include in
-	// version tests. It includes the master version.
-	upgradePathVersionsLimit = 5
+	// renterWorkersCooldownTimeout defines timeout for renter workers to
+	// finish cooldown after hosts upgrades in hosts upgrades tests.
+	renterWorkersCooldownTimeout = time.Minute * 15
 
 	// allowLocalIPs defines whether we allow ants to use localhost IPs.
 	// Default is true. When set to true it is possible to test from Sia v1.5.0
@@ -270,16 +275,16 @@ func TestRenterUploader(t *testing.T) {
 }
 
 // TestUpgrades is test group which contains two types of version upgrade
-// subtests. TestRenterUpgrades is a version test type where renter starts with
-// the first siad-dev defined in upgradePathVersions, renter upgrades
-// iteratively through the released Sia versions to the latest master.
-// TestHostsUpgrades is a version test type where hosts start with the first
-// siad-dev defined in upgradePathVersions, hosts upgrade iteratively through
-// the released Sia versions to the latest master. Other ants use either the
-// latest siad-dev released version (WithBaseLatestRelease test postfix) or the
-// latest master (WithBaseLatestMaster test postfix). During each version
-// iteration renter uploads a file and downloads and verifies all uploaded
-// files from the current and all previous versions.
+// subtests. RenterUpgrades is a version test type where renter starts with the
+// first siad-dev defined in upgradePath, renter upgrades iteratively through
+// the released Sia versions to the latest master. HostsUpgrades is a version
+// test type where hosts start with the first siad-dev defined in upgradePath,
+// hosts upgrade iteratively through the released Sia versions to the latest
+// master. Other ants use either the latest siad-dev released version
+// (WithBaseLatestRelease test postfix) or the latest master
+// (WithBaseLatestMaster test postfix). During each version iteration renter
+// uploads a file and downloads and verifies all uploaded files from the
+// current and all previous versions.
 func TestUpgrades(t *testing.T) {
 	if !build.VLONG {
 		t.SkipNow()
@@ -287,22 +292,25 @@ func TestUpgrades(t *testing.T) {
 	t.Parallel()
 
 	// Get releases from Sia Gitlab repo.
-	upgradePathVersions, err := binariesbuilder.GetReleases(minVersion)
+	releases, err := binariesbuilder.GetReleases(minVersion)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Exclude unwanted releases
-	exclVersions := strings.Split(excludeReleasedVersions, ",")
-	upgradePathVersions = binariesbuilder.ExcludeVersions(upgradePathVersions, exclVersions)
-
-	// Limit number of versions. '+1' represents the master version
-	if len(upgradePathVersions)+1 > upgradePathVersionsLimit {
-		upgradePathVersions = upgradePathVersions[len(upgradePathVersions)-upgradePathVersionsLimit+1:]
-	}
+	exclReleases := strings.Split(excludeReleasedVersions, ",")
+	releases = binariesbuilder.ExcludeVersions(releases, exclReleases)
 
 	// Get latest release
-	latestVersion := upgradePathVersions[len(upgradePathVersions)-1]
+	latestVersion := releases[len(releases)-1]
+
+	// Get upgrade path up through the latest master commit
+	upgradePath := append(releases, "master")
+
+	// Get upgrade path from Foundation hardfork through the latest master
+	// commit
+	upgradePathFromFoundationHardfork := binariesbuilder.ReleasesWithMinVersion(releases, foundationHardforkMinVersion)
+	upgradePathFromFoundationHardfork = append(upgradePathFromFoundationHardfork, "master")
 
 	// Prepare logger
 	dataDir := test.TestDir(t.Name())
@@ -313,37 +321,44 @@ func TestUpgrades(t *testing.T) {
 		}
 	}()
 
-	// Build binaries to test.
-	err = binariesbuilder.StaticBuilder.BuildVersions(logger, rebuildReleaseBinaries, upgradePathVersions...)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = binariesbuilder.StaticBuilder.BuildVersions(logger, rebuildMaster, "master")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Add master to upgrade path
-	upgradePathVersions = append(upgradePathVersions, "master")
-
-	// Configure tests
-	tests := []upgradeTestConfig{
-		{testName: "TestRenterUpgradesWithBaseLatestRelease", upgradeRenter: true, upgradePath: upgradePathVersions, baseVersion: latestVersion},
-		{testName: "TestRenterUpgradesWithBaseLatestMaster", upgradeRenter: true, upgradePath: upgradePathVersions, baseVersion: "master"},
-		{testName: "TestHostsUpgradesWithBaseLatestRelease", upgradeHosts: true, upgradePath: upgradePathVersions, baseVersion: latestVersion},
-		{testName: "TestHostsUpgradesWithBaseLatestMaster", upgradeHosts: true, upgradePath: upgradePathVersions, baseVersion: "master"},
-	}
-
 	// Check UPnP enabled router to speed up subtests
 	upnpStatus := upnprouter.CheckUPnPEnabled()
 	logger.Debugln(upnpStatus)
 
-	// Execute tests
-	for _, tt := range tests {
-		t.Run(tt.testName, func(t *testing.T) {
-			upgradeTest(t, tt)
-		})
+	// Configure tests
+	// We have split hosts upgrades to several subtests, because newer renter
+	// versions add penalty to older hosts and do not form contracts with older
+	// hosts. E.g. master to become v1.5.5 penalizes versions v1.5.3 and below
+	// and doesn't form contracts with them. Also when Foundation hardfork
+	// block height is reached the pre-hardfork ants stop to work with with
+	// post-hardfork ants, because their transaction signatures become invalid.
+	// Once the upgrade path for tests FromV154 becomes long and newer renters
+	// stop forming contracts with older hosts (v1.5.4), these subtests should
+	// be also divided to shorted upgrade paths.
+	hostsUpgradeTests := []upgradeTestConfig{
+		{testName: "FromV147ToV150WithBaseV1411", upgradeHosts: true, upgradePath: []string{"v1.4.7-antfarm", "v1.4.8-antfarm", "v1.4.11-antfarm", "v1.5.0"}, baseVersion: "v1.4.11-antfarm"},
+		{testName: "FromV150ToV153WithBaseV153", upgradeHosts: true, upgradePath: []string{"v1.5.0", "v1.5.1", "v1.5.2", "v1.5.3"}, baseVersion: "v1.5.3"},
+		{testName: "FromV153ToV154WithBaseV154", upgradeHosts: true, upgradePath: []string{"v1.5.3", "v1.5.4"}, baseVersion: "v1.5.4"},
+		{testName: "FromV154WithBaseLatestRelease", upgradeHosts: true, upgradePath: upgradePathFromFoundationHardfork, baseVersion: latestVersion},
+		{testName: "FromV154WithBaseLatestMaster", upgradeHosts: true, upgradePath: upgradePathFromFoundationHardfork, baseVersion: "master"},
 	}
+	// Both renter upgrades subtets start with renter at v1.4.7 up through the
+	// latest master commit. The tests are divided into two subtest, the first
+	// one where the base ants (miner and hosts) are at the latest released
+	// version and the second one where the base ants are at the latest master
+	// commit.
+	renterUpgradeTests := []upgradeTestConfig{
+		{testName: "WithBaseLatestRelease", upgradeRenter: true, upgradePath: upgradePath, baseVersion: latestVersion},
+		{testName: "WithBaseLatestMaster", upgradeRenter: true, upgradePath: upgradePath, baseVersion: "master"},
+	}
+
+	// Execute tests
+	t.Run("HostsUpgrades", func(t *testing.T) {
+		upgradeTests(t, hostsUpgradeTests)
+	})
+	t.Run("RenterUpgrades", func(t *testing.T) {
+		upgradeTests(t, renterUpgradeTests)
+	})
 }
 
 // TestRenewContractBackupRestoreSnapshot tests snapshot backup and restore.
@@ -602,6 +617,14 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 	msg += strings.Join(upgradePath, " -> ")
 	testLogger.Println(msg)
 
+	// Build binaries to test.
+	binariesToBuild := testConfig.upgradePath
+	binariesToBuild = append(binariesToBuild, testConfig.baseVersion)
+	err := binariesbuilder.StaticBuilder.BuildVersions(testLogger, rebuildBinaries, binariesToBuild...)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Get default Antfarm config
 	antfarmLlogger, err := antfarm.NewAntfarmLogger(dataDir)
 	if err != nil {
@@ -694,6 +717,22 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 						t.Fatal(err)
 					}
 				}
+
+				// KNOWN ISSUE:
+				// If the renter version is v1.5.1 and higher, after hosts go
+				// down, the renter workers start cooldown. For renter to
+				// download again from the hosts we must wait for renter
+				// workers to finish cooldown.
+				re := regexp.MustCompile(`^v\d+\.\d+\.\d+`)
+				renterVersion := testConfig.baseVersion
+				isVersion := re.MatchString(renterVersion)
+				if isVersion && build.VersionCmp(renterVersion, "v1.5.0") > 0 || !isVersion {
+					// Wait for renter workers cooldown
+					err := renterAnt.WaitForRenterWorkersCooldown(renterWorkersCooldownTimeout)
+					if err != nil {
+						t.Fatal(err)
+					}
+				}
 			}
 		}
 
@@ -718,8 +757,30 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		// Download and verify files
 		err = antfarm.DownloadAndVerifyFiles(testLogger, renterAnt, uploadedFiles)
 		if err != nil {
+			testLogger.Errorln(err)
 			t.Error(err)
 			continue
 		}
+
+		// KNOWN ISSUE:
+		// If we are about to upgrade the renter and the next version is
+		// v1.4.8-antfarm, sleep for a while before upgrading so that the
+		// v1.4.8 renter can successfully form contracts without "Contract did
+		// not last 1 week and is not being renewed" issue.
+		if testConfig.upgradeRenter && i+1 < len(testConfig.upgradePath) && testConfig.upgradePath[i+1] == "v1.4.8-antfarm" {
+			testLogger.Debug("sleep before v1.4.8-antfarm starting...")
+			time.Sleep(time.Minute)
+			testLogger.Debug("sleep before v1.4.8-antfarm finished")
+		}
+	}
+}
+
+// upgradeTests executes upgrade test. Its main purpose is to divide upgrade
+// tests between hosts and renter upgrade tests.
+func upgradeTests(t *testing.T, tests []upgradeTestConfig) {
+	for _, tt := range tests {
+		t.Run(tt.testName, func(t *testing.T) {
+			upgradeTest(t, tt)
+		})
 	}
 }

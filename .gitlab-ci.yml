@@ -57,6 +57,18 @@ default: &default_params
     variables:
       - $ANTFARM_JOBS_TO_RUN == "basic_jobs"
 
+## Define short upgrade test jobs filter
+.short_upgrade_test_jobs: &short_upgrade_test_jobs_filter
+  only:
+    variables: 
+      - $ANTFARM_JOBS_TO_RUN == "short_upgrade_tests" || $ANTFARM_JOBS_TO_RUN == "basic_jobs"
+
+## Define long upgrade test jobs filter
+.long_upgrade_test_jobs: &long_upgrade_test_jobs_filter
+  only:
+    variables: 
+      - $ANTFARM_JOBS_TO_RUN == "long_upgrade_tests"
+
 lint:
   <<: *basic_jobs_filter
   stage: lint
@@ -118,28 +130,90 @@ binaries-builder-tests:
   script:
     - make test-long pkgs="$binaries_builder_pkgs"
 
-# Short version/upgrade tests triggered by Sia project merge to master
-short-version-tests:
+# Short hosts upgrade tests
+short-hosts-upgrade-tests:
   <<: *default_test_params
+  <<: *short_upgrade_test_jobs_filter
   cache:
-    key: version-tests-short-cache
+    key: short-hosts-upgrade-tests-cache
     paths:
       - .cache
   script:
-    - make test-vlong pkgs="$version_test_pkgs" run='TestUpgrades/(TestRenterUpgradesWithBaseLatestMaster|TestHostsUpgradesWithBaseLatestMaster)'
-  only:
-    variables: 
-      - $ANTFARM_JOBS_TO_RUN == "short_version_tests"
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/HostsUpgrades/WithBaseLatestRelease
 
-# Long version tests triggered by Sia project scheduled pipeline
-long-version-tests:
+# Short renter upgrade tests
+short-renter-upgrade-tests:
   <<: *default_test_params
+  <<: *short_upgrade_test_jobs_filter
   cache:
-    key: version-tests-long-cache
+    key: short-renter-upgrade-tests-cache
     paths:
       - .cache
   script:
-    - make test-vlong pkgs="$version_test_pkgs"
-  only:
-    variables: 
-      - $ANTFARM_JOBS_TO_RUN == "long_version_tests"
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/RenterUpgrades/WithBaseLatestRelease
+
+# Long hosts upgrade tests v1.4.7 to v 1.5.0
+hosts-v147-to-v150-upgrade-tests:
+  <<: *default_test_params
+  <<: *long_upgrade_test_jobs_filter
+  cache:
+    key: long-hosts-v147-to-v150-upgrade-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/HostsUpgrades/FromV147ToV150WithBaseV1411
+
+# Long hosts upgrade tests v1.5.0 to v1.5.3
+hosts-v150-to-v153-upgrade-tests:
+  <<: *default_test_params
+  <<: *long_upgrade_test_jobs_filter
+  cache:
+    key: long-hosts-v150-to-v153-upgrade-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/HostsUpgrades/FromV150ToV153WithBaseV153
+
+# Long hosts upgrade tests v1.5.3 to v1.5.4
+hosts-v153-to-v154-upgrade-tests:
+  <<: *default_test_params
+  <<: *long_upgrade_test_jobs_filter
+  cache:
+    key: long-hosts-v153-to-v154-upgrade-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/HostsUpgrades/FromV153ToV154WithBaseV154
+
+# Long hosts upgrade tests v1.5.4 to master with base master
+hosts-v154-to-master-base-master-upgrade-tests:
+  <<: *default_test_params
+  <<: *long_upgrade_test_jobs_filter
+  cache:
+    key: long-hosts-v154-to-master-base-master-upgrade-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/HostsUpgrades/FromV154WithBaseLatestMaster
+
+# Long hosts upgrade tests v1.5.4 to master with base release
+hosts-v154-to-master-base-release-upgrade-tests:
+  <<: *default_test_params
+  <<: *long_upgrade_test_jobs_filter
+  cache:
+    key: long-hosts-v154-to-master-base-release-upgrade-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/HostsUpgrades/FromV154WithBaseLatestRelease
+
+# Long renter upgrade tests
+renter-upgrade-tests:
+  <<: *default_test_params
+  <<: *long_upgrade_test_jobs_filter
+  cache:
+    key: long-renter-release-upgrade-tests-cache
+    paths:
+      - .cache
+  script:
+    - make test-vlong pkgs="$version_test_pkgs" run=TestUpgrades/RenterUpgrades
