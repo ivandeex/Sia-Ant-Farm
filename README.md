@@ -127,19 +127,19 @@ sia-antfarm-debug -config nebulous-configs/basic-renter-host-5.json
 
 ```json
 {
-	'ListenAddress': '<Address:Port>'
+	'ListenAddress': 'localhost:9900' // string
 	'AntConfigs': [
 		<Ant Config 1>,
 		<Ant Config 2>,
 		...
 	]
-	'AutoConnect': '<true/false>'
+	'AutoConnect': true  // bool
 	'ExternalFarms': [
-		'<Address:Port 1>',
-		'<Address:Port 2>',
+		'localhost:9901' // string
+		'localhost:9902' // string
 		...
 	]
-	'WaitForSync': '<true/false>'
+	'WaitForSync': true  // bool
 }
 ```
 
@@ -162,25 +162,26 @@ Wait with all jobs until all ants are in sync, defaults to false.
 
 ## Ant configuration options
 
-`AntConfig`s have the following options:
+`AntConfig`s have the following options (with example values):
 ```json
 {
-	'APIAddr': '<Address:Port>'
-	'APIPassword': '<API Password>'
-	'RPCAddr': '<Address:Port>'
-	'HostAddr': '<Address:Port>'
-	'SiamuxAddr': '<Address:Port>'
-	'SiamuxWsAddr': '<Address:Port>'
-	'AllowHostLocalNetAddress': '<true/false>'
-	'RenterDisableIPViolationCheck': '<true/false>'
-	'SiaDirectory': '<Sia Working Directory>'
-	'SiadPath': '<Siad Path>'
+	'APIAddr':                       'localhost:9980' // string
+	'APIPassword':                   'a pass word'    // string
+	'RPCAddr':                       'localhost:9981' // string
+	'HostAddr':                      'localhost:9982' // string
+	'SiamuxAddr':                    'localhost:9983' // string
+	'SiamuxWsAddr':                  'localhost:9984' // string
+	'AllowHostLocalNetAddress':      true             // bool
+	'RenterDisableIPViolationCheck': true             // bool
+	'SiaDirectory':                  'ant_0'          // string
+	'SiadPath':                      'siad-dev'       // string
+	'Name':                          'miner1'         // string
 	'Jobs': [
-		'<Job 1>',
-		'<Job 2>',
+		'gateway',                                    // string
+		'miner',                                      // string
 		...
 	]
-	'DesiredCurrency': <Siacoins Amount>
+	'DesiredCurrency':               100000           // int
 }
 ```
 
@@ -224,14 +225,17 @@ The data directory to use for this ant, by default a unique directory in
 The path to the `siad` binary, by default the `siad-dev` in your path will be
 used.
 
+**Name**  
+Human readable name of the ant.
+
 **Jobs**  
 An array of jobs for this ant to run. Available jobs include:
-- 'miner'
-- 'host'
-- 'noAllowanceRenter'
-- 'renter'
-- 'autoRenter'
-- 'gateway'
+- `miner`
+- `host`
+- `noAllowanceRenter`
+- `renter`
+- `autoRenter`
+- `gateway`
 
 `noAllowanceRenter` job starts the renter and waits for renter wallet to be
 filled.  
