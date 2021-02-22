@@ -209,11 +209,11 @@ An array of jobs for this ant to run. Available jobs include:
 - 'autoRenter'
 - 'gateway'
 
-'noAllowanceRenter' job starts the renter and waits for renter wallet to be
+`noAllowanceRenter` job starts the renter and waits for renter wallet to be
 filled.  
-'renter' job starts the renter, sets default allowance and waits till the
+`renter` job starts the renter, sets default allowance and waits till the
 renter is upload ready, it doesn't starts any renter's background activity.  
-'autoRenter' does the same as 'renter' job and then starts renter's periodic
+`autoRenter` does the same as 'renter' job and then starts renter's periodic
 file uploads, downloads, and deletions.
 
 **DesiredCurrency**  
