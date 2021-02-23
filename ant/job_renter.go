@@ -74,7 +74,7 @@ const (
 
 	// renterParityPieces defines the number of parity pieces per erasure-coded
 	// chunk
-	renterParityPieces = 4
+	renterParityPieces = 2
 
 	// renterUploadReadyTimeout defines timeout for renter to become upload
 	// ready
