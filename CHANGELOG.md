@@ -19,6 +19,9 @@ Latest:
 **Other**
 - Update `README.md` dividing configuration options to template configs and
   configuration options descriptions.
+- Decrease required hosts from 5 to 4 and parity pieces from 4 to 2 to increase
+  tests and Antfarm stability.
+- Wait for renter workers pricetable update and cooldown in upgrade tests.
 
 ## Feb 19, 2021:
 ### v1.1.0
