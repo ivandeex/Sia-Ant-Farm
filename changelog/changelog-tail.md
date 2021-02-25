@@ -1,3 +1,13 @@
+## Feb 25, 2021:
+### v1.2.0
+**Key Updates**
+- Update Sia Antfarm to use Sia `v1.5.5`.
+- Update Sia Antfarm to use Go `1.15`.
+
+**Other**
+- Update `README.md` dividing configuration options to template configs and
+  configuration options descriptions.
+
 ## Feb 19, 2021:
 ### v1.1.0
 **Key Updates**
