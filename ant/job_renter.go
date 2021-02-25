@@ -74,7 +74,7 @@ const (
 
 	// renterParityPieces defines the number of parity pieces per erasure-coded
 	// chunk
-	renterParityPieces = 4
+	renterParityPieces = 2
 
 	// renterUploadReadyTimeout defines timeout for renter to become upload
 	// ready
@@ -130,7 +130,7 @@ var (
 	// renter
 	allowance = modules.Allowance{
 		Funds:       types.NewCurrency64(20e3).Mul(types.SiacoinPrecision),
-		Hosts:       5,
+		Hosts:       4,
 		Period:      renterAllowancePeriod,
 		RenewWindow: renterAllowancePeriod / 4,
 

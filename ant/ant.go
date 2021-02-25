@@ -625,15 +625,55 @@ func (a *Ant) WaitForContractsToRenew(contractsCount int, timeout time.Duration)
 	return nil
 }
 
-// WaitForRenterWorkersCooldown blocks until none of renter workers are on
-// cooldown.
+// WaitForRenterWorkersCooldown blocks until renter workers price tables are
+// updated and none of renter workers are on cooldown.
 func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
 	a.staticLogger.Debugf("%v: waiting for renter workers cooldown...", a.Config.SiadConfig.DataDir)
 	start := time.Now()
 
+	// Wait for renter workers price table updates
+	updateTimes := make(map[types.FileContractID]time.Time)
+	rwg, err := a.Jr.staticClient.RenterWorkersGet()
+	if err != nil {
+		return errors.AddContext(err, "can't get renter workers info")
+	}
+	for _, w := range rwg.Workers {
+		updateTimes[w.ContractID] = w.PriceTableStatus.UpdateTime
+	}
 	frequency := time.Second
 	tries := int(timeout/frequency) + 1
-	err := build.Retry(tries, frequency, func() error {
+	err = build.Retry(tries, frequency, func() error {
+		rwg, err := a.Jr.staticClient.RenterWorkersGet()
+		if err != nil {
+			return errors.AddContext(err, "can't get renter workers info")
+		}
+		for _, w := range rwg.Workers {
+			ut := w.PriceTableStatus.UpdateTime
+			now := time.Now()
+			if ut0, ok := updateTimes[w.ContractID]; ok && (ut == ut0 || ut.Before(now)) {
+				return fmt.Errorf("renter workers price table was not updated")
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		er := fmt.Errorf("waiting for renter workers pricetable updates reached %v timeout: %v", timeout, err)
+		a.staticLogger.Errorf("%v: %v", a.Config.SiadConfig.DataDir, er)
+		return er
+	}
+
+	// Give a little time for possible cooldowns to start
+	select {
+	case <-a.Jr.StaticTG.StopChan():
+		return nil
+	case <-time.After(time.Second):
+	}
+
+	// Wait for renter workers cooldown
+	elapsed := time.Since(start)
+	timeout = timeout - elapsed
+	tries = int(timeout/frequency) + 1
+	err = build.Retry(tries, frequency, func() error {
 		rwg, err := a.Jr.staticClient.RenterWorkersGet()
 		if err != nil {
 			return errors.AddContext(err, "can't get renter workers info")
