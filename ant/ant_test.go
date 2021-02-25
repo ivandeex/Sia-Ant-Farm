@@ -10,11 +10,16 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // newTestingAntConfig creates an AntConfig for testing.
-func newTestingAntConfig(datadir string) AntConfig {
-	return AntConfig{SiadConfig: newTestingSiadConfig(datadir)}
+func newTestingAntConfig(datadir string) (AntConfig, error) {
+	sc, err := newTestingSiadConfig(datadir)
+	if err != nil {
+		return AntConfig{}, errors.AddContext(err, "can't create new siad config")
+	}
+	return AntConfig{SiadConfig: sc}, nil
 }
 
 // TestClosingAnt tests closing the created Ant
@@ -26,7 +31,10 @@ func TestClosingAnt(t *testing.T) {
 
 	// Create testing config
 	dataDir := test.TestDir(t.Name())
-	config := newTestingAntConfig(dataDir)
+	config, err := newTestingAntConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
@@ -104,7 +112,10 @@ func TestInitWalletExistingSeed(t *testing.T) {
 
 	// Create testing config with the existing seed
 	dataDir := test.TestDir(t.Name())
-	config := newTestingAntConfig(dataDir)
+	config, err := newTestingAntConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 	config.InitialWalletSeed = test.WalletSeed1
 
 	// Create logger
@@ -163,7 +174,10 @@ func TestNewAnt(t *testing.T) {
 
 	// Create testing config
 	dataDir := test.TestDir(t.Name())
-	config := newTestingAntConfig(dataDir)
+	config, err := newTestingAntConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
@@ -207,7 +221,10 @@ func TestStartJob(t *testing.T) {
 
 	// Create testing config
 	dataDir := test.TestDir(t.Name())
-	config := newTestingAntConfig(dataDir)
+	config, err := newTestingAntConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
@@ -245,7 +262,10 @@ func TestUpdateAnt(t *testing.T) {
 
 	// Create testing config
 	dataDir := test.TestDir(t.Name())
-	config := newTestingAntConfig(dataDir)
+	config, err := newTestingAntConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
@@ -301,7 +321,10 @@ func TestWalletAddress(t *testing.T) {
 
 	// Create testing config
 	dataDir := test.TestDir(t.Name())
-	config := newTestingAntConfig(dataDir)
+	config, err := newTestingAntConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)

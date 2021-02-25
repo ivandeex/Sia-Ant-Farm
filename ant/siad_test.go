@@ -6,21 +6,27 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/persist"
+	"gitlab.com/NebulousLabs/errors"
 )
 
 // newTestingSiadConfig creates a generic SiadConfig for the provided datadir.
-func newTestingSiadConfig(datadir string) SiadConfig {
-	return SiadConfig{
+func newTestingSiadConfig(datadir string) (SiadConfig, error) {
+	addrs, err := test.RandomFreeLocalAddresses(5)
+	if err != nil {
+		return SiadConfig{}, errors.AddContext(err, "can't get free local addresses")
+	}
+	sc := SiadConfig{
 		AllowHostLocalNetAddress: true,
-		APIAddr:                  test.RandomLocalAddress(),
+		APIAddr:                  addrs[0],
 		APIPassword:              persist.RandomSuffix(),
 		DataDir:                  datadir,
-		HostAddr:                 test.RandomLocalAddress(),
-		RPCAddr:                  test.RandomLocalAddress(),
+		HostAddr:                 addrs[1],
+		RPCAddr:                  addrs[2],
 		SiadPath:                 test.TestSiadFilename,
-		SiaMuxAddr:               test.RandomLocalAddress(),
-		SiaMuxWsAddr:             test.RandomLocalAddress(),
+		SiaMuxAddr:               addrs[3],
+		SiaMuxWsAddr:             addrs[4],
 	}
+	return sc, nil
 }
 
 // TestNewSiad tests that NewSiad creates a reachable Sia API
@@ -32,7 +38,10 @@ func TestNewSiad(t *testing.T) {
 
 	// Create testing config
 	dataDir := test.TestDir(t.Name())
-	config := newTestingSiadConfig(dataDir)
+	config, err := newTestingSiadConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
