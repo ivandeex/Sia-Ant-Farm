@@ -11,7 +11,7 @@ Version History
 Latest:
 
 ## Feb 25, 2021:
-### v1.2.0
+### v1.1.1
 **Key Updates**
 - Update Sia Antfarm to use Sia `v1.5.5`.
 - Update Sia Antfarm to use Go `1.15`.
