@@ -5,7 +5,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"gitlab.com/NebulousLabs/Sia/build"
@@ -64,32 +63,33 @@ func AntDirs(dataDir string, numAnts int) ([]string, error) {
 // port.
 func RandomFreeLocalAddress() (string, error) {
 	ip := "127.0.0.1"
-	var port int
-	err := build.Retry(100, time.Millisecond, func() error {
+	var addr string
+	err := build.Retry(1000, time.Millisecond, func() error {
 		// Get a random port number between 10000 and 20000 for testing
-		port = 10000 + fastrand.Intn(10000)
+		port := 10000 + fastrand.Intn(10000)
 
-		// Check that the port is free
-		address := net.JoinHostPort(ip, strconv.Itoa(port))
-		// 3 second timeout
-		conn, err := net.DialTimeout("tcp", address, 3*time.Second)
+		// Try to listen
+		addr = fmt.Sprintf("%v:%v", ip, port)
+		tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
 		if err != nil {
-			return fmt.Errorf("can't try port %v: %v", port, err)
+			return errors.AddContext(err, "can't resolve TCP address")
 		}
-		if conn != nil {
-			err := conn.Close()
-			if err != nil {
-				return errors.AddContext(err, "can't close connection")
-			}
-			return nil
+		listener, err := net.ListenTCP("tcp", tcpAddr)
+		if err != nil {
+			return errors.AddContext(err, "can't listen on the address")
 		}
-		return errors.AddContext(err, "can't establish connection")
+		// Close listener
+		err = listener.Close()
+		if err != nil {
+			return errors.AddContext(err, "can't close TCP listener")
+		}
+		return nil
 	})
 	if err != nil {
 		return "", errors.AddContext(err, "can't get an open port")
 	}
 
-	return fmt.Sprintf("%v:%v", ip, port), nil
+	return addr, nil
 }
 
 // RandomFreeLocalAddresses returns slice of n free local addresses.
