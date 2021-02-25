@@ -769,7 +769,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 		// not last 1 week and is not being renewed" issue.
 		if testConfig.upgradeRenter && i+1 < len(testConfig.upgradePath) && testConfig.upgradePath[i+1] == "v1.4.8-antfarm" {
 			testLogger.Debug("sleep before v1.4.8-antfarm starting...")
-			time.Sleep(time.Minute)
+			time.Sleep(time.Second * 90)
 			testLogger.Debug("sleep before v1.4.8-antfarm finished")
 		}
 	}
