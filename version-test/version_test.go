@@ -719,14 +719,14 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 				}
 
 				// KNOWN ISSUE:
-				// If the renter version is v1.5.1 and higher, after hosts go
+				// If the renter version is v1.5.0 and higher, after hosts go
 				// down, the renter workers start cooldown. For renter to
 				// download again from the hosts we must wait for renter
 				// workers to finish cooldown.
 				re := regexp.MustCompile(`^v\d+\.\d+\.\d+`)
 				renterVersion := testConfig.baseVersion
 				isVersion := re.MatchString(renterVersion)
-				if isVersion && build.VersionCmp(renterVersion, "v1.5.0") > 0 || !isVersion {
+				if isVersion && build.VersionCmp(renterVersion, "v1.5.0") >= 0 || !isVersion {
 					// Wait for renter workers cooldown
 					err := renterAnt.WaitForRenterWorkersCooldown(renterWorkersCooldownTimeout)
 					if err != nil {
