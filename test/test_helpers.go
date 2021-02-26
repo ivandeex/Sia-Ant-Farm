@@ -70,11 +70,7 @@ func RandomFreeLocalAddress() (string, error) {
 
 		// Try to listen
 		addr = fmt.Sprintf("%v:%v", ip, port)
-		tcpAddr, err := net.ResolveTCPAddr("tcp", addr)
-		if err != nil {
-			return errors.AddContext(err, "can't resolve TCP address")
-		}
-		listener, err := net.ListenTCP("tcp", tcpAddr)
+		listener, err := net.Listen("tcp", addr)
 		if err != nil {
 			return errors.AddContext(err, "can't listen on the address")
 		}
