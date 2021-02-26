@@ -10,6 +10,19 @@ Version History
 
 Latest:
 
+## Feb 25, 2021:
+### v1.1.1
+**Key Updates**
+- Update Sia Antfarm to use Sia `v1.5.5`.
+- Update Sia Antfarm to use Go `1.15`.
+
+**Other**
+- Update `README.md` dividing configuration options to template configs and
+  configuration options descriptions.
+- Decrease required hosts from 5 to 4 and parity pieces from 4 to 2 to increase
+  tests and Antfarm stability.
+- Wait for renter workers pricetable update and cooldown in upgrade tests.
+
 ## Feb 19, 2021:
 ### v1.1.0
 **Key Updates**

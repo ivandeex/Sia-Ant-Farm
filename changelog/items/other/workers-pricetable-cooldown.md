@@ -1,1 +1,0 @@
-- Wait for renter workers pricetable update and cooldown in upgrade tests.
