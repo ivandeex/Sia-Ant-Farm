@@ -2,16 +2,12 @@ package test
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
-	"time"
 
-	"gitlab.com/NebulousLabs/Sia/build"
 	siapersist "gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/Sia/siatest"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -57,48 +53,6 @@ func AntDirs(dataDir string, numAnts int) ([]string, error) {
 		}
 	}
 	return antDirs, nil
-}
-
-// RandomFreeLocalAddress returns a random local 127.0.0.1 address with an free
-// port.
-func RandomFreeLocalAddress() (string, error) {
-	ip := "127.0.0.1"
-	var addr string
-	err := build.Retry(1000, time.Millisecond, func() error {
-		// Get a random port number between 10000 and 20000 for testing
-		port := 10000 + fastrand.Intn(10000)
-
-		// Try to listen
-		addr = fmt.Sprintf("%v:%v", ip, port)
-		listener, err := net.Listen("tcp", addr)
-		if err != nil {
-			return errors.AddContext(err, "can't listen on the address")
-		}
-		// Close listener
-		err = listener.Close()
-		if err != nil {
-			return errors.AddContext(err, "can't close TCP listener")
-		}
-		return nil
-	})
-	if err != nil {
-		return "", errors.AddContext(err, "can't get an open port")
-	}
-
-	return addr, nil
-}
-
-// RandomFreeLocalAddresses returns slice of n free local addresses.
-func RandomFreeLocalAddresses(n int) ([]string, error) {
-	var addresses []string
-	for i := 0; i < n; i++ {
-		addr, err := RandomFreeLocalAddress()
-		if err != nil {
-			return []string{}, err
-		}
-		addresses = append(addresses, addr)
-	}
-	return addresses, nil
 }
 
 // RelativeSiadPath returns default relative siad path in local or Gitlab CI

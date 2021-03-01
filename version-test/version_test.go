@@ -408,15 +408,10 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	// Add restore renter to the antfarm config. The ant stays dormant for now,
 	// later it will be restarted with renter job, desired currency and with
 	// the backup renter seed.
-	addr, err := test.RandomFreeLocalAddress()
-	if err != nil {
-		t.Fatal(err)
-	}
 	restoreRenterAntName := "Restore-Renter"
 	restoreRenterAntConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress:      true,
-			APIAddr:                       addr,
 			DataDir:                       filepath.Join(antfarmDataDir, "restore-renter"),
 			RenterDisableIPViolationCheck: true,
 		},

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -29,26 +28,6 @@ const (
 	// synced
 	waitForAntsToSyncFrequency = time.Second
 )
-
-// getAddrs returns n free listening ports by leveraging the behaviour of
-// net.Listen(":0").  Addresses are returned in the format of ":port"
-func getAddrs(logger *persist.Logger, n int) ([]string, error) {
-	var addrs []string
-
-	for i := 0; i < n; i++ {
-		l, err := net.Listen("tcp", ":0") //nolint:gosec
-		if err != nil {
-			return nil, err
-		}
-		defer func() {
-			if err := l.Close(); err != nil {
-				logger.Errorf("can't close network listener: %v", err)
-			}
-		}()
-		addrs = append(addrs, fmt.Sprintf(":%v", l.Addr().(*net.TCPAddr).Port))
-	}
-	return addrs, nil
-}
 
 // ConnectAnts connects two or more ants to the first ant in the slice,
 // effectively bootstrapping the antfarm.
@@ -301,9 +280,9 @@ func parseConfig(logger *persist.Logger, config ant.AntConfig) (ant.AntConfig, e
 	}
 	// Automatically generate 5 free operating system ports for the Ant's api,
 	// rpc, host, siamux, and siamux websocket addresses
-	addrs, err := getAddrs(logger, 5)
+	addrs, err := ant.GetAddrs(5)
 	if err != nil {
-		return ant.AntConfig{}, err
+		return ant.AntConfig{}, errors.AddContext(err, "can't get free local addresses")
 	}
 	if config.APIAddr == "" {
 		config.APIAddr = ipAddr + addrs[0]

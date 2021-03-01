@@ -11,20 +11,21 @@ import (
 
 // newTestingSiadConfig creates a generic SiadConfig for the provided datadir.
 func newTestingSiadConfig(datadir string) (SiadConfig, error) {
-	addrs, err := test.RandomFreeLocalAddresses(5)
+	addrs, err := GetAddrs(5)
 	if err != nil {
 		return SiadConfig{}, errors.AddContext(err, "can't get free local addresses")
 	}
+	ip := "127.0.0.1"
 	sc := SiadConfig{
 		AllowHostLocalNetAddress: true,
-		APIAddr:                  addrs[0],
+		APIAddr:                  ip + addrs[0],
 		APIPassword:              persist.RandomSuffix(),
 		DataDir:                  datadir,
-		HostAddr:                 addrs[1],
-		RPCAddr:                  addrs[2],
+		HostAddr:                 ip + addrs[1],
+		RPCAddr:                  ip + addrs[2],
 		SiadPath:                 test.TestSiadFilename,
-		SiaMuxAddr:               addrs[3],
-		SiaMuxWsAddr:             addrs[4],
+		SiaMuxAddr:               ip + addrs[3],
+		SiaMuxWsAddr:             ip + addrs[4],
 	}
 	return sc, nil
 }
