@@ -159,13 +159,10 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	}
 
 	// Create ant client
-	options, err := client.DefaultOptions()
+	c, err := newClient(config.APIAddr, config.APIPassword)
 	if err != nil {
-		return nil, errors.AddContext(err, "can't create client default options")
+		return nil, errors.AddContext(err, "can't create a new client")
 	}
-	options.Address = config.APIAddr
-	options.Password = config.APIPassword
-	c := client.New(options)
 
 	// Unforward the ports required for this ant
 	upnprouter.CheckUPnPEnabled()
@@ -220,6 +217,18 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	}
 
 	return ant, nil
+}
+
+// newClient creates a new ant http client from the given API address and
+// password.
+func newClient(APIAddr, APIPassword string) (*client.Client, error) {
+	options, err := client.DefaultOptions()
+	if err != nil {
+		return nil, errors.AddContext(err, "can't create client default options")
+	}
+	options.Address = APIAddr
+	options.Password = APIPassword
+	return client.New(options), nil
 }
 
 // SprintJSON is a wrapper for json.MarshalIndent

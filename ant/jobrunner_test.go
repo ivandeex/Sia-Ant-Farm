@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
 )
 
 // TestNewJobRunner test creating a new Job Runner
@@ -35,13 +34,10 @@ func TestNewJobRunner(t *testing.T) {
 	defer stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 
 	// Create ant client
-	opts, err := client.DefaultOptions()
+	client, err := newClient(config.APIAddr, config.APIPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts.Address = config.APIAddr
-	opts.Password = config.APIPassword
-	client := &client.Client{Options: opts}
 
 	// Create ant
 	ant := &Ant{

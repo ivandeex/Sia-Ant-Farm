@@ -37,13 +37,10 @@ func TestAnnounceHost(t *testing.T) {
 	defer stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 
 	// Create ant client
-	opts, err := client.DefaultOptions()
+	c, err := newClient(config.APIAddr, config.APIPassword)
 	if err != nil {
 		t.Fatal(err)
 	}
-	opts.Address = config.APIAddr
-	opts.Password = config.APIPassword
-	c := &client.Client{Options: opts}
 
 	// Create ant
 	ant := &Ant{
