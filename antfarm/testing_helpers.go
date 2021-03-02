@@ -16,7 +16,11 @@ import (
 // NewDefaultRenterAntfarmTestingConfig creates default basic antfarm config
 // for running renter tests
 func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (AntfarmConfig, error) {
-	antFarmAddr := test.RandomLocalAddress()
+	addr, err := ant.GetAddr()
+	if err != nil {
+		return AntfarmConfig{}, errors.AddContext(err, "can't create antfarm local address")
+	}
+	antFarmAddr := "127.0.0.1" + addr
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
 	antDirs, err := test.AntDirs(dataDir, 7)
 	if err != nil {
@@ -29,7 +33,6 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
-					APIAddr:                  test.RandomLocalAddress(),
 					DataDir:                  antDirs[0],
 					SiadPath:                 test.TestSiadFilename,
 				},
@@ -38,7 +41,6 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
-					APIAddr:                  test.RandomLocalAddress(),
 					DataDir:                  antDirs[1],
 					SiadPath:                 test.TestSiadFilename,
 				},
@@ -48,7 +50,6 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
-					APIAddr:                  test.RandomLocalAddress(),
 					DataDir:                  antDirs[2],
 					SiadPath:                 test.TestSiadFilename,
 				},
@@ -58,7 +59,6 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
-					APIAddr:                  test.RandomLocalAddress(),
 					DataDir:                  antDirs[3],
 					SiadPath:                 test.TestSiadFilename,
 				},
@@ -68,7 +68,6 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
-					APIAddr:                  test.RandomLocalAddress(),
 					DataDir:                  antDirs[4],
 					SiadPath:                 test.TestSiadFilename,
 				},
@@ -78,7 +77,6 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress: allowLocalIPs,
-					APIAddr:                  test.RandomLocalAddress(),
 					DataDir:                  antDirs[5],
 					SiadPath:                 test.TestSiadFilename,
 				},
@@ -88,7 +86,6 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 			{
 				SiadConfig: ant.SiadConfig{
 					AllowHostLocalNetAddress:      allowLocalIPs,
-					APIAddr:                       test.RandomLocalAddress(),
 					RenterDisableIPViolationCheck: true,
 					DataDir:                       antDirs[6],
 					SiadPath:                      test.TestSiadFilename,
@@ -107,7 +104,11 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 // NewAntfarmConfig creates a new antfarm config. Ants of different types have
 // standardized names.
 func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int, renters int, generic int) (AntfarmConfig, error) {
-	antFarmAddr := test.RandomLocalAddress()
+	addr, err := ant.GetAddr()
+	if err != nil {
+		return AntfarmConfig{}, errors.AddContext(err, "can't create antfarm local address")
+	}
+	antFarmAddr := "127.0.0.1" + addr
 	antFarmDir := filepath.Join(dataDir, "antfarm-data")
 	antCount := miners + hosts + renters + generic
 	antDirs, err := test.AntDirs(dataDir, antCount)
@@ -124,7 +125,6 @@ func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int,
 		ac := ant.AntConfig{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: allowLocalIPs,
-				APIAddr:                  test.RandomLocalAddress(),
 				DataDir:                  antDirs[doneAntConfigs],
 				SiadPath:                 test.TestSiadFilename,
 			},
@@ -140,7 +140,6 @@ func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int,
 		ac := ant.AntConfig{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: allowLocalIPs,
-				APIAddr:                  test.RandomLocalAddress(),
 				DataDir:                  antDirs[doneAntConfigs],
 				SiadPath:                 test.TestSiadFilename,
 			},
@@ -157,7 +156,6 @@ func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int,
 		ac := ant.AntConfig{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress:      allowLocalIPs,
-				APIAddr:                       test.RandomLocalAddress(),
 				RenterDisableIPViolationCheck: true,
 				DataDir:                       antDirs[doneAntConfigs],
 				SiadPath:                      test.TestSiadFilename,
@@ -175,7 +173,6 @@ func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int,
 		ac := ant.AntConfig{
 			SiadConfig: ant.SiadConfig{
 				AllowHostLocalNetAddress: allowLocalIPs,
-				APIAddr:                  test.RandomLocalAddress(),
 				DataDir:                  antDirs[doneAntConfigs],
 				SiadPath:                 test.TestSiadFilename,
 			},

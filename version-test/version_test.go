@@ -406,7 +406,6 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	restoreRenterAntConfig := ant.AntConfig{
 		SiadConfig: ant.SiadConfig{
 			AllowHostLocalNetAddress:      true,
-			APIAddr:                       test.RandomLocalAddress(),
 			DataDir:                       filepath.Join(antfarmDataDir, "restore-renter"),
 			RenterDisableIPViolationCheck: true,
 		},

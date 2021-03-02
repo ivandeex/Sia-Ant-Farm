@@ -118,6 +118,34 @@ func clearPorts(config AntConfig) error {
 	return nil
 }
 
+// GetAddr returns a free listening port by leveraging the behaviour of
+// net.Listen(":0").  Address is returned in the format of ":port".
+func GetAddr() (string, error) {
+	l, err := net.Listen("tcp", ":0") //nolint:gosec
+	if err != nil {
+		return "", err
+	}
+	addr := fmt.Sprintf(":%v", l.Addr().(*net.TCPAddr).Port)
+	if err := l.Close(); err != nil {
+		return "", fmt.Errorf("can't close network listener: %v", err)
+	}
+	return addr, nil
+}
+
+// GetAddrs returns n free listening ports. Addresses are returned in the
+// format of ":port".
+func GetAddrs(n int) ([]string, error) {
+	var addrs []string
+	for i := 0; i < n; i++ {
+		addr, err := GetAddr()
+		if err != nil {
+			return nil, err
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
+}
+
 // name returns standardized ant name by the given ant type and ant index.
 func name(t Type, i int) string {
 	return fmt.Sprintf("%s-%d", t, i)
