@@ -111,10 +111,7 @@ func TestFoundationFailsafeAddressCanChangeUnlockHashes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mc, err := m.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	mc := m.StaticClient
 
 	// Wait till miner has Siacoins
 	value := types.SiacoinPrecision.Mul64(3)
@@ -174,10 +171,7 @@ outputIDFinder:
 	if err != nil {
 		t.Fatal(err)
 	}
-	c1, err := g1.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	c1 := g1.StaticClient
 
 	// Get generic ant ownning new primary address
 	newPrimaryAnt, err := farm.GetAntByName(ant.NameGeneric(1))
@@ -265,10 +259,7 @@ func TestFoundationPrimaryAddressCanChangeUnlockHashes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c1, err := g1.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	c1 := g1.StaticClient
 
 	// Wait for initial Foundation subsidy
 	err = g1.WaitForBlockHeight(hardforkMatureBH, hardforkMatureTimeout, time.Second)
@@ -364,10 +355,7 @@ func TestFoundationPrimaryAddressCanSendSiacoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c1, err := g1.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	c1 := g1.StaticClient
 
 	// Wait for initial Foundation subsidy
 	err = g1.WaitForBlockHeight(hardforkMatureBH, hardforkMatureTimeout, time.Second)
@@ -438,10 +426,7 @@ func TestFoundationPrimaryAddressReceivesSubsidies(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c1, err := g1.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	c1 := g1.StaticClient
 
 	// Get generic ant 2 client and address
 	g2, err := farm.GetAntByName(ant.NameGeneric(1))
@@ -657,10 +642,7 @@ func TestFoundationUploadsDownloads(t *testing.T) {
 	}
 
 	// Check we didn't crossed Foundation hardfork before upgrade
-	rc, err := r.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	rc := r.StaticClient
 	cg, err := rc.ConsensusGet()
 	if err != nil {
 		t.Fatal(err)
@@ -859,10 +841,7 @@ func TestReplayProtection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mc, err := m.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	mc := m.StaticClient
 
 	// Wait till miner has Siacoins
 	value1 := types.SiacoinPrecision.Mul64(3)
@@ -882,10 +861,7 @@ func TestReplayProtection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c1, err := g1.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	c1 := g1.StaticClient
 
 	// Create spendable outputs
 	_, err = mc.WalletSiacoinsPost(value1, *g1Address, false)
@@ -973,10 +949,7 @@ func TestReplayProtection(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	c2, err := g2.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	c2 := g2.StaticClient
 	g2Address, err := g2.WalletAddress()
 	if err != nil {
 		t.Fatal(err)

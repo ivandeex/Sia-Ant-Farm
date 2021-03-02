@@ -36,14 +36,21 @@ func TestNewJobRunner(t *testing.T) {
 	}
 	defer stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 
+	// Create ant client
+	client, err := newClient(config.APIAddr, config.APIPassword)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Create ant
 	ant := &Ant{
 		staticAntsSyncWG: &sync.WaitGroup{},
 		staticLogger:     logger,
+		StaticClient:     client,
 	}
 
 	// Create jobRunnner on same APIAddr as the siad process
-	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.DataDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}
