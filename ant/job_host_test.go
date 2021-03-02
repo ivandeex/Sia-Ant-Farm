@@ -36,14 +36,24 @@ func TestAnnounceHost(t *testing.T) {
 	}
 	defer stopSiad(logger, config.DataDir, config.APIAddr, config.APIPassword, siad.Process)
 
+	// Create ant client
+	opts, err := client.DefaultOptions()
+	if err != nil {
+		t.Fatal(err)
+	}
+	opts.Address = config.APIAddr
+	opts.Password = config.APIPassword
+	c := &client.Client{Options: opts}
+
 	// Create ant
 	ant := &Ant{
 		staticAntsSyncWG: &sync.WaitGroup{},
 		staticLogger:     logger,
+		StaticClient:     c,
 	}
 
 	// Create jobRunnner on same APIAddr as the siad process
-	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.DataDir, "")
+	j, err := newJobRunner(logger, ant, config.DataDir, "")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -70,6 +70,8 @@ type Ant struct {
 	// should identify the ant by ant's siad dataDir.
 	staticLogger *persist.Logger
 
+	StaticClient *client.Client `json:"-"`
+
 	APIAddr string
 	RPCAddr string
 
@@ -156,6 +158,15 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 		}
 	}
 
+	// Create ant client
+	options, err := client.DefaultOptions()
+	if err != nil {
+		return nil, errors.AddContext(err, "can't create client default options")
+	}
+	options.Address = config.APIAddr
+	options.Password = config.APIPassword
+	c := client.New(options)
+
 	// Unforward the ports required for this ant
 	upnprouter.CheckUPnPEnabled()
 	if upnprouter.UPnPEnabled {
@@ -181,6 +192,7 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 	ant := &Ant{
 		staticAntsSyncWG: antsSyncWG,
 		staticLogger:     logger,
+		StaticClient:     c,
 		APIAddr:          config.APIAddr,
 		RPCAddr:          config.RPCAddr,
 		Config:           config,
@@ -188,7 +200,7 @@ func New(antsSyncWG *sync.WaitGroup, logger *persist.Logger, config AntConfig) (
 		siad:             siad,
 	}
 
-	j, err := newJobRunner(logger, ant, config.APIAddr, config.APIPassword, config.SiadConfig.DataDir, config.InitialWalletSeed)
+	j, err := newJobRunner(logger, ant, config.SiadConfig.DataDir, config.InitialWalletSeed)
 	if err != nil {
 		return nil, errors.AddContext(err, "unable to crate jobrunner")
 	}
@@ -251,24 +263,11 @@ func (a *Ant) HasRenterTypeJob() bool {
 	return false
 }
 
-// NewClient creates and returns a new ant http client
-func (a *Ant) NewClient() (*client.Client, error) {
-	options, err := client.DefaultOptions()
-	if err != nil {
-		return &client.Client{}, errors.AddContext(err, "can't create client default options")
-	}
-	options.Address = a.APIAddr
-	return client.New(options), nil
-}
-
 // PrintDebugInfo prints out helpful debug information, arguments define what
 // is printed.
 func (a *Ant) PrintDebugInfo(contractInfo, hostInfo, renterInfo bool) error {
 	var msg string
-	client, err := a.NewClient()
-	if err != nil {
-		return err
-	}
+	client := a.StaticClient
 	logger := a.staticLogger
 	if contractInfo {
 		rc, err := client.RenterAllContractsGet()
@@ -505,10 +504,7 @@ func (a *Ant) UpdateSiad(siadPath string) error {
 // WaitConfirmedSiacoinBalance waits until ant wallet confirmed Siacoins meet
 // comparison condition.
 func (a *Ant) WaitConfirmedSiacoinBalance(cmpOp BalanceComparisonOperator, value types.Currency, timeout time.Duration) error {
-	c, err := a.NewClient()
-	if err != nil {
-		return errors.AddContext(err, "can't get ant client")
-	}
+	c := a.StaticClient
 
 	frequency := time.Millisecond * 500
 	tries := int(timeout / frequency)
@@ -539,15 +535,12 @@ func (a *Ant) WaitConfirmedSiacoinBalance(cmpOp BalanceComparisonOperator, value
 // the timeout is reached.
 func (a *Ant) WaitForBlockHeight(blockHeight types.BlockHeight, timeout, frequency time.Duration) error {
 	// Get client
-	c, err := a.NewClient()
-	if err != nil {
-		return errors.AddContext(err, "can't get client")
-	}
+	c := a.StaticClient
 
 	// Wait for block height
 	a.staticLogger.Debugf("%v: waiting for block height %v", a.Config.DataDir, blockHeight)
 	tries := int(timeout / frequency)
-	err = build.Retry(tries, frequency, func() error {
+	err := build.Retry(tries, frequency, func() error {
 		cg, err := c.ConsensusGet()
 		if err != nil {
 			return errors.AddContext(err, "can't get consensus")

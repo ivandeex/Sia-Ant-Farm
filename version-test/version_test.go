@@ -16,7 +16,6 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/errors"
 )
 
@@ -242,12 +241,7 @@ func TestRenterUploader(t *testing.T) {
 	// Increase hosts storage folders
 	for _, ai := range antfarmConfig.GetHostAntConfigIndices() {
 		// Get client
-		opts, err := client.DefaultOptions()
-		if err != nil {
-			t.Fatal(err)
-		}
-		opts.Address = farm.Ants[ai].APIAddr
-		c := client.New(opts)
+		c := farm.Ants[ai].StaticClient
 
 		// Get storage folder path
 		sg, err := c.HostStorageGet()
@@ -468,10 +462,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	}
 
 	// Create a backup
-	backupRenterClient, err := backupRenterAnt.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	backupRenterClient := backupRenterAnt.StaticClient
 	backupName := "test-backup"
 	err = backupRenterClient.RenterCreateBackupPost(backupName)
 	if err != nil {
@@ -562,10 +553,7 @@ func TestRenewContractBackupRestoreSnapshot(t *testing.T) {
 	}
 
 	// Get restore renter client
-	restoreRenterClient, err := restoreRenterAnt.NewClient()
-	if err != nil {
-		t.Fatal(err)
-	}
+	restoreRenterClient := restoreRenterAnt.StaticClient
 
 	// Wait for backup to apear in renter backups
 	backupAppearTimeout := time.Minute
