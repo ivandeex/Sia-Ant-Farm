@@ -8,7 +8,6 @@ import (
 	siapersist "gitlab.com/NebulousLabs/Sia/persist"
 	"gitlab.com/NebulousLabs/Sia/siatest"
 	"gitlab.com/NebulousLabs/errors"
-	"gitlab.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -54,13 +53,6 @@ func AntDirs(dataDir string, numAnts int) ([]string, error) {
 		}
 	}
 	return antDirs, nil
-}
-
-// RandomLocalAddress returns a random local 127.0.0.1 address
-func RandomLocalAddress() string {
-	// Get a random port number between 10000 and 20000 for testing
-	port := 10000 + fastrand.Intn(10000)
-	return fmt.Sprintf("127.0.0.1:%v", port)
 }
 
 // RelativeSiadPath returns default relative siad path in local or Gitlab CI

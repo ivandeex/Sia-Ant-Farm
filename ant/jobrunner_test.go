@@ -16,7 +16,10 @@ func TestNewJobRunner(t *testing.T) {
 
 	// Create testing config
 	dataDir := test.TestDir(t.Name())
-	config := newTestingSiadConfig(dataDir)
+	config, err := newTestingSiadConfig(dataDir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// Create logger
 	logger := test.NewTestLogger(t, dataDir)
