@@ -31,12 +31,8 @@ func (j *JobRunner) blockMining() {
 	}
 	defer j.StaticTG.Done()
 
-	// Wait for ants to be synced if the wait group was set
-	synced := j.waitForAntsSync()
-	if !synced {
-		j.staticLogger.Errorf("%v: waiting for ants to sync failed", j.staticDataDir)
-		return
-	}
+	// Note:
+	// blockMining doesn't wait for WaitForSync
 
 	err = j.staticClient.MinerStartGet()
 	if err != nil {

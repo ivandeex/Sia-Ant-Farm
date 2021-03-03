@@ -59,26 +59,13 @@ markdown-spellcheck:
 	git ls-files "*.md" :\!:"vendor/**" | xargs codespell --check-filenames
 
 test: fmt vet install install-siad-dev
-	go test -short -tags='debug testing netgo' -timeout=5s $(pkgs) -run="$(run)" -count=$(count)
+	go test -short -tags='debug dev netgo' -timeout=5s $(pkgs) -run="$(run)" -count=$(count)
 
 test-long: clean fmt vet lint-ci install-siad-dev
 	@mkdir -p cover
-	go test --coverprofile='./cover/cover.out' -v -failfast -tags='testing debug netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
+	go test --coverprofile='./cover/cover.out' -v -failfast -tags='dev debug netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
 
 test-vlong: clean fmt vet lint-ci install-siad-dev
-	@mkdir -p cover
-	go test -v -tags='testing debug vlong netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
-
-# Target to execute tests using 'dev' build tag, so that Sia Antfarm loads Sia
-# dev constants.
-test-vlong-dev: clean fmt vet lint-ci install-siad-dev
-	@mkdir -p cover
-	go test -v -tags='dev debug vlong netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
-
-# Target to execute Foundation hardfork tests using 'foundation-antfarm-fix'
-# branch and using 'dev' build tag, so that Sia Antfarm loads Sia dev
-# constants.
-test-vlong-foundation-dev: clean fmt vet lint-ci
 	@mkdir -p cover
 	go test -v -tags='dev debug vlong netgo' -timeout=3300s $(pkgs) -run="$(run)" -count=$(count)
 
