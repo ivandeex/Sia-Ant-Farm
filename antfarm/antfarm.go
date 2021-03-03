@@ -15,6 +15,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
 	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
+	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
 )
 
@@ -22,8 +23,12 @@ const (
 	// monitorFrequency defines how frequently to run permanentSyncMonitor
 	monitorFrequency = time.Second * 20
 
-	// antsSyncTimeout is a timeout for all ants to sync
-	antsSyncTimeout = time.Minute * 5
+	// antsSyncTimeout defines a timeout for all ants to sync
+	antsSyncTimeout = time.Minute * 3
+
+	// asicHardforkTimeout defines a timeout for waiting for ASIC hardfork
+	// height, which is 20 blocks on dev binaries.
+	asicHardforkTimeout = time.Minute * 3
 
 	// antfarmLog defines antfarm log filename
 	antfarmLog = "antfarm.log"
@@ -32,14 +37,14 @@ const (
 type (
 	// AntfarmConfig contains the fields to parse and use to create a sia-antfarm.
 	AntfarmConfig struct {
-		ListenAddress string
-		DataDir       string
-		AntConfigs    []ant.AntConfig
-		AutoConnect   bool
-		WaitForSync   bool
+		ListenAddress              string
+		DataDir                    string
+		AntConfigs                 []ant.AntConfig
+		AutoConnect                bool
+		WaitForAsicHardforkAndSync bool
 
-		// ExternalFarms is a slice of net addresses representing the API addresses
-		// of other antFarms to connect to.
+		// ExternalFarms is a slice of net addresses representing the API
+		// addresses of other antFarms to connect to.
 		ExternalFarms []string
 	}
 
@@ -52,13 +57,14 @@ type (
 		// Ants is a slice of Ants in this antfarm.
 		Ants []*ant.Ant
 
-		// externalAnts is a slice of externally connected ants, that is, ants that
-		// are connected to this antfarm but managed by another antfarm.
+		// externalAnts is a slice of externally connected ants, that is, ants
+		// that are connected to this antfarm but managed by another antfarm.
 		externalAnts []*ant.Ant
 		router       *httprouter.Router
 
-		// antsSyncWG is a waitgroup to wait for all ants to be in sync and then
-		// start ant jobs
+		// antsSyncWG is a waitgroup to wait for ASIC hardfork height and for
+		// all ants to be in sync. Then all non-mining ant jobs start. Mining
+		// jobs do not wait for this sync.
 		antsSyncWG sync.WaitGroup
 
 		// logger is an antfarm logger. It is passed to ants to log to the same
@@ -90,7 +96,7 @@ func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Set ants sync waitgroup
-	if config.WaitForSync {
+	if config.WaitForAsicHardforkAndSync {
 		farm.antsSyncWG.Add(1)
 		defer farm.antsSyncWG.Done()
 	}
@@ -146,14 +152,6 @@ func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 		}
 	}
 
-	// Wait for all ants to sync
-	if config.WaitForSync {
-		err = farm.waitForAntsToSync(antsSyncTimeout)
-		if err != nil {
-			return nil, errors.AddContext(err, "wait for ants to sync failed")
-		}
-	}
-
 	// start up the api server listener
 	farm.apiListener, err = net.Listen("tcp", config.ListenAddress)
 	if err != nil {
@@ -163,6 +161,25 @@ func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 	// construct the router and serve the API.
 	farm.router = httprouter.New()
 	farm.router.GET("/ants", farm.getAnts)
+
+	// Wait for ASIC hardfork height and for all ants to sync
+	if config.WaitForAsicHardforkAndSync {
+		// Wait for ASIC hardfork height
+		logger.Debugf("%v: waiting for ASIC hardfork height...", dataDir)
+		err = farm.Ants[0].WaitForBlockHeight(types.ASICHardforkHeight, asicHardforkTimeout, time.Second)
+		if err != nil {
+			er := fmt.Errorf("waiting for ASIC hardfork height reached %v timeout: %v", asicHardforkTimeout, err)
+			logger.Debugf("%v: %v", dataDir, er)
+			return nil, er
+		}
+		logger.Debugf("%v: waiting for ASIC hardfork height finished", dataDir)
+
+		// Wait for all ants being synced
+		err = farm.waitForAntsToSync(antsSyncTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("waiting for ants to sync reached %v timeout: %v", antsSyncTimeout, err)
+		}
+	}
 
 	return farm, nil
 }
@@ -317,7 +334,7 @@ func (afc *AntfarmConfig) GetHostAntConfigIndices() (antConfigIndices []int) {
 
 // waitForAntsToSync waits for all ants to be synced with a given tmeout
 func (af *AntFarm) waitForAntsToSync(timeout time.Duration) error {
-	af.logger.Debugln("waiting for all ants to sync")
+	af.logger.Debugf("%v: waiting for all ants to sync...", af.dataDir)
 	start := time.Now()
 	for {
 		// Check sync status
@@ -345,6 +362,6 @@ func (af *AntFarm) waitForAntsToSync(timeout time.Duration) error {
 			// Continue waiting for sync after sleep
 		}
 	}
-	af.logger.Debugln("all ants are now synced")
+	af.logger.Debugf("%v: waiting for all ants to sync finished", af.dataDir)
 	return nil
 }

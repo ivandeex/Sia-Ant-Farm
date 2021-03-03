@@ -26,12 +26,8 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	}
 	defer j.StaticTG.Done()
 
-	// Wait for ants to be synced if the wait group was set
-	synced := j.waitForAntsSync()
-	if !synced {
-		j.staticLogger.Errorf("%v: waiting for ants to sync failed", j.staticDataDir)
-		return
-	}
+	// Note:
+	// balanceMaintainer doesn't wait for WaitForAsicHardforkAndSync
 
 	minerRunning := true
 	err = j.staticClient.MinerStartGet()

@@ -95,8 +95,8 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 				Name:            test.RenterAntName,
 			},
 		},
-		AutoConnect: true,
-		WaitForSync: true,
+		AutoConnect:                true,
+		WaitForAsicHardforkAndSync: true,
 	}
 	return config, nil
 }
@@ -184,11 +184,11 @@ func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int,
 	}
 
 	config := AntfarmConfig{
-		ListenAddress: antFarmAddr,
-		DataDir:       antFarmDir,
-		AntConfigs:    antConfigs,
-		AutoConnect:   true,
-		WaitForSync:   true,
+		ListenAddress:              antFarmAddr,
+		DataDir:                    antFarmDir,
+		AntConfigs:                 antConfigs,
+		AutoConnect:                true,
+		WaitForAsicHardforkAndSync: true,
 	}
 	return config, nil
 }
