@@ -655,13 +655,12 @@ func (a *Ant) WaitForContractsToRenew(contractsCount int, timeout time.Duration)
 	return nil
 }
 
-// WaitForRenterWorkersCooldown blocks until renter workers price tables are
-// updated and none of renter workers are on cooldown.
-func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
-	a.staticLogger.Debugf("%v: waiting for renter workers cooldown...", a.Config.SiadConfig.DataDir)
-	start := time.Now()
-
+// WaitForRenterWorkersPriceTableUpdatesAndCooldown blocks until renter workers
+// price tables are updated and none of renter workers are on cooldown.
+func (a *Ant) WaitForRenterWorkersPriceTableUpdatesAndCooldown(priceTableUpdateTimeout, cooldownTimeout time.Duration) error {
 	// Wait for renter workers price table updates
+	a.staticLogger.Debugf("%v: waiting for renter workers price tables updates...", a.Config.SiadConfig.DataDir)
+	start := time.Now()
 	updateTimes := make(map[types.FileContractID]time.Time)
 	rwg, err := a.Jr.staticClient.RenterWorkersGet()
 	if err != nil {
@@ -671,7 +670,7 @@ func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
 		updateTimes[w.ContractID] = w.PriceTableStatus.UpdateTime
 	}
 	frequency := time.Second
-	tries := int(timeout/frequency) + 1
+	tries := int(priceTableUpdateTimeout/frequency) + 1
 	err = build.Retry(tries, frequency, func() error {
 		rwg, err := a.Jr.staticClient.RenterWorkersGet()
 		if err != nil {
@@ -687,10 +686,11 @@ func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
 		return nil
 	})
 	if err != nil {
-		er := fmt.Errorf("waiting for renter workers pricetable updates reached %v timeout: %v", timeout, err)
+		er := fmt.Errorf("waiting for renter workers pricetable updates reached %v timeout: %v", priceTableUpdateTimeout, err)
 		a.staticLogger.Errorf("%v: %v", a.Config.SiadConfig.DataDir, er)
 		return er
 	}
+	a.staticLogger.Debugf("%v: waiting for renter workers price tables updates finished in %v", a.Config.SiadConfig.DataDir, time.Since(start))
 
 	// Give a little time for possible cooldowns to start
 	select {
@@ -700,9 +700,9 @@ func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
 	}
 
 	// Wait for renter workers cooldown
-	elapsed := time.Since(start)
-	timeout = timeout - elapsed
-	tries = int(timeout/frequency) + 1
+	a.staticLogger.Debugf("%v: waiting for renter workers cooldown...", a.Config.SiadConfig.DataDir)
+	start = time.Now()
+	tries = int(cooldownTimeout/frequency) + 1
 	err = build.Retry(tries, frequency, func() error {
 		rwg, err := a.Jr.staticClient.RenterWorkersGet()
 		if err != nil {
@@ -715,12 +715,12 @@ func (a *Ant) WaitForRenterWorkersCooldown(timeout time.Duration) error {
 		return nil
 	})
 	if err != nil {
-		er := fmt.Errorf("waiting for renter workers cooldown reached %v timeout: %v", timeout, err)
+		er := fmt.Errorf("waiting for renter workers cooldown reached %v timeout: %v", cooldownTimeout, err)
 		a.staticLogger.Errorf("%v: %v", a.Config.SiadConfig.DataDir, er)
 		return er
 	}
-
 	a.staticLogger.Debugf("%v: waiting for renter workers cooldown finished in %v", a.Config.SiadConfig.DataDir, time.Since(start))
+
 	return nil
 }
 
