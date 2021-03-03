@@ -48,6 +48,10 @@ const (
 	// finish cooldown after hosts upgrades in hosts upgrades tests.
 	renterWorkersCooldownTimeout = time.Minute * 15
 
+	// renterWorkersPriceTableUpdateTimeout defines timeout for renter workers
+	// to update price tables.
+	renterWorkersPriceTableUpdateTimeout = time.Minute * 15
+
 	// allowLocalIPs defines whether we allow ants to use localhost IPs.
 	// Default is true. When set to true it is possible to test from Sia v1.5.0
 	// on Gitlab CI and on machines without publicly accessible ports and
@@ -715,7 +719,7 @@ func upgradeTest(t *testing.T, testConfig upgradeTestConfig) {
 				isVersion := re.MatchString(renterVersion)
 				if isVersion && build.VersionCmp(renterVersion, "v1.5.0") >= 0 || !isVersion {
 					// Wait for renter workers cooldown
-					err := renterAnt.WaitForRenterWorkersCooldown(renterWorkersCooldownTimeout)
+					err := renterAnt.WaitForRenterWorkersPriceTableUpdatesAndCooldown(renterWorkersPriceTableUpdateTimeout, renterWorkersCooldownTimeout)
 					if err != nil {
 						t.Fatal(err)
 					}
