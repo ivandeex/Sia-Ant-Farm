@@ -32,7 +32,7 @@ func (j *JobRunner) blockMining() {
 	defer j.StaticTG.Done()
 
 	// Note:
-	// blockMining doesn't wait for WaitForAsicHardforkAndSync
+	// blockMining doesn't wait for WaitForSync
 
 	err = j.staticClient.MinerStartGet()
 	if err != nil {

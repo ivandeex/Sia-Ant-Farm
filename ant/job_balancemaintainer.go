@@ -27,7 +27,7 @@ func (j *JobRunner) balanceMaintainer(desiredBalance types.Currency) {
 	defer j.StaticTG.Done()
 
 	// Note:
-	// balanceMaintainer doesn't wait for WaitForAsicHardforkAndSync
+	// balanceMaintainer doesn't wait for WaitForSync
 
 	minerRunning := true
 	err = j.staticClient.MinerStartGet()

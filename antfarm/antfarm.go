@@ -37,11 +37,11 @@ const (
 type (
 	// AntfarmConfig contains the fields to parse and use to create a sia-antfarm.
 	AntfarmConfig struct {
-		ListenAddress              string
-		DataDir                    string
-		AntConfigs                 []ant.AntConfig
-		AutoConnect                bool
-		WaitForAsicHardforkAndSync bool
+		ListenAddress string
+		DataDir       string
+		AntConfigs    []ant.AntConfig
+		AutoConnect   bool
+		WaitForSync   bool
 
 		// ExternalFarms is a slice of net addresses representing the API
 		// addresses of other antFarms to connect to.
@@ -96,7 +96,7 @@ func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 	}
 
 	// Set ants sync waitgroup
-	if config.WaitForAsicHardforkAndSync {
+	if config.WaitForSync {
 		farm.antsSyncWG.Add(1)
 		defer farm.antsSyncWG.Done()
 	}
@@ -163,7 +163,7 @@ func New(logger *persist.Logger, config AntfarmConfig) (*AntFarm, error) {
 	farm.router.GET("/ants", farm.getAnts)
 
 	// Wait for ASIC hardfork height and for all ants to sync
-	if config.WaitForAsicHardforkAndSync {
+	if config.WaitForSync {
 		// Wait for ASIC hardfork height
 		logger.Debugf("%v: waiting for ASIC hardfork height...", dataDir)
 		err = farm.Ants[0].WaitForBlockHeight(types.ASICHardforkHeight, asicHardforkTimeout, time.Second)

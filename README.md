@@ -139,7 +139,7 @@ sia-antfarm-debug -config nebulous-configs/basic-renter-host-5.json
 		'localhost:9902' // string
 		...
 	]
-	'WaitForAsicHardforkAndSync': true  // bool
+	'WaitForSync': true  // bool
 }
 ```
 
@@ -157,7 +157,7 @@ A boolean which automatically bootstraps the antfarm if provided.
 An array of strings, where each string is the api address of an external
 antfarm to connect to.
 
-**WaitForAsicHardforkAndSync**  
+**WaitForSync**  
 Wait with all non-mining jobs until the ASIC hardfork block height is reached
 and all ants are in sync, defaults to false. This helps to prevent 2 known
 issues happening around hardfork height:
@@ -170,6 +170,7 @@ issues happening around hardfork height:
   coins spent in incomplete transactions - not enough remaining coins`. This
   issue is a known wallet issue which is fixed by itself after longer time
   period passes in the network.
+
 ## Ant configuration options
 
 `AntConfig`s have the following options (with example values):
