@@ -278,9 +278,9 @@ func parseConfig(logger *persist.Logger, config ant.AntConfig) (ant.AntConfig, e
 		}
 		ipAddr = externalIPAddr
 	}
-	// Automatically generate 5 free operating system ports for the Ant's api,
-	// rpc, host, siamux, and siamux websocket addresses
-	addrs, err := ant.GetAddrs(5)
+	// Automatically generate 5 free operating system ports for the Ant's API,
+	// RPC, host, SiaMux, and SiaMux websocket addresses
+	addrs, err := ant.GetAddrs(ant.NumPorts)
 	if err != nil {
 		return ant.AntConfig{}, errors.AddContext(err, "can't get free local addresses")
 	}
