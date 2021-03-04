@@ -126,9 +126,9 @@ const (
 )
 
 var (
-	// allowance is the set of allowance settings that will be used by
+	// Allowance is the set of allowance settings that will be used by
 	// renter
-	allowance = modules.Allowance{
+	Allowance = modules.Allowance{
 		Funds:       types.NewCurrency64(20e3).Mul(types.SiacoinPrecision),
 		Hosts:       4,
 		Period:      renterAllowancePeriod,
@@ -399,7 +399,7 @@ func (j *JobRunner) renter(phase renterPreparationPhase) {
 	start = time.Now()
 	for {
 		j.staticLogger.Debugf("%v: attempting to set allowance.", j.staticDataDir)
-		err := j.staticClient.RenterPostAllowance(allowance)
+		err := j.staticClient.RenterPostAllowance(Allowance)
 		j.staticLogger.Debugf("%v: allowance attempt complete", j.staticDataDir)
 		if err == nil {
 			// Success, we can exit the loop.

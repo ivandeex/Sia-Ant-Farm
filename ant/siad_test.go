@@ -11,7 +11,7 @@ import (
 
 // newTestingSiadConfig creates a generic SiadConfig for the provided datadir.
 func newTestingSiadConfig(datadir string) (SiadConfig, error) {
-	addrs, err := GetAddrs(5)
+	addrs, err := GetAddrs(NumPorts)
 	if err != nil {
 		return SiadConfig{}, errors.AddContext(err, "can't get free local addresses")
 	}

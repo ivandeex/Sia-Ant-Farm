@@ -20,6 +20,10 @@ import (
 )
 
 const (
+	// NumPorts stores number of network ports an ant has: API, host, RPC,
+	// SiaMux and SiaMux websocket port.
+	NumPorts = 5
+
 	// updateSiadWarmUpTime defines initial warm-up sleep time for an ant after
 	// siad update
 	updateSiadWarmUpTime = time.Second * 10
@@ -135,13 +139,13 @@ func GetAddr() (string, error) {
 // GetAddrs returns n free listening ports. Addresses are returned in the
 // format of ":port".
 func GetAddrs(n int) ([]string, error) {
-	var addrs []string
+	addrs := make([]string, n)
 	for i := 0; i < n; i++ {
 		addr, err := GetAddr()
 		if err != nil {
 			return nil, err
 		}
-		addrs = append(addrs, addr)
+		addrs[i] = addr
 	}
 	return addrs, nil
 }
