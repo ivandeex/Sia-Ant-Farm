@@ -1,1 +1,0 @@
-- Use `dev` tag in all `make test-...` targets to load Sia `dev` constants.
