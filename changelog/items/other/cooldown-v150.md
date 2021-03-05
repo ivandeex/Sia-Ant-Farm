@@ -1,1 +1,0 @@
-- Use waiting for renter workers cooldown also with siad `v1.5.0`.

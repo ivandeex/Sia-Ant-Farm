@@ -1,3 +1,17 @@
+## Mar 5, 2021:
+### v1.1.2
+**Key Updates**
+- Code for Antfarm option `WaitForSync` was updated to wait for ASIC hardfork
+  height and then for ants to be in sync. This prevents 2 known issues
+  happening around hardfork height and improves Antfarm stability.
+
+**Other**
+- Check if port is free before assigning a random port to antfarm or ants.
+- Update waiting for renter workers with 2 separate timeouts: For price table
+  updates and for cooldown.
+- Use waiting for renter workers cooldown also with siad `v1.5.0`.
+- Use `dev` tag in all `make test-...` targets to load Sia `dev` constants.
+
 ## Feb 25, 2021:
 ### v1.1.1
 **Key Updates**
