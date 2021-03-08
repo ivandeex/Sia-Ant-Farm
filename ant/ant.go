@@ -17,6 +17,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -42,10 +43,6 @@ const (
 	BalanceGreater        BalanceComparisonOperator = "greater then"
 )
 
-// usedPorts is a global set of ports used by all antfarms. It prevents port
-// collisions within an antfarm and between test antfarms.
-var usedPorts map[int]struct{}
-
 // Type defines type for ant Type enum
 type Type string
 
@@ -56,6 +53,16 @@ const (
 	TypeRenter  Type = "Renter"
 	TypeGeneric Type = "Generic"
 )
+
+// usedPortsType defines a type used by usedPorts global variable.
+type usedPortsType struct {
+	sync.Mutex
+	set map[int]struct{}
+}
+
+// usedPorts is a global set of ports used by all started services (both ants
+// and antfarms). It prevents port collisions between all configured services.
+var usedPorts usedPortsType
 
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
@@ -97,7 +104,9 @@ type Ant struct {
 // init initializes an ant package global variable.
 func init() {
 	// Initialize the global used ports set.
-	usedPorts = make(map[int]struct{})
+	usedPorts.Lock()
+	defer usedPorts.Unlock()
+	usedPorts.set = make(map[int]struct{})
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -132,31 +141,42 @@ func clearPorts(config AntConfig) error {
 	return nil
 }
 
-// GetAddr returns a free listening port by leveraging the behaviour of
-// net.Listen(":0").  Address is returned in the format of ":port".
+// GetAddr returns a free random port. It doesn't check for listening port by
+// net.Listen(":0"), because sometimes the port is not immediately available
+// after closing the listener. It checks for a free port by trying to dial a
+// TCP connection and checking for refused connection. Address is returned in
+// the format of ":port".
 func GetAddr() (string, error) {
 	var port int
 	err := build.Retry(100, time.Millisecond, func() error {
-		l, err := net.Listen("tcp", ":0") //nolint:gosec
-		if err != nil {
-			return errors.AddContext(err, "can't get a free port")
+		port = fastrand.Intn(10000) + 32768
+		usedPorts.Lock()
+		defer usedPorts.Unlock()
+		if _, ok := usedPorts.set[port]; ok {
+			// We have hit an already assigned port
+			return errors.New("the port was already assigned")
 		}
-		port = l.Addr().(*net.TCPAddr).Port
-		// Check the free port against already assigned ports, because assigned
-		// ports might still be free and there can be port collisions.
-		if _, ok := usedPorts[port]; ok {
-			return errors.New("this port was already assigned")
+		addr := fmt.Sprintf("127.0.0.1:%v", port)
+		conn, err := net.DialTimeout("tcp", addr, time.Millisecond)
+		if strings.HasSuffix(err.Error(), "connection refused") {
+			// We have found a free port
+			return nil
+		} else if err != nil {
+			// Some other error checking for a port
+			return errors.AddContext(err, "can't dial port")
 		}
-		if err := l.Close(); err != nil {
-			return fmt.Errorf("can't close network listener: %v", err)
+		// The port is already open
+		if err := conn.Close(); err != nil {
+			return errors.AddContext(err, "can't close the port")
 		}
-		// Update global used ports set
-		usedPorts[port] = struct{}{}
-		return nil
+		return errors.New("the port is already open")
 	})
 	if err != nil {
 		return "", errors.AddContext(err, "can't find a free port")
 	}
+	usedPorts.Lock()
+	defer usedPorts.Unlock()
+	usedPorts.set[port] = struct{}{}
 	return fmt.Sprintf(":%v", port), nil
 }
 
