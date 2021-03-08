@@ -42,6 +42,10 @@ const (
 	BalanceGreater        BalanceComparisonOperator = "greater then"
 )
 
+// usedPorts is a global set of ports used by all antfarms. It prevents port
+// collisions within an antfarm and between test antfarms.
+var usedPorts map[int]struct{}
+
 // Type defines type for ant Type enum
 type Type string
 
@@ -90,6 +94,12 @@ type Ant struct {
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
 }
 
+// init initializes an ant package global variable.
+func init() {
+	// Initialize the global used ports set.
+	usedPorts = make(map[int]struct{})
+}
+
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
 // ant before the ant is started.
 func clearPorts(config AntConfig) error {
@@ -125,15 +135,29 @@ func clearPorts(config AntConfig) error {
 // GetAddr returns a free listening port by leveraging the behaviour of
 // net.Listen(":0").  Address is returned in the format of ":port".
 func GetAddr() (string, error) {
-	l, err := net.Listen("tcp", ":0") //nolint:gosec
+	var port int
+	err := build.Retry(100, time.Millisecond, func() error {
+		l, err := net.Listen("tcp", ":0") //nolint:gosec
+		if err != nil {
+			return errors.AddContext(err, "can't get a free port")
+		}
+		port = l.Addr().(*net.TCPAddr).Port
+		// Check the free port against already assigned ports, because assigned
+		// ports might still be free and there can be port collisions.
+		if _, ok := usedPorts[port]; ok {
+			return errors.New("this port was already assigned")
+		}
+		if err := l.Close(); err != nil {
+			return fmt.Errorf("can't close network listener: %v", err)
+		}
+		// Update global used ports set
+		usedPorts[port] = struct{}{}
+		return nil
+	})
 	if err != nil {
-		return "", err
+		return "", errors.AddContext(err, "can't find a free port")
 	}
-	addr := fmt.Sprintf(":%v", l.Addr().(*net.TCPAddr).Port)
-	if err := l.Close(); err != nil {
-		return "", fmt.Errorf("can't close network listener: %v", err)
-	}
-	return addr, nil
+	return fmt.Sprintf(":%v", port), nil
 }
 
 // GetAddrs returns n free listening ports. Addresses are returned in the
