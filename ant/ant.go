@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -145,8 +146,9 @@ func clearPorts(config AntConfig) error {
 // GetAddr returns a free random port. Address is returned in the format of
 // ":port". It seems that checking a free port by Golang net.Listen() or by
 // net.Dial()/DialTimeout() affects OS operations on the checked port and it
-// lowered stability of starting siad or Antfarm services. So we check for free
-// ports via ss command line utility which keeps Antfarm stable.
+// lowered stability of starting siad or Antfarm services. So on Linux and in
+// Gitlab CI we check for free ports via ss command line utility which keeps
+// Antfarm much more stable.
 func GetAddr() (string, error) {
 	var port int
 	err := build.Retry(100, time.Millisecond, func() error {
@@ -159,28 +161,42 @@ func GetAddr() (string, error) {
 			return errors.New("the port was already assigned")
 		}
 
-		// List all used TCP IPv4 ports
-		// ss: list all TCP IPv4 used ports without header line
-		// awk: print 4th column
-		// awk: extract port from address
-		// grep: only lines with numbers
-		getPorts := `ss -at4H | awk '{ print $4 }' | awk -F ":" '{print $NF}' | grep -Eo '[0-9]{1,5}'`
-		cmd := exec.Command("sh", "-c", getPorts)
-		stdout, err := cmd.Output()
-		if err != nil {
-			return errors.AddContext(err, "can't execute get ports command")
-		}
-		portsString := strings.TrimSpace(string(stdout))
-		portsStringSlice := strings.Split(portsString, "\n")
-
-		// Check the random port is not in used ports
-		for _, s := range portsStringSlice {
-			p, err := strconv.Atoi(s)
+		// On Linux use ss command line utility to keep very stable tests and
+		// Gitlab CI pipelines
+		if runtime.GOOS == "linux" {
+			// List all used TCP IPv4 ports
+			// ss: list all TCP IPv4 used ports without header line
+			// awk: print 4th column
+			// awk: extract port from address
+			// grep: only lines with numbers
+			getPorts := `ss -at4H | awk '{ print $4 }' | awk -F ":" '{print $NF}' | grep -Eo '[0-9]{1,5}'`
+			cmd := exec.Command("sh", "-c", getPorts)
+			stdout, err := cmd.Output()
 			if err != nil {
-				return errors.AddContext(err, "can't convert port string to int")
+				return errors.AddContext(err, "can't execute get ports command")
 			}
-			if port == p {
-				return errors.New("the port is already used")
+			portsString := strings.TrimSpace(string(stdout))
+			portsStringSlice := strings.Split(portsString, "\n")
+
+			// Check the random port is not in used ports
+			for _, s := range portsStringSlice {
+				p, err := strconv.Atoi(s)
+				if err != nil {
+					return errors.AddContext(err, "can't convert port string to int")
+				}
+				if port == p {
+					return errors.New("the port is already used")
+				}
+			}
+		} else {
+			// Other platforms, e.g. local MacOS
+			addr := fmt.Sprintf(":%d", port)
+			l, err := net.Listen("tcp", addr) //nolint:gosec
+			if err != nil {
+				return errors.AddContext(err, "can't listen on the port")
+			}
+			if err := l.Close(); err != nil {
+				return errors.AddContext(err, "can't close network listener")
 			}
 		}
 
