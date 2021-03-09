@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -141,38 +142,52 @@ func clearPorts(config AntConfig) error {
 	return nil
 }
 
-// GetAddr returns a free random port. It doesn't check for listening port by
-// net.Listen(":0"), because sometimes the port is not immediately available
-// after closing the listener. It checks for a free port by trying to dial a
-// TCP connection and checking for refused connection. Address is returned in
-// the format of ":port".
+// GetAddr returns a free random port. Address is returned in the format of
+// ":port". It seems that checking a free port by Golang net.Listen() or by
+// net.Dial()/DialTimeout() affects OS operations on the checked port and it
+// lowered stability of starting siad or Antfarm services. So we check for free
+// ports via ss command line utility which keeps Antfarm stable.
 func GetAddr() (string, error) {
 	var port int
 	err := build.Retry(100, time.Millisecond, func() error {
 		port = fastrand.Intn(10000) + 32768
 		usedPorts.Lock()
 		defer usedPorts.Unlock()
+
+		// Check if we haven't already assigned the port
 		if _, ok := usedPorts.set[port]; ok {
-			// We have hit an already assigned port
 			return errors.New("the port was already assigned")
 		}
-		addr := fmt.Sprintf("127.0.0.1:%v", port)
-		conn, err := net.DialTimeout("tcp", addr, time.Millisecond)
-		if strings.HasSuffix(err.Error(), "connection refused") {
-			// We have found a free port
-			return nil
-		} else if err != nil {
-			// Some other error checking for a port
-			return errors.AddContext(err, "can't dial port")
+
+		// List all used TCP IPv4 ports
+		// ss: list all TCP IPv4 used ports without header line
+		// awk: print 4th column
+		// awk: extract port from address
+		// grep: only lines with numbers
+		getPorts := `ss -at4H | awk '{ print $4 }' | awk -F ":" '{print $NF}' | grep -Eo '[0-9]{1,5}'`
+		cmd := exec.Command("sh", "-c", getPorts)
+		stdout, err := cmd.Output()
+		if err != nil {
+			return errors.AddContext(err, "can't execute get ports command")
 		}
-		// The port is already open
-		if err := conn.Close(); err != nil {
-			return errors.AddContext(err, "can't close the port")
+		portsString := strings.TrimSpace(string(stdout))
+		portsStringSlice := strings.Split(portsString, "\n")
+
+		// Check the random port is not in used ports
+		for _, s := range portsStringSlice {
+			p, err := strconv.Atoi(s)
+			if err != nil {
+				return errors.AddContext(err, "can't convert port string to int")
+			}
+			if port == p {
+				return errors.New("the port is already used")
+			}
 		}
-		return errors.New("the port is already open")
+
+		return nil
 	})
 	if err != nil {
-		return "", errors.AddContext(err, "can't find a free port")
+		return "", errors.New("can't find a free port")
 	}
 	usedPorts.Lock()
 	defer usedPorts.Unlock()
