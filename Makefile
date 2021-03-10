@@ -43,9 +43,14 @@ fmt:
 install:
 	go install $(release-pkgs)
 
-# install Sia Antfarm with debug option on (debug messages are printed to the log)
-install-debug: install
-	go build -o $(GOPATH)/bin/sia-antfarm-debug -tags='debug dev netgo' $(release-pkgs)
+# install Sia Antfarm dev binary.
+install-dev: install-siad-dev
+	go build -o $(GOPATH)/bin/sia-antfarm-dev -tags='dev netgo' $(release-pkgs)
+
+# install Sia Antfarm dev binary with debug option on (debug messages are
+# printed to the log).
+install-dev-debug: install-siad-dev
+	go build -o $(GOPATH)/bin/sia-antfarm-dev-debug -tags='debug dev netgo' $(release-pkgs)
 
 install-siad-dev:
 	go build -o $(GOPATH)/bin/siad-dev -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
