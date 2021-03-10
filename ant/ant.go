@@ -56,15 +56,17 @@ const (
 	TypeGeneric Type = "Generic"
 )
 
-// usedPortsType defines a type used by usedPorts global variable.
-type usedPortsType struct {
+// assignedPortsType defines a type used by usedPorts global variable.
+type assignedPortsType struct {
 	sync.Mutex
-	set map[int]struct{}
+	assigned map[int]struct{}
+	checking map[int]struct{}
 }
 
-// usedPorts is a global set of ports used by all started services (both ants
-// and antfarms). It prevents port collisions between all configured services.
-var usedPorts usedPortsType
+// assignedPorts is a global set of ports used by all started services (both
+// ants and antfarms). It prevents port collisions between all configured
+// services.
+var assignedPorts assignedPortsType
 
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
@@ -105,10 +107,9 @@ type Ant struct {
 
 // init initializes an ant package global variable.
 func init() {
-	// Initialize the global used ports set.
-	usedPorts.Lock()
-	defer usedPorts.Unlock()
-	usedPorts.set = make(map[int]struct{})
+	// Initialize the global assigned ports.
+	assignedPorts.assigned = make(map[int]struct{})
+	assignedPorts.checking = make(map[int]struct{})
 }
 
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
@@ -143,21 +144,36 @@ func clearPorts(config AntConfig) error {
 	return nil
 }
 
-// GetAddr returns a free random port. Address is returned in the format of
-// ":port". It seems that checking a free port by Golang net.Listen() or by
+// ManagedGetAddr returns a free random port. Address is returned in the format
+// of ":port". It seems that checking a free port by Golang net.Listen() or by
 // net.Dial()/DialTimeout() affects OS operations on the checked port and it
 // lowered stability of starting siad or Antfarm services. So on Linux and in
 // Gitlab CI we check for free ports via ss command line utility which keeps
 // Antfarm much more stable.
-func GetAddr() (string, error) {
+func ManagedGetAddr() (string, error) {
 	var port int
 	err := build.Retry(100, time.Millisecond, func() error {
 		port = fastrand.Intn(10000) + 32768
-		usedPorts.Lock()
-		defer usedPorts.Unlock()
+
+		// Release reserved port that is just being checked
+		defer func() {
+			assignedPorts.Lock()
+			delete(assignedPorts.checking, port)
+			assignedPorts.Unlock()
+		}()
+
+		// Check if we aren't already checking the port and reserve it by
+		// adding the port to the checking set
+		assignedPorts.Lock()
+		if _, ok := assignedPorts.checking[port]; ok {
+			assignedPorts.Unlock()
+			return errors.New("the port is already being checked by other goroutine/test")
+		}
+		assignedPorts.checking[port] = struct{}{}
+		assignedPorts.Unlock()
 
 		// Check if we haven't already assigned the port
-		if _, ok := usedPorts.set[port]; ok {
+		if _, ok := assignedPorts.assigned[port]; ok {
 			return errors.New("the port was already assigned")
 		}
 
@@ -200,14 +216,17 @@ func GetAddr() (string, error) {
 			}
 		}
 
+		// We have found a free port, add it to the assigned ports
+		assignedPorts.Lock()
+		assignedPorts.assigned[port] = struct{}{}
+		assignedPorts.Unlock()
+
 		return nil
 	})
 	if err != nil {
 		return "", errors.New("can't find a free port")
 	}
-	usedPorts.Lock()
-	defer usedPorts.Unlock()
-	usedPorts.set[port] = struct{}{}
+
 	return fmt.Sprintf(":%v", port), nil
 }
 
@@ -216,7 +235,7 @@ func GetAddr() (string, error) {
 func GetAddrs(n int) ([]string, error) {
 	addrs := make([]string, n)
 	for i := 0; i < n; i++ {
-		addr, err := GetAddr()
+		addr, err := ManagedGetAddr()
 		if err != nil {
 			return nil, err
 		}
