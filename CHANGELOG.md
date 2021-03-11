@@ -10,6 +10,16 @@ Version History
 
 Latest:
 
+## Mar 11, 2021:
+### v1.1.3
+**Key Updates**
+- On Linux (incl. Gitlab CI) use `ss` command line utility to check for free
+  ports to improve Ants and Antfarm stability.
+
+**Other**
+- Create a new make target `install-dev`, rename `install-debug` to
+  `install-dev-debug`. Install dev version by Gitlab CI pipelines.
+
 ## Mar 5, 2021:
 ### v1.1.2
 **Key Updates**
