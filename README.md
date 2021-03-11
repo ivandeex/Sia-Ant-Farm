@@ -19,6 +19,7 @@ sia-antfarm is also available as a docker image `nebulouslabs/siaantfarm`:
   `1.15` on Linux and should be running well also on MacOS.
 - `$GOPATH/bin` should be added to the `$PATH` so that built siad binary can be
   found and executed.
+- On Linux Sia Antfarm requires `ss` command line utility to be installed.
 
 ## Version Test Requirements
 

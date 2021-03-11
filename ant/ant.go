@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -17,6 +19,7 @@ import (
 	"gitlab.com/NebulousLabs/Sia/node/api/client"
 	"gitlab.com/NebulousLabs/Sia/types"
 	"gitlab.com/NebulousLabs/errors"
+	"gitlab.com/NebulousLabs/fastrand"
 )
 
 const (
@@ -52,6 +55,18 @@ const (
 	TypeRenter  Type = "Renter"
 	TypeGeneric Type = "Generic"
 )
+
+// assignedPortsType defines a type used by usedPorts global variable.
+type assignedPortsType struct {
+	sync.Mutex
+	assigned map[int]struct{}
+	checking map[int]struct{}
+}
+
+// assignedPorts is a global set of ports used by all started services (both
+// ants and antfarms). It prevents port collisions between all configured
+// services.
+var assignedPorts assignedPortsType
 
 // AntConfig represents a configuration object passed to New(), used to
 // configure a newly created Sia Ant.
@@ -90,6 +105,13 @@ type Ant struct {
 	SeenBlocks map[types.BlockHeight]types.BlockID `json:"-"`
 }
 
+// init initializes an ant package global variable.
+func init() {
+	// Initialize the global assigned ports.
+	assignedPorts.assigned = make(map[int]struct{})
+	assignedPorts.checking = make(map[int]struct{})
+}
+
 // clearPorts discovers the UPNP enabled router and clears the ports used by an
 // ant before the ant is started.
 func clearPorts(config AntConfig) error {
@@ -122,18 +144,90 @@ func clearPorts(config AntConfig) error {
 	return nil
 }
 
-// GetAddr returns a free listening port by leveraging the behaviour of
-// net.Listen(":0").  Address is returned in the format of ":port".
+// GetAddr returns a free random port. Address is returned in the format of
+// ":port". It seems that checking a free port by Golang net.Listen() or by
+// net.Dial()/DialTimeout() affects OS operations on the checked port and it
+// lowered stability of starting siad or Antfarm services. So on Linux and in
+// Gitlab CI we check for free ports via ss command line utility which keeps
+// Antfarm much more stable.
 func GetAddr() (string, error) {
-	l, err := net.Listen("tcp", ":0") //nolint:gosec
+	var port int
+	err := build.Retry(100, time.Millisecond, func() error {
+		port = fastrand.Intn(10000) + 32768
+
+		// Release reserved port that is just being checked
+		defer func() {
+			assignedPorts.Lock()
+			delete(assignedPorts.checking, port)
+			assignedPorts.Unlock()
+		}()
+
+		// Check if we aren't already checking the port and reserve it by
+		// adding the port to the checking set
+		assignedPorts.Lock()
+		if _, ok := assignedPorts.checking[port]; ok {
+			assignedPorts.Unlock()
+			return errors.New("the port is already being checked by other goroutine/test")
+		}
+		assignedPorts.checking[port] = struct{}{}
+		assignedPorts.Unlock()
+
+		// Check if we haven't already assigned the port
+		if _, ok := assignedPorts.assigned[port]; ok {
+			return errors.New("the port was already assigned")
+		}
+
+		// On Linux use ss command line utility to keep very stable tests and
+		// Gitlab CI pipelines
+		if runtime.GOOS == "linux" {
+			// List all used TCP IPv4 ports
+			// ss: list all TCP IPv4 used ports without header line
+			// awk: print 4th column
+			// awk: extract port from address
+			// grep: only lines with numbers
+			getPorts := `ss -at4H | awk '{ print $4 }' | awk -F ":" '{print $NF}' | grep -Eo '[0-9]{1,5}'`
+			cmd := exec.Command("sh", "-c", getPorts)
+			stdout, err := cmd.Output()
+			if err != nil {
+				return errors.AddContext(err, "can't execute get ports command")
+			}
+			portsString := strings.TrimSpace(string(stdout))
+			portsStringSlice := strings.Split(portsString, "\n")
+
+			// Check the random port is not in used ports
+			for _, s := range portsStringSlice {
+				p, err := strconv.Atoi(s)
+				if err != nil {
+					return errors.AddContext(err, "can't convert port string to int")
+				}
+				if port == p {
+					return errors.New("the port is already used")
+				}
+			}
+		} else {
+			// Other platforms, e.g. local MacOS
+			addr := fmt.Sprintf(":%d", port)
+			l, err := net.Listen("tcp", addr) //nolint:gosec
+			if err != nil {
+				return errors.AddContext(err, "can't listen on the port")
+			}
+			if err := l.Close(); err != nil {
+				return errors.AddContext(err, "can't close network listener")
+			}
+		}
+
+		// We have found a free port, add it to the assigned ports
+		assignedPorts.Lock()
+		assignedPorts.assigned[port] = struct{}{}
+		assignedPorts.Unlock()
+
+		return nil
+	})
 	if err != nil {
-		return "", err
+		return "", errors.New("can't find a free port")
 	}
-	addr := fmt.Sprintf(":%v", l.Addr().(*net.TCPAddr).Port)
-	if err := l.Close(); err != nil {
-		return "", fmt.Errorf("can't close network listener: %v", err)
-	}
-	return addr, nil
+
+	return fmt.Sprintf(":%v", port), nil
 }
 
 // GetAddrs returns n free listening ports. Addresses are returned in the
