@@ -94,11 +94,11 @@ build:
     paths:
       - $CI_PROJECT_DIR/artifacts
   script:
-      - make dependencies && make install
+      - make dependencies && make install-dev
       ## Publish artifacts
       - mkdir -p "$CI_PROJECT_DIR/artifacts"
       - cp "$GOPATH/bin/siad-dev" "$CI_PROJECT_DIR/artifacts/."
-      - cp "$GOPATH/bin/sia-antfarm" "$CI_PROJECT_DIR/artifacts/."
+      - cp "$GOPATH/bin/sia-antfarm-dev" "$CI_PROJECT_DIR/artifacts/."
 
 ant-tests:
   <<: *default_test_params

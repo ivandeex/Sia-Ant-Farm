@@ -35,16 +35,28 @@ changes, they will be reset and lost.
 
 # Install
 
+To install release version of the Sia Antfarm which loads release constants
+from Sia repository, execute:
+
 ```shell
 go get -u gitlab.com/NebulousLabs/Sia-Ant-Farm/...
 cd $GOPATH/src/gitlab.com/NebulousLabs/Sia-Ant-Farm
 make dependencies && make
 ```
 
-To install debug version of Sia Antfarm with debug logs enabled, execute:
+Sia Antfarm dev version loads dev constants from the Sia repository (it has
+e.g. faster blocks) execute one of the dev targets below.
+
+To install dev version of Sia Antfarm without debug logs enabled, execute:
 
 ```shell
-make dependencies && make install-debug
+make dependencies && make install-dev
+```
+
+To install dev version of Sia Antfarm with debug logs enabled, execute:
+
+```shell
+make dependencies && make install-dev-debug
 ```
 
 If `siad` (at `$GOPATH/src/gitlab.com/NebulousLabs/Sia/cmd/siad`) is updated
