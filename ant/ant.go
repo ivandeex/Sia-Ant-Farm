@@ -144,13 +144,13 @@ func clearPorts(config AntConfig) error {
 	return nil
 }
 
-// ManagedGetAddr returns a free random port. Address is returned in the format
-// of ":port". It seems that checking a free port by Golang net.Listen() or by
+// GetAddr returns a free random port. Address is returned in the format of
+// ":port". It seems that checking a free port by Golang net.Listen() or by
 // net.Dial()/DialTimeout() affects OS operations on the checked port and it
 // lowered stability of starting siad or Antfarm services. So on Linux and in
 // Gitlab CI we check for free ports via ss command line utility which keeps
 // Antfarm much more stable.
-func ManagedGetAddr() (string, error) {
+func GetAddr() (string, error) {
 	var port int
 	err := build.Retry(100, time.Millisecond, func() error {
 		port = fastrand.Intn(10000) + 32768
@@ -235,7 +235,7 @@ func ManagedGetAddr() (string, error) {
 func GetAddrs(n int) ([]string, error) {
 	addrs := make([]string, n)
 	for i := 0; i < n; i++ {
-		addr, err := ManagedGetAddr()
+		addr, err := GetAddr()
 		if err != nil {
 			return nil, err
 		}

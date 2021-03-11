@@ -16,7 +16,7 @@ import (
 // NewDefaultRenterAntfarmTestingConfig creates default basic antfarm config
 // for running renter tests
 func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (AntfarmConfig, error) {
-	addr, err := ant.ManagedGetAddr()
+	addr, err := ant.GetAddr()
 	if err != nil {
 		return AntfarmConfig{}, errors.AddContext(err, "can't create antfarm local address")
 	}
@@ -104,7 +104,7 @@ func NewDefaultRenterAntfarmTestingConfig(dataDir string, allowLocalIPs bool) (A
 // NewAntfarmConfig creates a new antfarm config. Ants of different types have
 // standardized names.
 func NewAntfarmConfig(dataDir string, allowLocalIPs bool, miners int, hosts int, renters int, generic int) (AntfarmConfig, error) {
-	addr, err := ant.ManagedGetAddr()
+	addr, err := ant.GetAddr()
 	if err != nil {
 		return AntfarmConfig{}, errors.AddContext(err, "can't create antfarm local address")
 	}
