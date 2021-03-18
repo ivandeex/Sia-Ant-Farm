@@ -1,5 +1,9 @@
 # sia-antfarm
-[![Build Status](https://travis-ci.org/NebulousLabs/Sia-Ant-Farm.svg?branch=travis)](https://travis-ci.org/NebulousLabs/Sia)
+[![Build Status](https://gitlab.com/NebulousLabs/Sia-Ant-Farm/badges/master/pipeline.svg)](https://gitlab.com/NebulousLabs/Sia-Ant-Farm/commits/master)
+[![Coverage Report](https://gitlab.com/NebulousLabs/Sia-Ant-Farm/badges/master/coverage.svg)](https://gitlab.com/NebulousLabs/Sia-Ant-Farm/commits/master)
+[![GoDoc](https://godoc.org/gitlab.com/NebulousLabs/Sia-Ant-Farm?status.svg)](https://godoc.org/gitlab.com/NebulousLabs/Sia-Ant-Farm)
+[![Go Report Card](https://goreportcard.com/badge/gitlab.com/NebulousLabs/Sia-Ant-Farm)](https://goreportcard.com/report/gitlab.com/NebulousLabs/Sia-Ant-Farm)
+[![License MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://img.shields.io/badge/License-MIT-brightgreen.svg)
 
 sia-antfarm is a collection of utilities for performing complex, end-to-end
 tests of the [Sia](https://gitlab.com/NebulousLabs/Sia) platform.  These test
