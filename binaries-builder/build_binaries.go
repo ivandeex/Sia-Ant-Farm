@@ -335,6 +335,32 @@ func GetReleases(minVersion string) ([]string, error) {
 	// Sort releases in ascending order by semantic version
 	sort.Sort(bySemanticVersion(releaseTags))
 
+	// Workaround for v1.5.5 just being a git tag, not yet released in
+	// https://gitlab.com/NebulousLabs/Sia/-/releases
+	// TODO: Once v1.5.5 is properly released, this code can be removed.
+	v155 := "v1.5.5"
+	var found bool
+	var inserted bool
+	for i, t := range releaseTags {
+		// v1.5.5 was already released, nothing to do.
+		if t == v155 {
+			found = true
+			break
+		}
+		// Insert v1.5.5 before this release.
+		if build.VersionCmp(v155, t) < 0 {
+			releaseTags = append(releaseTags, "")
+			copy(releaseTags[i+1:], releaseTags[i:])
+			releaseTags[i] = v155
+			inserted = true
+			break
+		}
+	}
+	// Append v1.5.5 as the last release.
+	if !found && !inserted {
+		releaseTags = append(releaseTags, v155)
+	}
+
 	// If there is an antfarm patch for a release, replace release tag with a
 	// patch tag
 	for i, r := range releaseTags {

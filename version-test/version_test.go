@@ -346,8 +346,11 @@ func TestUpgrades(t *testing.T) {
 	// version and the second one where the base ants are at the latest master
 	// commit.
 	renterUpgradeTests := []upgradeTestConfig{
+		// TODO: Once v1.5.6 is released, WithBaseLatestRelease will fail
+		// because v1.5.6 hosts will not connect to v1.5.3 and earlier renters.
+		// The test should than be divided to 2 subtests.
 		{testName: "WithBaseLatestRelease", upgradeRenter: true, upgradePath: upgradePath, baseVersion: latestVersion},
-		{testName: "WithBaseLatestMaster", upgradeRenter: true, upgradePath: upgradePath, baseVersion: "master"},
+		{testName: "FromV154WithBaseLatestMaster", upgradeRenter: true, upgradePath: upgradePathFromFoundationHardfork, baseVersion: "master"},
 	}
 
 	// Execute tests
