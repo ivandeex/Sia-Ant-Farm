@@ -1,0 +1,65 @@
+{
+	"AntConfigs": 
+	[ 
+		{
+			"AllowHostLocalNetAddress": true,
+			"Jobs": [
+				"gateway",
+				"miner"
+			]
+		},
+		{
+			"AllowHostLocalNetAddress": true,
+			"APIAddr": "127.0.0.1:10980",
+			"Name": "host1",
+			"Jobs": [
+				"host"
+			],
+			"DesiredCurrency": 100000
+		},
+		{
+			"AllowHostLocalNetAddress": true,
+			"Name": "host2",
+			"Jobs": [
+				"host"
+			],
+			"DesiredCurrency": 100000
+		},
+		{
+			"AllowHostLocalNetAddress": true,
+			"Name": "host3",
+			"Jobs": [
+				"host"
+			],
+			"DesiredCurrency": 100000
+		},
+		{
+			"AllowHostLocalNetAddress": true,
+			"Name": "host4",
+			"Jobs": [
+				"host"
+			],
+			"DesiredCurrency": 100000
+		},
+		{
+			"AllowHostLocalNetAddress": true,
+			"Name": "host5",
+			"Jobs": [
+				"host"
+			],
+			"DesiredCurrency": 100000
+		},
+		{
+			"AllowHostLocalNetAddress": true,
+			"RenterDisableIPViolationCheck": true,
+			"APIAddr": "127.0.0.1:9980",
+			"Name": "renter",
+			"Jobs": [
+				"renter"
+			],
+			"DesiredCurrency": 100000
+		}
+	],
+	"AutoConnect": true,
+	"WaitForSync": true
+}
