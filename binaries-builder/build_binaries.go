@@ -12,7 +12,7 @@ import (
 	"sort"
 	"strings"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
+	"go.sia.tech/sia-antfarm/persist"
 	"gitlab.com/NebulousLabs/Sia/build"
 	"gitlab.com/NebulousLabs/errors"
 )

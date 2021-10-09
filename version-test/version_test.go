@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
-	binariesbuilder "gitlab.com/NebulousLabs/Sia-Ant-Farm/binaries-builder"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/modules"
+	"go.sia.tech/sia-antfarm/ant"
+	"go.sia.tech/sia-antfarm/antfarm"
+	binariesbuilder "go.sia.tech/sia-antfarm/binaries-builder"
+	"go.sia.tech/sia-antfarm/test"
+	"go.sia.tech/sia-antfarm/upnprouter"
+	"go.sia.tech/siad/build"
+	"go.sia.tech/siad/modules"
 	"gitlab.com/NebulousLabs/errors"
 )
 

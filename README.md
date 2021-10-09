@@ -17,8 +17,8 @@ sia-antfarm is also available as a docker image [ivandeex/sia-antfarm](https://h
 ### Latest
 * **latest**
 
-### 1.2.0
-* Sia AntFarm `v1.2.0` based on Sia `v1.5.8-dev`
+### 1.2.0 (iva02)
+* Sia AntFarm `v1.2.0` based on Sia `v1.5.7`
 
 ### 1.1.3
 * Sia AntFarm `v1.1.3` with AntFarm stability updates and updated build test

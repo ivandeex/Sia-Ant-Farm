@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
+	"go.sia.tech/sia-antfarm/persist"
 )
 
 // NewTestLogger creates a logger for a test.

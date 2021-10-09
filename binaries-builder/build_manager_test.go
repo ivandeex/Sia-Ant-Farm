@@ -3,7 +3,7 @@ package binariesbuilder
 import (
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
+	"go.sia.tech/sia-antfarm/test"
 )
 
 // TestBuildManager tests building binaries for multiple tests.

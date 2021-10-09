@@ -3,7 +3,7 @@ package ant
 import (
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia/types"
+	"go.sia.tech/siad/types"
 )
 
 var (

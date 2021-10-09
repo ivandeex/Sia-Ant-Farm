@@ -13,11 +13,11 @@ import (
 	"sync"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/upnprouter"
-	"gitlab.com/NebulousLabs/Sia/build"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"go.sia.tech/sia-antfarm/persist"
+	"go.sia.tech/sia-antfarm/upnprouter"
+	"go.sia.tech/siad/build"
+	"go.sia.tech/siad/node/api/client"
+	"go.sia.tech/siad/types"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/fastrand"
 )

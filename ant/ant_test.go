@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"go.sia.tech/sia-antfarm/test"
+	"go.sia.tech/siad/node/api/client"
+	"go.sia.tech/siad/types"
 	"gitlab.com/NebulousLabs/errors"
 )
 

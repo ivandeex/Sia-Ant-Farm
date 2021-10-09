@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	siapersist "gitlab.com/NebulousLabs/Sia/persist"
-	"gitlab.com/NebulousLabs/Sia/siatest"
+	siapersist "go.sia.tech/siad/persist"
+	"go.sia.tech/siad/siatest"
 	"gitlab.com/NebulousLabs/errors"
 )
 

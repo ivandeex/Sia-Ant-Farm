@@ -1,5 +1,13 @@
 all: install
 
+# update siad modules to latest version
+SIAD_VERSION ?= master
+
+update-modules:
+	go mod tidy
+	go get -d go.sia.tech/siad/cmd/siad@${SIAD_VERSION}
+	go get -u go.sia.tech/siad
+
 dependencies: get-all install-siad-dev install-std
 
 get-all:
@@ -53,7 +61,7 @@ install-dev-debug: install-siad-dev
 	go build -o $(GOPATH)/bin/sia-antfarm-dev-debug -tags='debug dev netgo' $(release-pkgs)
 
 install-siad-dev:
-	go build -o $(GOPATH)/bin/siad-dev -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
+	go build -o $(GOPATH)/bin/siad-dev -tags='dev' go.sia.tech/siad/cmd/siad
 
 install-std:
 	go install std

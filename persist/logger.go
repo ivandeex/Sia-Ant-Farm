@@ -4,7 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/build"
+	"go.sia.tech/sia-antfarm/build"
 	"gitlab.com/NebulousLabs/errors"
 	"gitlab.com/NebulousLabs/log"
 )

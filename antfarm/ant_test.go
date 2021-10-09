@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"go.sia.tech/sia-antfarm/ant"
+	"go.sia.tech/sia-antfarm/test"
+	"go.sia.tech/siad/node/api/client"
 )
 
 // TestStartAnts verifies that startAnts successfully starts ants given some

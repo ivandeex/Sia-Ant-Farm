@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
+	"go.sia.tech/sia-antfarm/persist"
+	"go.sia.tech/sia-antfarm/test"
 	"gitlab.com/NebulousLabs/fastrand"
 )
 

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
+	"go.sia.tech/sia-antfarm/test"
 )
 
 // TestNewJobRunner test creating a new Job Runner

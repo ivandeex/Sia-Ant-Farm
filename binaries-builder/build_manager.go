@@ -4,7 +4,7 @@ import (
 	"os"
 	"sync"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
+	"go.sia.tech/sia-antfarm/persist"
 	"gitlab.com/NebulousLabs/errors"
 )
 

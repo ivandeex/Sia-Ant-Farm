@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
+	"go.sia.tech/sia-antfarm/test"
 )
 
 const (

@@ -7,7 +7,7 @@ import (
 	"os"
 	"os/signal"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
+	"go.sia.tech/sia-antfarm/antfarm"
 	"gitlab.com/NebulousLabs/errors"
 )
 

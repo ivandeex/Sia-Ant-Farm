@@ -7,13 +7,13 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/antfarm"
-	binariesbuilder "gitlab.com/NebulousLabs/Sia-Ant-Farm/binaries-builder"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
-	"gitlab.com/NebulousLabs/Sia/crypto"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/types"
+	"go.sia.tech/sia-antfarm/ant"
+	"go.sia.tech/sia-antfarm/antfarm"
+	binariesbuilder "go.sia.tech/sia-antfarm/binaries-builder"
+	"go.sia.tech/sia-antfarm/test"
+	"go.sia.tech/siad/crypto"
+	"go.sia.tech/siad/modules"
+	"go.sia.tech/siad/types"
 	"gitlab.com/NebulousLabs/errors"
 )
 

@@ -15,9 +15,9 @@ import (
 	"strings"
 	"time"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
-	"gitlab.com/NebulousLabs/Sia/modules"
-	"gitlab.com/NebulousLabs/Sia/node/api/client"
+	"go.sia.tech/sia-antfarm/persist"
+	"go.sia.tech/siad/modules"
+	"go.sia.tech/siad/node/api/client"
 	"gitlab.com/NebulousLabs/errors"
 )
 

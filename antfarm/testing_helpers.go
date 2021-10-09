@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/ant"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/persist"
-	"gitlab.com/NebulousLabs/Sia-Ant-Farm/test"
-	"gitlab.com/NebulousLabs/Sia/modules"
+	"go.sia.tech/sia-antfarm/ant"
+	"go.sia.tech/sia-antfarm/persist"
+	"go.sia.tech/sia-antfarm/test"
+	"go.sia.tech/siad/modules"
 	"gitlab.com/NebulousLabs/errors"
 )
 
