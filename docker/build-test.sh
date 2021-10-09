@@ -42,8 +42,8 @@ cleanup_test_containers() {
 ###############################################################################
 cleanup_test_containers_subcall() {
   CONTAINERS=$(docker ps -a -q --filter "name=sia-ant-farm-test-container")
-  if [ ! -z $CONTAINERS ]; then
-    docker stop $CONTAINERS
+  if [[ $CONTAINERS ]]; then
+    docker kill $CONTAINERS || true
     docker rm   $CONTAINERS
   fi
 }
@@ -58,15 +58,15 @@ cleanup_test_containers_subcall() {
 ###############################################################################
 log_cmd() {
   # Get and echo log message
-	local MSG=$1
-	echo "Starting: $MSG..."
+  local MSG=$1
+  echo "Starting: $MSG..."
 
   # Execute the command
   shift 1
-	"$@"
+  "$@"
 
   # Log success
-	echo "Success: $MSG"
+  echo "Success: $MSG"
 }
 
 ###############################################################################
@@ -83,13 +83,11 @@ wait_for_consensus() {
   
   # Set variables
   local url=http://localhost:$port/consensus
-  local cmd="until wget --user-agent='Sia-Agent' -q -O - $url
-    do
-      sleep 1
-    done"
+  local cmd="until curl -A Sia-Agent -s $url ;do sleep 1 ;done"
   
   # Execute
-  log_cmd "Waiting for consensus at $url" timeout $timeout sh -c "$cmd"
+  log_cmd "Waiting for consensus at $url" \
+  timeout "$timeout" sh -c "$cmd"
 }
 
 ###############################################################################
@@ -106,13 +104,11 @@ wait_for_renter_upload_ready() {
   
   # Set variables
   local url=http://localhost:$port/renter/uploadready
-  local cmd="until wget --user-agent='Sia-Agent' -q -O - $url | grep '\"ready\":true' 
-    do
-      sleep 1
-    done"
+  local cmd="until curl -A Sia-Agent -s $url | grep '\"ready\":true' ;do sleep 1 ;done"
   
   # Execute
-  log_cmd "Waiting for renter to become upload ready at $url" timeout $timeout sh -c "$cmd"
+  log_cmd "Waiting for renter to become upload ready at $url" \
+  timeout "$timeout" sh -c "$cmd"
 }
 
 # Remove test containers before we start
@@ -122,7 +118,8 @@ cleanup_test_containers
 for DIR in .
 do
   # Build the image
-  log_cmd "Building a test image according to $DIR/Dockerfile" docker build \
+  log_cmd "Building a test image according to $DIR/Dockerfile" \
+  docker build \
     --no-cache \
     --tag sia-ant-farm-image-test \
     -f $DIR/Dockerfile \
@@ -133,9 +130,10 @@ do
   DUMMY_DATA_DIR=$(mktemp -d)
   TEST1_RENTER_PORT=9980
   
-  log_cmd "Test 1: Starting test container" docker run \
+  log_cmd "Test 1: Starting test container" \
+  docker run \
     --detach \
-    --publish 127.0.0.1:$TEST1_RENTER_PORT:9980 \
+    --publish 127.0.0.1:${TEST1_RENTER_PORT}:9980 \
     --volume "${DUMMY_DATA_DIR}:/sia-antfarm/data" \
     --name sia-ant-farm-test-container \
     sia-ant-farm-image-test
@@ -157,10 +155,11 @@ do
   TEST2_RENTER_PORT=33333
   TEST2_HOST_PORT=34444
   
-  log_cmd "Test 2: Starting test container" docker run \
+  log_cmd "Test 2: Starting test container" \
+  docker run \
     --detach \
-    --publish 127.0.0.1:$TEST2_RENTER_PORT:9980 \
-    --publish 127.0.0.1:$TEST2_HOST_PORT:10980 \
+    --publish 127.0.0.1:${TEST2_RENTER_PORT}:9980 \
+    --publish 127.0.0.1:${TEST2_HOST_PORT}:10980 \
     --volume "${DUMMY_DATA_DIR}:/sia-antfarm/data" \
     --volume "$(pwd)/config:/sia-antfarm/config" \
     --env CONFIG=config/basic-renter-5-hosts-2-api-ports-docker.json \
