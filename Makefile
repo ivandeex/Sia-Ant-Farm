@@ -56,7 +56,7 @@ install-siad-dev:
 	go build -o $(GOPATH)/bin/siad-dev -tags='dev' gitlab.com/NebulousLabs/Sia/cmd/siad
 
 install-std:
-	go install -race std
+	go install std
 
 # markdown-spellcheck runs codespell on all markdown files that are not
 # vendored.
@@ -109,4 +109,18 @@ staticcheck:
 vet:
 	go vet $(pkgs)
 
+# build docker image
+
+ANTFARM_IMAGE ?= ivandeex/sia-antfarm:latest
+
+docker-test:
+	./docker/build-test.sh
+
+docker-push:
+	docker tag sia-antfarm-test ${ANTFARM_IMAGE}
+	docker push ${ANTFARM_IMAGE}
+
+docker-all: docker-test docker-push
+
+.PHONY: docker-test docker-push docker-all
 .PHONY: all dependencies pkgs fmt vet install test lint clean cover

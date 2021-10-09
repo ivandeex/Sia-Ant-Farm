@@ -41,7 +41,7 @@ cleanup_test_containers() {
 # Parameters: none
 ###############################################################################
 cleanup_test_containers_subcall() {
-  CONTAINERS=$(docker ps -a -q --filter "name=sia-ant-farm-test-container")
+  CONTAINERS=$(docker ps -a -q --filter "name=sia-antfarm-test")
   if [[ $CONTAINERS ]]; then
     docker kill $CONTAINERS || true
     docker rm   $CONTAINERS
@@ -115,28 +115,32 @@ wait_for_renter_upload_ready() {
 cleanup_test_containers
 
 # Iterate over all Dockerfiles
-for DIR in .
+for DIR in ./docker
 do
   # Build the image
   log_cmd "Building a test image according to $DIR/Dockerfile" \
   docker build \
     --no-cache \
-    --tag sia-ant-farm-image-test \
+    --tag sia-antfarm-test \
+    --build-arg DIR=$DIR \
     -f $DIR/Dockerfile \
     .
 
   # Test with a single published standard renter port
   # Run container in detached state
+
+  CONFIG_DIR=$(readlink -f "$DIR")/config
   DUMMY_DATA_DIR=$(mktemp -d)
-  TEST1_RENTER_PORT=9980
+  TEST1_RENTER_PORT=32222
   
   log_cmd "Test 1: Starting test container" \
   docker run \
     --detach \
     --publish 127.0.0.1:${TEST1_RENTER_PORT}:9980 \
     --volume "${DUMMY_DATA_DIR}:/sia-antfarm/data" \
-    --name sia-ant-farm-test-container \
-    sia-ant-farm-image-test
+    --volume "${CONFIG_DIR}:/sia-antfarm/config" \
+    --name sia-antfarm-test \
+    sia-antfarm-test
 
   # Wait till API (/consensus) is accessible
   wait_for_consensus 120 $TEST1_RENTER_PORT
@@ -161,10 +165,10 @@ do
     --publish 127.0.0.1:${TEST2_RENTER_PORT}:9980 \
     --publish 127.0.0.1:${TEST2_HOST_PORT}:10980 \
     --volume "${DUMMY_DATA_DIR}:/sia-antfarm/data" \
-    --volume "$(pwd)/config:/sia-antfarm/config" \
+    --volume "${CONFIG_DIR}:/sia-antfarm/config" \
     --env CONFIG=config/basic-renter-5-hosts-2-api-ports-docker.json \
-    --name sia-ant-farm-test-container \
-    sia-ant-farm-image-test
+    --name sia-antfarm-test \
+    sia-antfarm-test
   
   # Wait till both APIs (/consensus) are accessible
   wait_for_consensus 120 $TEST2_RENTER_PORT
