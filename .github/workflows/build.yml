@@ -1,0 +1,34 @@
+name: Docker image
+
+on:
+  push:
+
+jobs:
+  docker:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    name: Publish image job
+    steps:
+      - name: Make tag
+        id: image_tag
+        run: echo ::set-output name=tag::${GITHUB_REF#refs/tags/v}
+        shell: bash
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+      - name: Test image
+        run: |
+          make docker-test
+        shell: bash
+      - name: Publish image
+        uses: ilteoood/docker_buildx@1.1.0
+        with:
+          tag: latest,${{ steps.image_tag.outputs.tag }}
+          imageName: ${{ github.repository_owner }}/sia-antfarm
+          dockerfile: docker/Dockerfile
+          buildArg: DIR=docker
+          platform: linux/amd64
+          publish: true
+          dockerUser: ${{ github.repository_owner }}
+          dockerPassword: ${{ secrets.DOCKER_PASSWORD }}
